@@ -37,3 +37,17 @@ if(WIN32)
     set_target_properties(minicam PROPERTIES WIN32_EXECUTABLE ON)
     target_link_libraries(minicam PRIVATE opengl32)
 endif()
+
+# Przy dynamicznym Qt wtyczka platformy (qwindows.dll) musi leżeć w podfolderze
+# platforms/ obok exe – inaczej: "no Qt platform plugin could be initialized".
+# Przy statycznym Qt wtyczki są już wewnątrz exe, więc nic nie kopiujemy.
+get_target_property(_qt_core_type Qt6::Core TYPE)
+if(_qt_core_type STREQUAL "SHARED_LIBRARY" AND TARGET Qt6::QWindowsIntegrationPlugin)
+    add_custom_command(TARGET minicam POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:minicam>/platforms"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"
+                "$<TARGET_FILE_DIR:minicam>/platforms/"
+        COMMENT "Kopiowanie wtyczki platformy Qt"
+    )
+endif()
