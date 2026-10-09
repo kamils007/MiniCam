@@ -15,7 +15,7 @@ minicam/
 ├── CMakeLists.txt
 ├── core/            rdzeń (C++ + OCCT, bez Qt)
 │   ├── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
-│   └── ModelAlign.h/.cpp    ustawienie bryły względem 0,0,0
+│   └── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
 └── app/             GUI (Qt)
     ├── main.cpp
     ├── MainWindow.h/.cpp
