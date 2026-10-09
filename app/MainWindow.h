@@ -23,9 +23,12 @@ private slots:
 
 private:
     void createRibbon();
+    void showAligned();
 
     OccView* m_view = nullptr;
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
+    bool m_aligned = false; // czy pokazany model jest wyrównany
+    bool m_flipped = false; // czy leży na przeciwnej stronie niż wybrał algorytm
     camcore::AlignSettings m_alignSettings;
 };

@@ -48,7 +48,8 @@ void MainWindow::createRibbon()
 
     QAction* autoAlignAct = new QAction(style()->standardIcon(QStyle::SP_ArrowDown),
                                         "Auto-Wyrównanie\nCzęści", this);
-    autoAlignAct->setToolTip("Wyrównaj bryłę według ustawień z okna Konfiguracja");
+    autoAlignAct->setToolTip("Wyrównaj bryłę według ustawień z okna Konfiguracja;\n"
+                             "każde kolejne kliknięcie odwraca ją na drugą stronę");
     connect(autoAlignAct, &QAction::triggered, this, &MainWindow::onAutoAlign);
 
     QAction* settingsAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView),
@@ -103,10 +104,11 @@ void MainWindow::openFile(const QString& path)
         m_original = camcore::importModel(path.toUtf8().toStdString());
         m_fileName = QFileInfo(path).fileName();
 
+        m_flipped = false;
+        m_aligned = m_alignSettings.alignAfterImport;
         QString how = "położenie z pliku";
-        if (m_alignSettings.alignAfterImport) {
-            const gp_Trsf trsf = camcore::computeAlignment(m_original.shape, m_alignSettings);
-            m_view->showModel(camcore::transformed(m_original, trsf));
+        if (m_aligned) {
+            showAligned();
             how = "wyrównano automatycznie";
         } else {
             m_view->showModel(m_original);
@@ -125,16 +127,30 @@ void MainWindow::openFile(const QString& path)
     }
 }
 
+void MainWindow::showAligned()
+{
+    // Liczymy zawsze od oryginału z pliku – wynik zależy tylko od ustawień i m_flipped.
+    const gp_Trsf trsf = camcore::computeAlignment(m_original.shape, m_alignSettings, m_flipped);
+    m_view->showModel(camcore::transformed(m_original, trsf));
+}
+
 void MainWindow::onAutoAlign()
 {
     if (m_original.shape.IsNull()) {
         statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
         return;
     }
-    // Liczymy zawsze od oryginału z pliku – ponowne kliknięcie daje ten sam wynik.
-    const gp_Trsf trsf = camcore::computeAlignment(m_original.shape, m_alignSettings);
-    m_view->showModel(camcore::transformed(m_original, trsf));
-    statusBar()->showMessage("Wyrównano " + m_fileName);
+    if (!m_aligned) {
+        // Pierwsze użycie (gdy "Wyrównaj po imporcie" jest wyłączone): zwykłe wyrównanie.
+        m_aligned = true;
+        statusBar()->showMessage("Wyrównano " + m_fileName);
+    } else {
+        // Kolejne kliknięcia: przekładamy bryłę na drugą stronę i z powrotem.
+        m_flipped = !m_flipped;
+        statusBar()->showMessage(m_flipped ? "Odwrócono na drugą stronę"
+                                           : "Przywrócono stronę wybraną automatycznie");
+    }
+    showAligned();
 }
 
 void MainWindow::onAlignSettings()
@@ -144,4 +160,7 @@ void MainWindow::onAlignSettings()
         return;
     m_alignSettings = dialog.settings();
     saveAlignSettings(m_alignSettings);
+    // Nowe ustawienia od razu widać na wyrównanej bryle.
+    if (m_aligned && !m_original.shape.IsNull())
+        showAligned();
 }

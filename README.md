@@ -5,10 +5,12 @@ zapisanymi w pliku. Na górze okna jest wstążka w stylu Alphacam (Plik, Narzę
 główne, Ekstrakcja modelu bryłowego, Bryły - Użytkowe).
 
 **Auto-wyrównanie** (Bryły - Użytkowe): ustawienia w „Rozpoznawanie cech modelu…”.
-Przy „Wyrównanie panelu” największa płaska ściana bryły kładzie się na stole
-(jeśli bryła już leży płasko, nie jest odwracana), najdłuższa krawędź idzie wzdłuż
-osi X lub Y, a punkt bazowy i zero Z trafiają w 0,0,0. Ustawienia zapisują się
-same i można je wyeksportować do pliku .ini.
+Przy „Wyrównanie panelu” na stole kładzie się płaszczyzna o największej sumie pól
+leżących w niej ścian (kieszenie mogą być z obu stron – spodem zostaje strona mniej
+wycięta), najdłuższa krawędź idzie wzdłuż osi X lub Y, a punkt bazowy i zero Z
+trafiają w 0,0,0. Przycisk Auto-Wyrównanie Części odwraca bryłę na drugą stronę
+(kolejne kliknięcie przywraca). Ustawienia zapisują się same i można je
+wyeksportować do pliku .ini.
 
 ```
 minicam/

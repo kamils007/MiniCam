@@ -14,7 +14,7 @@ struct AlignSettings
 
     bool alignAfterImport = true; // wyrównaj od razu po wczytaniu pliku
     bool lathe = false;           // wyrównanie dla toczenia – jeszcze nieobsługiwane
-    bool panel = true;            // obróć jak płytę: największa płaska ściana leży na stole
+    bool panel = true;            // obróć jak płytę: płaszczyzna o największej sumie pól na stół
     bool minimalBox = false;      // orientację licz z najmniejszego obróconego prostopadłościanu
 
     ZZero zZero = ZZero::Bottom;
@@ -24,7 +24,9 @@ struct AlignSettings
 };
 
 // Liczy przekształcenie (obrót + przesunięcie), które wyrównuje bryłę.
-gp_Trsf computeAlignment(const TopoDS_Shape& shape, const AlignSettings& settings);
+// flipped = true kładzie bryłę na przeciwną stronę (wierzchem do stołu).
+gp_Trsf computeAlignment(const TopoDS_Shape& shape, const AlignSettings& settings,
+                         bool flipped = false);
 
 // Zwraca kopię modelu przekształconą przez trsf (kolory jadą razem z bryłą).
 ImportedModel transformed(const ImportedModel& model, const gp_Trsf& trsf);

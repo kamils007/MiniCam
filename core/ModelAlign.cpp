@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 
 namespace {
 
@@ -35,54 +36,79 @@ gp_Dir outwardNormal(const TopoDS_Face& face)
     return n;
 }
 
-// Wariant "płyta": największa płaska ściana to spód lub wierzch płyty.
-PanelFrame frameFromLargestFace(const TopoDS_Shape& shape)
+// Jedna płaszczyzna bryły: wszystkie płaskie ściany, które w niej leżą
+// i patrzą w tę samą stronę (np. wierzch płyty pocięty kieszeniami na kilka ścian).
+struct PlaneGroup
 {
-    PanelFrame frame;
-    double bestArea = 0.0;
-    TopoDS_Face bestFace;
+    gp_Dir normal;   // normalna na zewnątrz bryły
+    double offset;   // odległość płaszczyzny od zera wzdłuż normalnej
+    double area = 0; // suma pól ścian w tej płaszczyźnie
+    std::vector<TopoDS_Face> faces;
+};
+
+// Wariant "płyta": spodem zostaje płaszczyzna o największej SUMIE pól ścian.
+// Dzięki temu kieszenie mogą być z obu stron – wygrywa strona mniej "wycięta".
+PanelFrame frameFromLargestPlane(const TopoDS_Shape& shape)
+{
+    std::vector<PlaneGroup> groups;
     for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) {
         const TopoDS_Face face = TopoDS::Face(ex.Current());
-        if (BRepAdaptor_Surface(face).GetType() != GeomAbs_Plane)
+        const BRepAdaptor_Surface surf(face);
+        if (surf.GetType() != GeomAbs_Plane)
             continue;
+        const gp_Dir n = outwardNormal(face);
+        const double offset = gp_Vec(surf.Plane().Location().XYZ()).Dot(gp_Vec(n));
         GProp_GProps props;
         BRepGProp::SurfaceProperties(face, props);
-        const double area = props.Mass();
-        // Przy równych polach (np. gładka płyta: wierzch = spód) wybieramy ścianę,
-        // która już patrzy w dół – wtedy płyta nie jest niepotrzebnie odwracana.
-        const bool tie = !bestFace.IsNull() && std::abs(area - bestArea) <= 1e-6 * std::max(area, bestArea);
-        if ((!tie && area > bestArea) || (tie && outwardNormal(face).Z() < outwardNormal(bestFace).Z())) {
-            bestArea = area;
-            bestFace = face;
+
+        // Szukamy grupy z tą samą normalną i tą samą płaszczyzną (tolerancja 0.001 mm).
+        PlaneGroup* group = nullptr;
+        for (PlaneGroup& g : groups) {
+            if (g.normal.Dot(n) > 1.0 - 1e-9 && std::abs(g.offset - offset) < 1e-3) {
+                group = &g;
+                break;
+            }
         }
+        if (!group) {
+            groups.push_back({n, offset});
+            group = &groups.back();
+        }
+        group->area += props.Mass();
+        group->faces.push_back(face);
     }
-    if (bestFace.IsNull())
+
+    PanelFrame frame;
+    const PlaneGroup* best = nullptr;
+    for (const PlaneGroup& g : groups) {
+        // Przy równych sumach (np. gładka płyta) wybieramy płaszczyznę,
+        // która już patrzy w dół – wynik jest zawsze ten sam dla tego samego pliku.
+        const bool tie = best && std::abs(g.area - best->area) <= 1e-6 * std::max(g.area, best->area);
+        if (!best || (!tie && g.area > best->area) || (tie && g.normal.Z() < best->normal.Z()))
+            best = &g;
+    }
+    if (!best)
         return frame; // brak płaskich ścian – nie obracamy
 
-    // Kładziemy tę ścianę na stole, czyli jej normalna ma patrzeć w dół (-Z).
-    gp_Dir normal = outwardNormal(bestFace);
-    // Bryła już leży płasko (największa ściana pozioma)? Wtedy NIE odwracamy jej
-    // na drugą stronę – zostaje spodem tam, gdzie była; najwyżej obrót wokół Z.
-    if (std::abs(normal.Z()) > 1.0 - 1e-6)
-        normal = -gp::DZ();
-
-    // Najdłuższa prosta krawędź tej ściany wyznacza kierunek długości.
+    // Najdłuższa prosta krawędź w tej płaszczyźnie wyznacza kierunek długości.
     double bestLen = 0.0;
-    for (TopExp_Explorer ex(bestFace, TopAbs_EDGE); ex.More(); ex.Next()) {
-        const BRepAdaptor_Curve curve(TopoDS::Edge(ex.Current()));
-        if (curve.GetType() != GeomAbs_Line)
-            continue;
-        const double len = curve.Value(curve.FirstParameter())
-                               .Distance(curve.Value(curve.LastParameter()));
-        if (len > bestLen) {
-            bestLen = len;
-            frame.length = curve.Line().Direction();
+    for (const TopoDS_Face& face : best->faces) {
+        for (TopExp_Explorer ex(face, TopAbs_EDGE); ex.More(); ex.Next()) {
+            const BRepAdaptor_Curve curve(TopoDS::Edge(ex.Current()));
+            if (curve.GetType() != GeomAbs_Line)
+                continue;
+            const double len = curve.Value(curve.FirstParameter())
+                                   .Distance(curve.Value(curve.LastParameter()));
+            if (len > bestLen) {
+                bestLen = len;
+                frame.length = curve.Line().Direction();
+            }
         }
     }
     if (bestLen <= 0.0)
         return frame;
 
-    frame.thickness = normal;
+    // Tę płaszczyznę kładziemy na stole: jej normalna ma patrzeć w dół (-Z).
+    frame.thickness = best->normal;
     frame.valid = true;
     return frame;
 }
@@ -144,15 +170,22 @@ gp_Trsf panelRotation(const PanelFrame& frame, camcore::AlignSettings::LongEdge 
 
 namespace camcore {
 
-gp_Trsf computeAlignment(const TopoDS_Shape& shape, const AlignSettings& s)
+gp_Trsf computeAlignment(const TopoDS_Shape& shape, const AlignSettings& s, bool flipped)
 {
     // 1. Obrót (tylko w trybie "płyta").
     gp_Trsf rotation;
     if (s.panel) {
         const PanelFrame frame = s.minimalBox ? frameFromMinimalBox(shape)
-                                              : frameFromLargestFace(shape);
+                                              : frameFromLargestPlane(shape);
         if (frame.valid)
             rotation = panelRotation(frame, s.longEdge);
+    }
+    // Odwrócenie na drugą stronę: pół obrotu wokół osi najdłuższej krawędzi –
+    // spód staje się wierzchem, a długość zostaje wzdłuż tej samej osi.
+    if (flipped) {
+        gp_Trsf flip;
+        flip.SetRotation(s.longEdge == AlignSettings::LongEdge::X ? gp::OX() : gp::OY(), 3.14159265358979323846);
+        rotation = flip * rotation;
     }
 
     // 2. Przesunięcie: prostopadłościan otaczający już obróconą bryłę,
