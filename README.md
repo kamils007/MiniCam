@@ -36,6 +36,11 @@ wybierz preset **x64 Debug** i cel **minicam.exe**, naciśnij F5.
 Biblioteki z `vcpkg.json` (Qt, Open CASCADE) zbudują się same przy pierwszej
 konfiguracji – to trwa 1–2 h, później są w cache.
 
+**Program na inny komputer:** wybierz preset **x64 Release**, zbuduj
+i skopiuj `out/build/x64-release/minicam.exe`. To jeden plik – wszystkie
+biblioteki są linkowane statycznie (triplet `x64-windows-static`), nie trzeba
+DLL ani VC++ Redistributable.
+
 Alternatywa: instalator Qt (qt.io) + gotowe binarki OCCT z dev.opencascade.org,
 wtedy wskaż je przez `-DCMAKE_PREFIX_PATH="C:/Qt/6.8.0/msvc2022_64;C:/OpenCASCADE-7.9.0/cmake"`.
 

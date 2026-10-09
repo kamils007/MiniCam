@@ -9,7 +9,7 @@
       "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_TARGET_TRIPLET": "x64-windows"
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static"
       },
       "architecture": { "value": "x64", "strategy": "external" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
