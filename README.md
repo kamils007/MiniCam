@@ -1,14 +1,15 @@
 # MiniCAM
 
 Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z kolorami
-zapisanymi w pliku. Bryła pojawia się dokładnie w położeniu z pliku, a osie X/Y/Z
-w punkcie 0,0,0 pokazują, gdzie leży względem zera.
+zapisanymi w pliku. Po wczytaniu bryła jest przesuwana (bez obracania) tak, żeby
+jej lewy przedni dolny róg leżał w punkcie 0,0,0 – osie X/Y/Z pokazują to zero.
 
 ```
 minicam/
 ├── CMakeLists.txt
 ├── core/            rdzeń (C++ + OCCT, bez Qt)
-│   └── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
+│   ├── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
+│   └── ModelAlign.h/.cpp    ustawienie bryły względem 0,0,0
 └── app/             GUI (Qt)
     ├── main.cpp
     ├── MainWindow.h/.cpp

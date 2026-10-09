@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "OccView.h"
 
+#include "ModelAlign.h"
 #include "ModelImport.h"
 
 #include <QApplication>
@@ -54,14 +55,19 @@ void MainWindow::openFile(const QString& path)
 
     try {
         // Rdzeń dostaje ścieżkę w UTF-8 – działa też z polskimi znakami.
-        const camcore::ImportedModel model = camcore::importModel(path.toUtf8().toStdString());
+        camcore::ImportedModel model = camcore::importModel(path.toUtf8().toStdString());
+        // Ustawiamy bryłę w zerze: lewy przedni dolny róg w 0,0,0.
+        const gp_Vec shift = camcore::alignModel(model, camcore::AlignMode::BottomCorner);
         m_view->showModel(model);
         QApplication::restoreOverrideCursor();
 
         setWindowTitle("MiniCAM – " + QFileInfo(path).fileName());
-        statusBar()->showMessage(QString("Wczytano %1 w %2 ms")
+        statusBar()->showMessage(QString("Wczytano %1 w %2 ms, przesunięto o X %3  Y %4  Z %5 mm")
                                      .arg(QFileInfo(path).fileName())
-                                     .arg(timer.elapsed()));
+                                     .arg(timer.elapsed())
+                                     .arg(shift.X(), 0, 'f', 3)
+                                     .arg(shift.Y(), 0, 'f', 3)
+                                     .arg(shift.Z(), 0, 'f', 3));
     } catch (const std::exception& ex) {
         QApplication::restoreOverrideCursor();
         statusBar()->clearMessage();

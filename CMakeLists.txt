@@ -36,11 +36,14 @@ endif()
 add_library(camcore STATIC
     core/ModelImport.cpp
     core/ModelImport.h
+    core/ModelAlign.cpp
+    core/ModelAlign.h
 )
 target_include_directories(camcore PUBLIC core ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(camcore PUBLIC
     ${MINICAM_OCC_IMPORT}
     TKXCAF TKLCAF TKCAF  # dokument XCAF: kolory i nazwy z pliku
+    TKTopAlgo   # BRepBndLib – prostopadłościan otaczający
     TKBRep      # TopoDS, BRepTools
     TKG3d TKGeomBase TKMath TKernel
 )
