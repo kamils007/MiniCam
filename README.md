@@ -28,15 +28,10 @@ minicam/
 
 ### Windows (Visual Studio + vcpkg) – zalecane
 
-Jednorazowo:
+Visual Studio 2022 17.6+ / 2026 ma wbudowane vcpkg – nic nie trzeba instalować.
+Wersje bibliotek są przypięte w `vcpkg.json` (`builtin-baseline` + `overrides`).
 
-```
-git clone https://github.com/microsoft/vcpkg C:\vcpkg
-C:\vcpkg\bootstrap-vcpkg.bat
-setx VCPKG_ROOT C:\vcpkg
-```
-
-Potem uruchom ponownie Visual Studio, otwórz folder projektu (lub sklonuj repo),
+Otwórz folder projektu (lub sklonuj repo),
 wybierz preset **x64 Debug** i cel **minicam.exe**, naciśnij F5.
 Biblioteki z `vcpkg.json` (Qt, Open CASCADE) zbudują się same przy pierwszej
 konfiguracji – to trwa 1–2 h, później są w cache.
