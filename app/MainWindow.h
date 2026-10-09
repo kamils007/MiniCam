@@ -6,6 +6,7 @@
 #include "ModelImport.h"
 
 class OccView;
+class QDockWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -23,9 +24,11 @@ private slots:
 
 private:
     void createRibbon();
+    void createDock();
     void showAligned();
 
     OccView* m_view = nullptr;
+    QDockWidget* m_dock = nullptr;
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
     bool m_aligned = false; // czy pokazany model jest wyrównany

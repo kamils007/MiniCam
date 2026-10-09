@@ -5,6 +5,8 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QDockWidget>
+#include <QLabel>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -24,8 +26,24 @@ MainWindow::MainWindow(QWidget* parent)
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
 
+    createDock();
     createRibbon();
     statusBar()->showMessage("Otwórz bryłę: Plik → Otwórz (Ctrl+O)");
+}
+
+void MainWindow::createDock()
+{
+    // Dokowane okno po lewej – miejsce na późniejsze dodatki (np. lista operacji).
+    // Można je przeciągnąć na prawą stronę, odczepić jako osobne okno albo zamknąć.
+    m_dock = new QDockWidget("Dodatki", this);
+    m_dock->setObjectName("dodatkiDock"); // potrzebne do zapamiętania układu okien
+    m_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    auto* placeholder = new QLabel("Tu pojawią się dodatki.", m_dock);
+    placeholder->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+    placeholder->setMargin(12);
+    m_dock->setWidget(placeholder);
+    m_dock->setMinimumWidth(220);
+    addDockWidget(Qt::LeftDockWidgetArea, m_dock);
 }
 
 void MainWindow::createRibbon()
@@ -68,9 +86,16 @@ void MainWindow::createRibbon()
     ribbon->fileMenu()->addSeparator();
     ribbon->fileMenu()->addAction(quitAct);
 
+    // Akcja "pokaż/ukryj okno" gotowa od Qt – zaznaczona, gdy okno jest widoczne.
+    QAction* dockAct = m_dock->toggleViewAction();
+    dockAct->setText("Okno\nDodatki");
+    dockAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogListView));
+
     RibbonPage* home = ribbon->addPage("Narzędzia główne");
     home->addGroup("Plik")->addAction(openAct);
-    home->addGroup("Widok")->addAction(fitAct);
+    RibbonGroup* viewGroup = home->addGroup("Widok");
+    viewGroup->addAction(fitAct);
+    viewGroup->addAction(dockAct);
 
     ribbon->addPage("Ekstrakcja modelu bryłowego"); // na razie pusta
 
