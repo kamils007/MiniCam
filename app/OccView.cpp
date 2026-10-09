@@ -161,8 +161,14 @@ void OccView::paintEvent(QPaintEvent*)
 
 void OccView::resizeEvent(QResizeEvent*)
 {
-    if (!m_view.IsNull())
-        m_view->MustBeResized();
+    if (m_view.IsNull())
+        return;
+    // MustBeResized odczytuje nowy rozmiar okna. Na Windows po maksymalizacji
+    // (albo zmniejszeniu okna) Qt nie zawsze wysyła potem paintEvent dla widżetu,
+    // który maluje sam (WA_PaintOnScreen) – wtedy obraz zostawał w starym rozmiarze.
+    // Dlatego od razu przerysowujemy scenę.
+    m_view->MustBeResized();
+    m_view->Redraw();
 }
 
 QPoint OccView::toPixels(const QPointF& p) const
