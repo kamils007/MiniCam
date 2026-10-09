@@ -1,13 +1,14 @@
-# MiniCAM – krok 1: wczytanie bryły
+# MiniCAM
 
-Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP.
+Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP
+(krok 1) i pozwala wybierać ściany bryły myszką (krok 2).
 
 ```
 minicam/
 ├── CMakeLists.txt
 ├── core/            rdzeń (C++ + OCCT, bez Qt)
-│   ├── ModelImport.h
-│   └── ModelImport.cpp
+│   ├── ModelImport.h/.cpp   wczytywanie plików
+│   └── FaceInfo.h/.cpp      typ, pole, normalna i wysokość ściany
 └── app/             GUI (Qt)
     ├── main.cpp
     ├── MainWindow.h/.cpp
@@ -18,7 +19,10 @@ minicam/
 
 | Akcja | Mysz / klawisz |
 |---|---|
-| Obrót | lewy przycisk |
+| Obrót | lewy przycisk – przeciągnij |
+| Wybór ściany | lewy przycisk – kliknij |
+| Dodaj/usuń ścianę z wyboru | Ctrl + klik |
+| Wyczyść wybór | Esc |
 | Przesuwanie | środkowy lub prawy przycisk |
 | Zoom (do kursora) | kółko |
 | Dopasuj do okna | F |
@@ -65,6 +69,9 @@ cmake --build build -j
 
 - Pod Linuxem program sam przełącza Qt na X11 (`QT_QPA_PLATFORM=xcb`), bo widok OCCT
   wymaga natywnego okna X11. Pod Waylandem działa przez XWayland.
-- Na Windows, uruchamiając poza Visual Studio, DLL-e OCCT i Qt muszą być w PATH
-  albo obok `minicam.exe` (`windeployqt` dla Qt).
+- Przy dynamicznym Qt (triplet `x64-windows`) CMake sam kopiuje wtyczkę
+  `platforms/qwindows.dll` obok `minicam.exe`; DLL-e OCCT i Qt muszą być w PATH
+  albo obok exe. Przy domyślnym, statycznym tripletcie nic nie trzeba kopiować.
+- Informacje o wybranej ścianie pojawiają się w pasku stanu. Dla ściany poziomej
+  widać jej wysokość Z – np. dno kieszeni 8 mm pod górą detalu ma Z o 8 mniejsze.
 - Plik testowy: dowolny STEP z producenta części, np. z GrabCAD lub katalogu Misumi.
