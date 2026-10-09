@@ -17,6 +17,9 @@ public:
 
     void openFile(const QString& path);
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private slots:
     void onOpen();
     void onAutoAlign();
@@ -25,6 +28,7 @@ private slots:
 private:
     void createRibbon();
     void createDock();
+    void dockToHome();
     void showAligned();
 
     OccView* m_view = nullptr;

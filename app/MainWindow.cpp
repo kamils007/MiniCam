@@ -6,6 +6,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QDockWidget>
+#include <QEvent>
 #include <QLabel>
 #include <QElapsedTimer>
 #include <QFileDialog>
@@ -43,7 +44,35 @@ void MainWindow::createDock()
     placeholder->setMargin(12);
     m_dock->setWidget(placeholder);
     m_dock->setMinimumWidth(220);
+    // Tło trochę jaśniejsze niż pas ikon na wstążce, kolory niezależne od motywu Windows.
+    m_dock->setStyleSheet(R"(
+        QDockWidget { color: black; }
+        QDockWidget::title { background: #d4d4d4; padding: 4px; }
+        QDockWidget > QWidget { background: #efefef; color: black; }
+    )");
     addDockWidget(Qt::LeftDockWidgetArea, m_dock);
+
+    // Odczepione okno na Windows ma systemowy pasek tytułu – dwuklik w niego
+    // maksymalizowałby okno. Przechwytujemy go i przyczepiamy okno z powrotem.
+    m_dock->installEventFilter(this);
+}
+
+void MainWindow::dockToHome()
+{
+    m_dock->setFloating(false);
+    addDockWidget(Qt::LeftDockWidgetArea, m_dock); // "baza" – lewa strona okna
+    m_dock->show();
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == m_dock && m_dock->isFloating()
+        && (event->type() == QEvent::NonClientAreaMouseButtonDblClick
+            || event->type() == QEvent::MouseButtonDblClick)) {
+        dockToHome();
+        return true; // zdarzenie obsłużone – system go już nie dostanie
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::createRibbon()
