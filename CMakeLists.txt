@@ -25,23 +25,22 @@ find_package(OpenCASCADE REQUIRED)
 # same jako zależności). ${OpenCASCADE_LIBRARIES} to WSZYSTKIE moduły – przy
 # statycznym linkowaniu niepotrzebnie wydłuża to linkowanie, a w niektórych
 # dystrybucjach zawiera moduły Draw, których nie ma na dysku.
-# Od OCCT 7.8 moduły importu nazywają się TKDESTEP/TKDEIGES (wcześniej TKSTEP/TKIGES).
+# Od OCCT 7.8 import STEP/IGES (także z kolorami) siedzi w TKDESTEP/TKDEIGES;
+# wcześniej był rozbity na TKSTEP/TKIGES i TKXDESTEP/TKXDEIGES.
 if(TARGET TKDESTEP)
     set(MINICAM_OCC_IMPORT TKDESTEP TKDEIGES)
 else()
-    set(MINICAM_OCC_IMPORT TKSTEP TKIGES)
+    set(MINICAM_OCC_IMPORT TKXDESTEP TKXDEIGES TKSTEP TKIGES)
 endif()
 
 add_library(camcore STATIC
     core/ModelImport.cpp
     core/ModelImport.h
-    core/FaceInfo.cpp
-    core/FaceInfo.h
 )
 target_include_directories(camcore PUBLIC core ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(camcore PUBLIC
     ${MINICAM_OCC_IMPORT}
-    TKTopAlgo   # BRepGProp, BRepAdaptor – pola i typy ścian
+    TKXCAF TKLCAF TKCAF  # dokument XCAF: kolory i nazwy z pliku
     TKBRep      # TopoDS, BRepTools
     TKG3d TKGeomBase TKMath TKernel
 )

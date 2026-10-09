@@ -15,9 +15,7 @@ public:
 
 private slots:
     void onOpen();
-    void onSelectionChanged();
 
 private:
     OccView* m_view = nullptr;
-    QString m_fileName; // nazwa wczytanego pliku – do paska stanu
 };

@@ -1,14 +1,14 @@
 # MiniCAM
 
-Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP
-(krok 1) i pozwala wybierać ściany bryły myszką (krok 2).
+Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z kolorami
+zapisanymi w pliku. Bryła pojawia się dokładnie w położeniu z pliku, a osie X/Y/Z
+w punkcie 0,0,0 pokazują, gdzie leży względem zera.
 
 ```
 minicam/
 ├── CMakeLists.txt
 ├── core/            rdzeń (C++ + OCCT, bez Qt)
-│   ├── ModelImport.h/.cpp   wczytywanie plików
-│   └── FaceInfo.h/.cpp      typ, pole, normalna i wysokość ściany
+│   └── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
 └── app/             GUI (Qt)
     ├── main.cpp
     ├── MainWindow.h/.cpp
@@ -19,10 +19,7 @@ minicam/
 
 | Akcja | Mysz / klawisz |
 |---|---|
-| Obrót | lewy przycisk – przeciągnij |
-| Wybór ściany | lewy przycisk – kliknij |
-| Dodaj/usuń ścianę z wyboru | Ctrl + klik |
-| Wyczyść wybór | Esc |
+| Obrót | lewy przycisk |
 | Przesuwanie | środkowy lub prawy przycisk |
 | Zoom (do kursora) | kółko |
 | Dopasuj do okna | F |
@@ -77,6 +74,4 @@ cmake --build build -j
 - Przy dynamicznym Qt (triplet `x64-windows`) CMake sam kopiuje wtyczkę
   `platforms/qwindows.dll` obok `minicam.exe`; DLL-e OCCT i Qt muszą być w PATH
   albo obok exe. Przy domyślnym, statycznym tripletcie nic nie trzeba kopiować.
-- Informacje o wybranej ścianie pojawiają się w pasku stanu. Dla ściany poziomej
-  widać jej wysokość Z – np. dno kieszeni 8 mm pod górą detalu ma Z o 8 mniejsze.
 - Plik testowy: dowolny STEP z producenta części, np. z GrabCAD lub katalogu Misumi.

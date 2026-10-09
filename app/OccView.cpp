@@ -1,13 +1,15 @@
 #include "OccView.h"
 
-#include <AIS_Shape.hxx>
+#include <AIS_ColoredShape.hxx>
+#include <AIS_Trihedron.hxx>
+#include <Prs3d_DatumAspect.hxx>
+#include <Geom_Axis2Placement.hxx>
+#include <Graphic3d_TransformPers.hxx>
 #include <Aspect_DisplayConnection.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
-#include <TopoDS.hxx>
 
-#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
@@ -50,15 +52,6 @@ void OccView::initViewer()
     m_context->DefaultDrawer()->SetFaceBoundaryAspect(
         new Prs3d_LineAspect(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 1.0));
 
-    // Kolory podświetlenia ścian ("Local" = fragment bryły, nie cała bryła):
-    // pod kursorem – jasnoniebieski, wybrana – pomarańczowy.
-    const Handle(Prs3d_Drawer)& hover = m_context->HighlightStyle(Prs3d_TypeOfHighlight_LocalDynamic);
-    hover->SetColor(Quantity_Color(0.35, 0.75, 1.0, Quantity_TOC_RGB));
-    hover->SetDisplayMode(AIS_Shaded);
-    const Handle(Prs3d_Drawer)& picked = m_context->HighlightStyle(Prs3d_TypeOfHighlight_LocalSelected);
-    picked->SetColor(Quantity_NOC_ORANGE);
-    picked->SetDisplayMode(AIS_Shaded);
-
     m_view = m_viewer->CreateView();
 
 #if defined(_WIN32)
@@ -73,58 +66,82 @@ void OccView::initViewer()
     if (!window->IsMapped())
         window->Map();
 
-    m_view->SetBgGradientColors(Quantity_Color(0.30, 0.34, 0.40, Quantity_TOC_RGB),
-                                Quantity_Color(0.10, 0.11, 0.13, Quantity_TOC_RGB),
-                                Aspect_GFM_VER);
-    m_view->TriedronDisplay(Aspect_TOTP_LEFT_LOWER, Quantity_NOC_WHITE, 0.08, V3d_ZBUFFER);
+    // Jednolite ciemnoszare tło (#1E1E1E). sRGB = kolor tak, jak podaje go grafik/edytor.
+    m_view->SetBackgroundColor(Quantity_Color(30 / 255.0, 30 / 255.0, 30 / 255.0, Quantity_TOC_sRGB));
     m_view->MustBeResized();
+
+    showOriginAxes();
 }
 
-void OccView::showShape(const TopoDS_Shape& shape)
+void OccView::showOriginAxes()
+{
+    // Osie układu współrzędnych w punkcie 0,0,0 – widać, gdzie leży detal względem zera.
+    Handle(AIS_Trihedron) axes = new AIS_Trihedron(new Geom_Axis2Placement(gp::XOY()));
+    axes->SetDatumDisplayMode(Prs3d_DM_Shaded); // pełne strzałki zamiast linii
+    axes->SetSize(80.0);                        // długość osi w pikselach (patrz niżej)
+    // Grubość osi i wielkość grotów – jako ułamek długości osi.
+    const Handle(Prs3d_DatumAspect)& look = axes->Attributes()->DatumAspect();
+    look->SetAttribute(Prs3d_DatumAttribute_ShadingTubeRadiusPercent, 0.025);
+    look->SetAttribute(Prs3d_DatumAttribute_ShadingConeRadiusPercent, 0.07);
+    look->SetAttribute(Prs3d_DatumAttribute_ShadingConeLengthPercent, 0.20);
+    look->SetAttribute(Prs3d_DatumAttribute_ShadingOriginRadiusPercent, 0.05);
+    // Kolory jak w programach CAD: X czerwony, Y zielony, Z niebieski (oś + grot).
+    axes->SetDatumPartColor(Prs3d_DatumParts_XAxis, Quantity_NOC_RED);
+    axes->SetDatumPartColor(Prs3d_DatumParts_XArrow, Quantity_NOC_RED);
+    axes->SetDatumPartColor(Prs3d_DatumParts_YAxis, Quantity_NOC_GREEN);
+    axes->SetDatumPartColor(Prs3d_DatumParts_YArrow, Quantity_NOC_GREEN);
+    axes->SetDatumPartColor(Prs3d_DatumParts_ZAxis, Quantity_NOC_BLUE1);
+    axes->SetDatumPartColor(Prs3d_DatumParts_ZArrow, Quantity_NOC_BLUE1);
+    axes->SetDatumPartColor(Prs3d_DatumParts_Origin, Quantity_NOC_GREEN);
+    axes->SetTextColor(Prs3d_DatumParts_XAxis, Quantity_NOC_RED);
+    axes->SetTextColor(Prs3d_DatumParts_YAxis, Quantity_NOC_GREEN);
+    axes->SetTextColor(Prs3d_DatumParts_ZAxis, Quantity_NOC_BLUE1);
+
+    // ZoomPers: osie stoją w punkcie 0,0,0, ale mają stały rozmiar na ekranie,
+    // niezależnie od przybliżenia – jak w programach CAD/CAM.
+    axes->SetTransformPersistence(new Graphic3d_TransformPers(Graphic3d_TMF_ZoomPers, gp::Origin()));
+    // Osie nie liczą się do "Dopasuj do okna" (F) – dopasowujemy tylko detal.
+    axes->SetInfiniteState(Standard_True);
+
+    // -1 = obiektu nie da się zaznaczyć myszką.
+    m_context->Display(axes, 0, -1, Standard_False);
+}
+
+void OccView::showModel(const camcore::ImportedModel& model)
 {
     initViewer();
 
-    m_context->RemoveAll(Standard_False);
-    m_shape = new AIS_Shape(shape);
-    // Neutralny szary materiał – na nim pomarańczowy wybór jest dobrze widoczny.
-    m_shape->SetColor(Quantity_Color(0.72, 0.74, 0.77, Quantity_TOC_RGB));
+    if (!m_model.IsNull())
+        m_context->Remove(m_model, Standard_False); // osie zostają
+
+    // AIS_ColoredShape = bryła, której fragmenty mogą mieć różne kolory.
+    // Geometria trafia na ekran dokładnie tam, gdzie leży w pliku – nic nie przesuwamy.
+    Handle(AIS_ColoredShape) ais = new AIS_ColoredShape(model.shape);
+    // Fragmenty bez koloru w pliku: neutralny jasnoszary.
+    ais->SetColor(Quantity_Color(0.70, 0.70, 0.70, Quantity_TOC_sRGB));
     // SetColor przemalowuje też krawędzie – przywracamy im czarny kolor.
-    m_shape->Attributes()->SetFaceBoundaryDraw(Standard_True);
-    m_shape->Attributes()->SetFaceBoundaryAspect(
-        new Prs3d_LineAspect(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 1.0));
-    // Tryb wyboru: pojedyncze ściany (TopAbs_FACE) zamiast całej bryły (tryb 0).
-    // Dzięki temu kliknięcie wskazuje konkretną ścianę, np. dno kieszeni.
-    m_context->Display(m_shape, AIS_Shaded, AIS_Shape::SelectionMode(TopAbs_FACE),
-                       Standard_False);
+    const Handle(Prs3d_LineAspect) blackEdges =
+        new Prs3d_LineAspect(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 1.0);
+    ais->Attributes()->SetFaceBoundaryDraw(Standard_True);
+    ais->Attributes()->SetFaceBoundaryAspect(blackEdges);
+
+    // Kolory z pliku. Każdy kolorowany fragment dostaje własny zestaw ustawień
+    // (CustomAspects), więc czarne krawędzie trzeba mu ustawić osobno.
+    for (const camcore::ShapeColor& c : model.colors) {
+        ais->SetCustomColor(c.shape, c.color);
+        const Handle(AIS_ColoredDrawer)& aspects = ais->CustomAspects(c.shape);
+        aspects->SetFaceBoundaryDraw(Standard_True);
+        aspects->SetFaceBoundaryAspect(blackEdges);
+    }
+
+    m_model = ais;
+    m_context->Display(m_model, AIS_Shaded, 0, Standard_False);
 
     m_view->SetProj(V3d_XposYnegZpos); // widok izometryczny
     // Okno mogło właśnie zmienić rozmiar (np. plik podany przy starcie programu) –
     // bez tego FitAll liczyłby dopasowanie dla starego rozmiaru.
     m_view->MustBeResized();
     fitAll();
-    emit selectionChanged(); // stary wybór zniknął razem ze starą bryłą
-}
-
-void OccView::clearSelection()
-{
-    if (m_context.IsNull())
-        return;
-    m_context->ClearSelected(Standard_True);
-    emit selectionChanged();
-}
-
-std::vector<TopoDS_Face> OccView::selectedFaces() const
-{
-    std::vector<TopoDS_Face> faces;
-    if (m_context.IsNull())
-        return faces;
-    // Kontekst przechowuje listę wybranych "właścicieli" (owner) – tu każdy to jedna ściana.
-    for (m_context->InitSelected(); m_context->MoreSelected(); m_context->NextSelected()) {
-        const TopoDS_Shape s = m_context->SelectedShape();
-        if (!s.IsNull() && s.ShapeType() == TopAbs_FACE)
-            faces.push_back(TopoDS::Face(s));
-    }
-    return faces;
 }
 
 void OccView::fitAll()
@@ -160,42 +177,8 @@ void OccView::mousePressEvent(QMouseEvent* e)
     if (m_view.IsNull())
         return;
     m_lastPos = toPixels(e->position());
-    if (e->button() == Qt::LeftButton) {
-        // Jeszcze nie wiemy, czy to kliknięcie (wybór), czy przeciąganie (obrót).
-        // Rozstrzygnie się w mouseMoveEvent / mouseReleaseEvent.
-        m_pressPos = m_lastPos;
-        m_rotating = false;
-    }
-}
-
-void OccView::mouseReleaseEvent(QMouseEvent* e)
-{
-    if (m_view.IsNull() || e->button() != Qt::LeftButton)
-        return;
-    if (m_rotating) {
-        m_rotating = false;
-        return;
-    }
-
-    // Kliknięcie bez przeciągania = wybór ściany pod kursorem.
-    // MoveTo ustala, co jest pod kursorem ("detected"), SelectDetected to zaznacza.
-    const QPoint pos = toPixels(e->position());
-    m_context->MoveTo(pos.x(), pos.y(), m_view, Standard_False);
-    const AIS_SelectionScheme scheme = (e->modifiers() & Qt::ControlModifier)
-                                           ? AIS_SelectionScheme_XOR      // dodaj/usuń
-                                           : AIS_SelectionScheme_Replace; // tylko ta
-    m_context->SelectDetected(scheme);
-    m_context->UpdateCurrentViewer();
-    emit selectionChanged();
-}
-
-void OccView::keyPressEvent(QKeyEvent* e)
-{
-    if (e->key() == Qt::Key_Escape) {
-        clearSelection();
-        return;
-    }
-    QWidget::keyPressEvent(e);
+    if (e->button() == Qt::LeftButton)
+        m_view->StartRotation(m_lastPos.x(), m_lastPos.y());
 }
 
 void OccView::mouseMoveEvent(QMouseEvent* e)
@@ -205,19 +188,9 @@ void OccView::mouseMoveEvent(QMouseEvent* e)
     const QPoint pos = toPixels(e->position());
 
     if (e->buttons() & Qt::LeftButton) {
-        // Obrót startuje dopiero po przesunięciu o kilka pikseli –
-        // inaczej każde kliknięcie lekko obracałoby widok.
-        if (!m_rotating && (pos - m_pressPos).manhattanLength() > 4) {
-            m_view->StartRotation(m_pressPos.x(), m_pressPos.y());
-            m_rotating = true;
-        }
-        if (m_rotating)
-            m_view->Rotation(pos.x(), pos.y());
+        m_view->Rotation(pos.x(), pos.y());
     } else if (e->buttons() & (Qt::MiddleButton | Qt::RightButton)) {
         m_view->Pan(pos.x() - m_lastPos.x(), m_lastPos.y() - pos.y());
-    } else {
-        // Bez wciśniętych przycisków: podświetl ścianę pod kursorem.
-        m_context->MoveTo(pos.x(), pos.y(), m_view, Standard_True);
     }
     m_lastPos = pos;
 }
