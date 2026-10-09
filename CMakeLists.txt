@@ -56,6 +56,10 @@ qt_add_executable(minicam
     app/MainWindow.h
     app/OccView.cpp
     app/OccView.h
+    app/Ribbon.cpp
+    app/Ribbon.h
+    app/AlignSettingsDialog.cpp
+    app/AlignSettingsDialog.h
 )
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT

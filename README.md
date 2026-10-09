@@ -1,8 +1,14 @@
 # MiniCAM
 
 Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z kolorami
-zapisanymi w pliku. Po wczytaniu bryła jest przesuwana (bez obracania) tak, żeby
-jej lewy przedni dolny róg leżał w punkcie 0,0,0 – osie X/Y/Z pokazują to zero.
+zapisanymi w pliku. Na górze okna jest wstążka w stylu Alphacam (Plik, Narzędzia
+główne, Ekstrakcja modelu bryłowego, Bryły - Użytkowe).
+
+**Auto-wyrównanie** (Bryły - Użytkowe): ustawienia w „Rozpoznawanie cech modelu…”.
+Przy „Wyrównanie panelu” największa płaska ściana bryły kładzie się na stole
+(jeśli bryła już leży płasko, nie jest odwracana), najdłuższa krawędź idzie wzdłuż
+osi X lub Y, a punkt bazowy i zero Z trafiają w 0,0,0. Ustawienia zapisują się
+same i można je wyeksportować do pliku .ini.
 
 ```
 minicam/
@@ -13,6 +19,8 @@ minicam/
 └── app/             GUI (Qt)
     ├── main.cpp
     ├── MainWindow.h/.cpp
+    ├── Ribbon.h/.cpp              wstążka (zakładki, grupy, przyciski)
+    ├── AlignSettingsDialog.h/.cpp okno Konfiguracja → Auto-wyrównanie
     └── OccView.h/.cpp   widok 3D
 ```
 

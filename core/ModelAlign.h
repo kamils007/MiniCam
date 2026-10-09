@@ -1,19 +1,32 @@
 #pragma once
-#include <gp_Vec.hxx>
+#include <gp_Trsf.hxx>
 #include "ModelImport.h"
 
 namespace camcore {
 
-// Gdzie ma wylądować bryła względem punktu 0,0,0.
-enum class AlignMode
+// Ustawienia auto-wyrównania – odpowiadają oknu Konfiguracja → Auto-wyrównanie.
+struct AlignSettings
 {
-    BottomCorner, // lewy przedni dolny róg w 0,0,0 – bryła "leży na stole"
-    TopCorner,    // lewy przedni róg w 0,0, wierzch na Z=0
-    CenterBottom, // środek w X/Y w 0,0, spód na Z=0
+    enum class ZZero { Top, Middle, Bottom };     // gdzie ma być Z=0
+    enum class LongEdge { X, Y };                 // wzdłuż której osi najdłuższa krawędź
+    enum class BaseX { Left, Center, Right };     // punkt bazowy w X
+    enum class BaseY { Bottom, Center, Top };     // punkt bazowy w Y ("Dół" = przód)
+
+    bool alignAfterImport = true; // wyrównaj od razu po wczytaniu pliku
+    bool lathe = false;           // wyrównanie dla toczenia – jeszcze nieobsługiwane
+    bool panel = true;            // obróć jak płytę: największa płaska ściana leży na stole
+    bool minimalBox = false;      // orientację licz z najmniejszego obróconego prostopadłościanu
+
+    ZZero zZero = ZZero::Bottom;
+    LongEdge longEdge = LongEdge::Y;
+    BaseX baseX = BaseX::Left;
+    BaseY baseY = BaseY::Bottom;
 };
 
-// Przesuwa bryłę (bez obracania) według prostopadłościanu, który ją otacza.
-// Zwraca wektor przesunięcia – przydaje się do pokazania, o ile przesunięto.
-gp_Vec alignModel(ImportedModel& model, AlignMode mode);
+// Liczy przekształcenie (obrót + przesunięcie), które wyrównuje bryłę.
+gp_Trsf computeAlignment(const TopoDS_Shape& shape, const AlignSettings& settings);
+
+// Zwraca kopię modelu przekształconą przez trsf (kolory jadą razem z bryłą).
+ImportedModel transformed(const ImportedModel& model, const gp_Trsf& trsf);
 
 } // namespace camcore
