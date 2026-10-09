@@ -5,10 +5,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-# Wszystko linkowane statycznie (triplet x64-windows-static):
-# wynikiem jest jeden minicam.exe bez DLL i bez VC++ Redistributable.
+# Triplet x64-windows-static: wszystko linkowane statycznie, wynikiem jest jeden
+# minicam.exe bez DLL i bez VC++ Redistributable (runtime /MT).
+# Triplet x64-windows (preset "DLL"): biblioteki jako DLL, runtime /MD.
+# Runtime programu MUSI zgadzać się z bibliotekami, inaczej linker zgłosi LNK2038.
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    if(VCPKG_TARGET_TRIPLET MATCHES "-static$")
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    else()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    endif()
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)

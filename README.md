@@ -40,6 +40,11 @@ wybierz preset **x64 Debug** i cel **minicam.exe**, naciśnij F5.
 Biblioteki z `vcpkg.json` (Qt, Open CASCADE) zbudują się same przy pierwszej
 konfiguracji – to trwa 1–2 h, później są w cache.
 
+**Preset x64 Debug (DLL)** używa bibliotek dynamicznych (triplet `x64-windows`).
+Dobry do codziennej pracy: linkowanie jest szybsze, a jeśli Qt i OCCT w wersji DLL
+są już zbudowane, nic nie buduje się od nowa. Każdy preset ma osobny folder
+w `out/build/`, więc można je przełączać bez kasowania czegokolwiek.
+
 **Program na inny komputer:** wybierz preset **x64 Release**, zbuduj
 i skopiuj `out/build/x64-release/minicam.exe`. To jeden plik – wszystkie
 biblioteki są linkowane statycznie (triplet `x64-windows-static`), nie trzeba
