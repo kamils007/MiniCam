@@ -84,6 +84,8 @@ private:
     std::vector<int> m_moveGeometries; // wybrane geometrie
     bool m_moveModel = false;          // czy wybrano bryłę
     gp_Pnt m_moveBase;
+    QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
+    QAction* m_repeatAct = nullptr;   // skrót spacji
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)
     std::vector<QToolButton*> m_snapButtons; // uchwyty na belce polecenia
     QToolBar* m_commandBar = nullptr;       // belka polecenia (druga od dołu)

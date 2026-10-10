@@ -355,6 +355,30 @@ void MainWindow::createRibbon()
     solids->addGroup("Wyrównanie")->addAction(autoAlignAct);
     solids->addGroup("Ustawienia")->addAction(settingsAct);
 
+    // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
+    // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
+    // widok, okna, plik i Cofnij/Ponów się nie liczą.
+    for (QAction* a : {moveAct, recognizeAct, autoAlignAct, settingsAct}) {
+        connect(a, &QAction::triggered, this, [this, a] {
+            m_lastCommand = a;
+            m_repeatAct->setToolTip("Powtórz: " + a->text().replace('\n', ' ') + " (spacja)");
+        });
+    }
+    // Skrót okna: pole tekstowe z fokusem zabiera spację dla siebie, więc pisanie
+    // w polach paska wprowadzania nie powtarza polecenia.
+    m_repeatAct = new QAction("Powtórz ostatnie polecenie", this);
+    m_repeatAct->setShortcut(Qt::Key_Space);
+    connect(m_repeatAct, &QAction::triggered, this, [this] {
+        if (!m_lastCommand) {
+            statusBar()->showMessage("Spacja powtarza ostatnie polecenie – na razie żadnego nie było");
+            return;
+        }
+        if (m_moveStep != MoveStep::None || !m_lastCommand->isEnabled())
+            return; // w trakcie polecenia spacja nic nie robi
+        m_lastCommand->trigger();
+    });
+    addAction(m_repeatAct);
+
     // Wstążka zajmuje miejsce zwykłego paska menu.
     setMenuWidget(ribbon);
 }

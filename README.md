@@ -94,6 +94,9 @@ minicam/
 
 ## Sterowanie
 
+Spacja powtarza ostatnie polecenie (Przesuń, Rozpoznaj cechy, Auto-Wyrównanie,
+Rozpoznawanie cech modelu…) – tak, jakby kliknąć jego przycisk na wstążce.
+
 | Akcja | Mysz / klawisz |
 |---|---|
 | Obrót | lewy przycisk |
