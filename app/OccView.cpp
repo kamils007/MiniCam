@@ -480,16 +480,22 @@ void OccView::onClick(Qt::MouseButton button, const QPoint& pos)
             emit selectionConfirmed();
         }
     } else if (m_interaction == Interaction::PickPoint && button == Qt::LeftButton) {
-        // Promień spod kursora przecinamy z płaszczyzną Z = 0 (płaszczyzna stołu).
-        double x, y, z, vx, vy, vz;
-        m_view->ConvertWithProj(pos.x(), pos.y(), x, y, z, vx, vy, vz);
-        if (std::abs(vz) > 1e-9) {
-            const double t = -z / vz;
-            x += t * vx;
-            y += t * vy;
-        }
-        emit pointPicked(x, y, 0.0);
+        const gp_Pnt p = pointOnTable(pos);
+        emit pointPicked(p.X(), p.Y(), 0.0);
     }
+}
+
+gp_Pnt OccView::pointOnTable(const QPoint& pos) const
+{
+    // Promień spod kursora przecinamy z płaszczyzną Z = 0 (płaszczyzna stołu).
+    double x, y, z, vx, vy, vz;
+    m_view->ConvertWithProj(pos.x(), pos.y(), x, y, z, vx, vy, vz);
+    if (std::abs(vz) > 1e-9) {
+        const double t = -z / vz;
+        x += t * vx;
+        y += t * vy;
+    }
+    return gp_Pnt(x, y, 0.0);
 }
 
 void OccView::setInteraction(Interaction mode)
@@ -549,6 +555,8 @@ void OccView::mouseMoveEvent(QMouseEvent* e)
         m_view->Pan(pos.x() - m_lastPos.x(), m_lastPos.y() - pos.y());
     }
     m_lastPos = pos;
+    const gp_Pnt p = pointOnTable(pos);
+    emit cursorMoved(p.X(), p.Y());
 }
 
 void OccView::wheelEvent(QWheelEvent* e)

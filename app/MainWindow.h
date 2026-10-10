@@ -15,6 +15,9 @@ class QDockWidget;
 class LayersPanel;
 class QDoubleSpinBox;
 class QWidget;
+class QAction;
+class QLabel;
+class QToolBar;
 
 class MainWindow : public QMainWindow
 {
@@ -42,6 +45,7 @@ private slots:
 private:
     void createRibbon();
     void createDock();
+    void createBottomBars();
     void createMovePanel();
     void applyMove(const gp_Vec& offset);
     void finishMove(const QString& message);
@@ -67,7 +71,11 @@ private:
     std::vector<int> m_moveGeometries; // wybrane geometrie
     bool m_moveModel = false;          // czy wybrano bryłę
     gp_Pnt m_moveBase;
+    QToolBar* m_commandBar = nullptr;       // belka polecenia (druga od dołu)
+    QAction* m_commandBarSpacer = nullptr;  // pola polecenia wstawiamy przed nim
+    QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce
     QWidget* m_movePanel = nullptr;
+    QAction* m_movePanelAction = nullptr;   // pokazuje/ukrywa m_movePanel w belce
     QDoubleSpinBox* m_moveDx = nullptr;
     QDoubleSpinBox* m_moveDy = nullptr;
     QDoubleSpinBox* m_moveDz = nullptr;

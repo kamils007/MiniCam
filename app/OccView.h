@@ -67,6 +67,7 @@ signals:
     void selectionConfirmed();                     // PPM w trybie wyboru
     void pointPicked(double x, double y, double z); // LPM w trybie wskazywania punktu
     void cancelRequested();                        // Esc
+    void cursorMoved(double x, double y);          // kursor na płaszczyźnie Z = 0
 
 protected:
     void keyPressEvent(QKeyEvent* e) override;
@@ -86,6 +87,7 @@ private:
     void onClick(Qt::MouseButton button, const QPoint& pos);
     int geometryAt(const QPoint& pos) const; // -1 = żadna
     bool modelAt(const QPoint& pos) const;   // czy pod kursorem jest bryła
+    gp_Pnt pointOnTable(const QPoint& pos) const; // punkt spod kursora na płaszczyźnie Z = 0
     void refreshGeometryLook();
     QPoint toPixels(const QPointF& p) const;
 

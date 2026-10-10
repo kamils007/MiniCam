@@ -22,6 +22,8 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QStyle>
+#include <QToolBar>
+#include <QToolButton>
 
 #include <algorithm>
 #include <cmath>
@@ -63,6 +65,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_alignSettings = loadAlignSettings();
 
     createDock();
+    createBottomBars();
     createMovePanel();
     createRibbon();
     connect(m_view, &OccView::selectionConfirmed, this, &MainWindow::onSelectionConfirmed);
@@ -379,6 +382,90 @@ void MainWindow::onRecognizeFeatures()
     statusBar()->showMessage(QString("Wyciągnięto %1 geometrii").arg(m_geometries.size()));
 }
 
+namespace {
+// Pusty przycisk – miejsce na przyszłą funkcję (na razie bez ikony i bez działania).
+QToolButton* placeholderButton(QWidget* parent, const QString& tip, int width = 26)
+{
+    auto* b = new QToolButton(parent);
+    b->setFixedSize(width, 24);
+    b->setToolTip(tip + " (wkrótce)");
+    b->setEnabled(false);
+    b->setProperty("placeholder", true);
+    return b;
+}
+} // namespace
+
+void MainWindow::createBottomBars()
+{
+    // Belka polecenia (druga od dołu, jak w Alphacam): po lewej pola aktualnego
+    // polecenia (np. dX/dY/dZ przy przesuwaniu), po prawej przyciąganie.
+    m_commandBar = new QToolBar("Polecenie", this);
+    m_commandBar->setObjectName("commandBar");
+    m_commandBar->setMovable(false);
+    m_commandBar->setFloatable(false);
+    m_commandBar->setContextMenuPolicy(Qt::PreventContextMenu);
+    auto* spacer = new QWidget(m_commandBar);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_commandBarSpacer = m_commandBar->addWidget(spacer);
+    m_commandBar->addSeparator();
+    m_commandBar->addWidget(new QLabel(" Przyciąganie ", m_commandBar));
+    for (int i = 1; i <= 9; ++i)
+        m_commandBar->addWidget(placeholderButton(m_commandBar, QString("Przyciąganie %1").arg(i)));
+    addToolBar(Qt::BottomToolBarArea, m_commandBar);
+
+    // Belki odcinamy od siebie liniami i lekkim cieniem, a pola i przyciski mają
+    // wklęsłe ramki – żeby nic się nie zlewało z tłem.
+    const QString barStyle = R"(
+        QToolBar#commandBar {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f7f7f7, stop:1 #e4e4e4);
+            border-top: 1px solid #8c8c8c; border-bottom: 1px solid #8c8c8c;
+            padding: 2px 4px; spacing: 3px;
+        }
+        QStatusBar {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ececec, stop:1 #dcdcdc);
+            border-top: 1px solid #ffffff;
+        }
+        QStatusBar::item { border: none; }
+        QToolButton[placeholder="true"] {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
+            border: 1px solid #a8a8a8; border-radius: 2px;
+        }
+        QLabel#cursorLabel {
+            background: #fafafa; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 6px;
+        }
+        QWidget#barGroup { border-left: 1px solid #b0b0b0; }
+    )";
+    setStyleSheet(styleSheet() + barStyle);
+
+    // Stopka (najniżej): komunikaty, współrzędne kursora, widoki i przełączniki.
+    m_cursorLabel = new QLabel("X –   Y –", this);
+    m_cursorLabel->setObjectName("cursorLabel");
+    m_cursorLabel->setMinimumWidth(190);
+    m_cursorLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    statusBar()->addPermanentWidget(m_cursorLabel);
+    connect(m_view, &OccView::cursorMoved, this, [this](double x, double y) {
+        m_cursorLabel->setText(QString("X %1   Y %2").arg(x, 0, 'f', 3).arg(y, 0, 'f', 3));
+    });
+
+    auto* views = new QWidget(this);
+    views->setObjectName("barGroup");
+    auto* viewsLayout = new QHBoxLayout(views);
+    viewsLayout->setContentsMargins(8, 0, 0, 0);
+    viewsLayout->setSpacing(1);
+    for (int i = 1; i <= 15; ++i)
+        viewsLayout->addWidget(placeholderButton(views, QString("Widok %1").arg(i), 22));
+    statusBar()->addPermanentWidget(views);
+
+    auto* toggles = new QWidget(this);
+    toggles->setObjectName("barGroup");
+    auto* togglesLayout = new QHBoxLayout(toggles);
+    togglesLayout->setContentsMargins(8, 0, 0, 0);
+    togglesLayout->setSpacing(1);
+    for (int i = 1; i <= 4; ++i)
+        togglesLayout->addWidget(placeholderButton(toggles, QString("Przełącznik %1").arg(i), 50));
+    statusBar()->addPermanentWidget(toggles);
+}
+
 void MainWindow::createMovePanel()
 {
     // Pasek w stopce okna, widoczny podczas przesuwania: dokładne przesunięcie
@@ -405,8 +492,9 @@ void MainWindow::createMovePanel()
     layout->addWidget(cancel);
     connect(ok, &QPushButton::clicked, this, &MainWindow::onMoveByValues);
     connect(cancel, &QPushButton::clicked, this, &MainWindow::cancelMove);
-    statusBar()->addPermanentWidget(m_movePanel);
-    m_movePanel->hide();
+    // W pasku narzędzi widocznością widżetu steruje jego akcja.
+    m_movePanelAction = m_commandBar->insertWidget(m_commandBarSpacer, m_movePanel);
+    m_movePanelAction->setVisible(false);
 
     // Esc przerywa przesuwanie także wtedy, gdy widok 3D nie ma fokusu.
     auto* escAct = new QAction(this);
@@ -422,7 +510,7 @@ void MainWindow::onMove()
         return;
     }
     m_moveStep = MoveStep::Selecting;
-    m_movePanel->hide();
+    m_movePanelAction->setVisible(false);
     m_view->clearSelection();
     m_view->setInteraction(OccView::Interaction::Select);
     m_view->setFocus();
@@ -446,7 +534,7 @@ void MainWindow::onSelectionConfirmed()
     m_moveDx->setValue(0);
     m_moveDy->setValue(0);
     m_moveDz->setValue(0);
-    m_movePanel->show();
+    m_movePanelAction->setVisible(true);
     statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz przesunięcie");
 }
 
@@ -500,7 +588,7 @@ void MainWindow::finishMove(const QString& message)
     m_moveStep = MoveStep::None;
     m_moveGeometries.clear();
     m_moveModel = false;
-    m_movePanel->hide();
+    m_movePanelAction->setVisible(false);
     m_view->setInteraction(OccView::Interaction::Navigate);
     statusBar()->showMessage(message);
 }

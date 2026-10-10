@@ -51,6 +51,11 @@ PPM zatwierdza wybór. Potem albo klikamy punkt bazowy i punkt docelowy (na
 płaszczyźnie Z 0), albo wpisujemy dokładne przesunięcie dX/dY/dZ na pasku stanu
 i klikamy „Przesuń”. Esc lub „Anuluj” przerywa.
 
+**Dolne belki** (jak w Alphacam): belka polecenia – po lewej pola aktualnego
+polecenia (np. dX/dY/dZ przy przesuwaniu), po prawej przyciąganie (9 przycisków);
+stopka – komunikaty, współrzędne kursora na płaszczyźnie Z 0, 15 przycisków
+widoków i 4 przełączniki. Przyciski są na razie puste, bez funkcji.
+
 ```
 minicam/
 ├── CMakeLists.txt
