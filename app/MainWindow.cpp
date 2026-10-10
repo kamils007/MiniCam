@@ -743,11 +743,11 @@ void MainWindow::onSelectionConfirmed()
     statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz go w pasku wprowadzania i Enter");
 }
 
-void MainWindow::onPointPicked(double x, double y, double /*z*/)
+void MainWindow::onPointPicked(double x, double y, double z)
 {
     // Kliknięcie w widoku: wartości wpisane (przypięte) w pasku wprowadzania
     // zastępują odpowiednie współrzędne kursora.
-    if (const auto p = m_inputBar->resolveClick(x, y))
+    if (const auto p = m_inputBar->resolveClick(x, y, z))
         onPointEntered(p->X(), p->Y(), p->Z());
     else
         statusBar()->showMessage("Błędna wartość w pasku wprowadzania – popraw pole zaznaczone na czerwono");
@@ -785,9 +785,11 @@ void MainWindow::applyMove(const gp_Vec& offset)
         m_shown = camcore::transformed(m_shown, t);
         m_view->updateModel(m_shown);
     }
+    // Bryła jedzie także w Z; geometrie (kontury 2D) tylko w X i Y.
+    const gp_Vec flat(offset.X(), offset.Y(), 0.0);
     for (int i : m_moveGeometries) {
         camcore::Geometry& g = m_geometries[static_cast<size_t>(i)];
-        g.contour = camcore::translated(g.contour, offset);
+        g.contour = camcore::translated(g.contour, flat);
     }
     if (!m_moveGeometries.empty())
         showGeometries();

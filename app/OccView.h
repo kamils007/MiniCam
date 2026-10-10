@@ -129,6 +129,7 @@ private:
     Handle(AIS_InteractiveObject) m_snapMarker; // znacznik punktu uchwytu (biała kulka)
     Snap m_snap = Snap::None;
     std::vector<Handle(AIS_Shape)> m_movePreview; // kopia przesuwanych elementów pod kursorem
+    bool m_movePreviewHasModel = false; // pierwsza kopia to bryła (jedzie też w Z)
     gp_Pnt m_moveBase;
     QCursor m_snapCursor; // strzałka z ikonką aktywnego uchwytu
     struct SnapPoint

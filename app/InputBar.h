@@ -13,10 +13,11 @@ class QLineEdit;
 class QPushButton;
 class QToolButton;
 
-// Pasek wprowadzania – jak Input Bar w Alphacam ("LINE From  X [0] F1=?  Y [0] F1=?  OK").
+// Pasek wprowadzania – jak Input Bar w Alphacam ("LINE From  X [0] F1=?  Y [0] F1=?  OK"),
+// u nas z polem Z – bryłę przesuwamy także w pionie.
 //  - Bez polecenia pasek jest pusty.
 //  - Polecenie, które potrzebuje danych, pokazuje podpowiedź (np. "PRZESUŃ Punkt bazowy"),
-//    pola X i Y oraz przycisk OK. Punkt można wpisać w pola albo kliknąć w widoku.
+//    pola X, Y, Z oraz przycisk OK. Punkt można wpisać w pola albo kliknąć w widoku.
 //  - W polach można wpisywać wyrażenia, np. 100/3+2*(5-1); przecinek = kropka.
 //  - F1 albo przycisk "F1=?" przy polu pomija wartość, której nie znamy. Pasek pokazuje
 //    wtedy inną podpowiedź: brakującą współrzędną bierzemy z kliknięcia w widoku,
@@ -35,7 +36,7 @@ public:
     // Polecenie wybiera elementy: podpowiedź i przyciski Poprzednie / Zakończ (ESC) /
     // Wszystko (A) / Warstwy (L) – na razie bez działania; wybór zatwierdza PPM lub Enter.
     void startSelect(const QString& command, const QString& prompt);
-    // Polecenie czeka na punkt: podpowiedź, pola X i Y, OK.
+    // Polecenie czeka na punkt: podpowiedź, pola X, Y, Z, OK.
     void startPoint(const QString& command, const QString& prompt);
     void setPrompt(const QString& prompt);
 
@@ -43,7 +44,7 @@ public:
 
     // Punkt kliknięty w widoku. Gdy jakieś pole pominięto (F1), wpisane pola
     // zastępują współrzędne kliknięcia. Brak wartości = błąd w polu.
-    std::optional<gp_Pnt> resolveClick(double x, double y);
+    std::optional<gp_Pnt> resolveClick(double x, double y, double z);
     // Klawisz wciśnięty w widoku 3D: cyfry zaczynają wpisywanie, Enter = OK,
     // Tab przechodzi do pól, F1 pomija pole X. Zwraca true, gdy klawisz obsłużono.
     bool handleViewKey(QKeyEvent* e);

@@ -521,7 +521,7 @@ void OccView::onClick(Qt::MouseButton button, const QPoint& pos)
             // Z uchwytem liczy się tylko punkt przyciągnięty; bez niego kliknięcie nic nie daje.
             gp_Pnt p;
             if (snapAt(pos, p))
-                emit pointPicked(p.X(), p.Y(), 0.0);
+                emit pointPicked(p.X(), p.Y(), p.Z()); // punkt uchwytu z prawdziwym Z (np. wierzchołek bryły)
             return;
         }
         const gp_Pnt p = pointOnTable(pos);
@@ -687,6 +687,7 @@ void OccView::addSnapPoints(const TopoDS_Shape& shape, double height, std::vecto
 void OccView::startMovePreview(const gp_Pnt& base, bool model, const std::vector<int>& geometries)
 {
     stopMovePreview();
+    m_movePreviewHasModel = false;
     m_moveBase = base;
     if (model && !m_modelData.shape.IsNull()) {
         // Bryła: półprzezroczysta kopia.
@@ -702,6 +703,7 @@ void OccView::startMovePreview(const gp_Pnt& base, bool model, const std::vector
         solid->SetZLayer(Graphic3d_ZLayerId_Top);
         m_context->Display(solid, AIS_Shaded, -1, Standard_False); // -1: nie do zaznaczania
         m_movePreview.push_back(solid);
+        m_movePreviewHasModel = true;
     }
     for (int i : geometries) {
         if (i < 0 || i >= static_cast<int>(m_geometry.size()))
@@ -768,14 +770,18 @@ bool OccView::snapAt(const QPoint& pos, gp_Pnt& out) const
 void OccView::updatePickFeedback(const QPoint& pos)
 {
     if (!m_movePreview.empty()) {
-        // Kopia jedzie tam, gdzie trafiłby punkt: na uchwyt albo pod kursor (Z bez zmian).
+        // Kopia jedzie tam, gdzie trafiłby punkt: na uchwyt (z jego Z) albo pod kursor
+        // na płaszczyźnie Z = 0. Bryła przesuwa się też w Z, geometrie tylko w X i Y.
         gp_Pnt p;
         if (m_snap == Snap::None || !snapAt(pos, p))
             p = pointOnTable(pos);
-        gp_Trsf move;
-        move.SetTranslation(gp_Vec(p.X() - m_moveBase.X(), p.Y() - m_moveBase.Y(), 0.0));
-        for (const Handle(AIS_Shape)& copy : m_movePreview)
-            m_context->SetLocation(copy, TopLoc_Location(move));
+        const gp_Vec offset(p.X() - m_moveBase.X(), p.Y() - m_moveBase.Y(), p.Z() - m_moveBase.Z());
+        gp_Trsf move, flat;
+        move.SetTranslation(offset);
+        flat.SetTranslation(gp_Vec(offset.X(), offset.Y(), 0.0));
+        for (size_t i = 0; i < m_movePreview.size(); ++i)
+            m_context->SetLocation(m_movePreview[i],
+                                   TopLoc_Location(i == 0 && m_movePreviewHasModel ? move : flat));
     }
     if (m_snap == Snap::None) {
         if (!m_snapMarker.IsNull())

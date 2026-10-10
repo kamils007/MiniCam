@@ -13,6 +13,8 @@
 
 namespace {
 
+constexpr int kFields = 3; // X, Y, Z
+
 // Prosty parser rekurencyjny: wyrażenie = składnik {(+|-) składnik},
 // składnik = czynnik {(*|/) czynnik}, czynnik = [+|-] (liczba | "(" wyrażenie ")").
 class Parser
@@ -133,13 +135,13 @@ InputBar::InputBar(QWidget* parent)
     layout->addWidget(m_command);
     layout->addWidget(m_prompt);
 
-    // Pola X i Y, każde z przyciskiem "F1=?" (pomiń nieznaną wartość).
+    // Pola X, Y i Z, każde z przyciskiem "F1=?" (pomiń nieznaną wartość).
     m_fieldsBox = new QWidget(this);
     auto* fieldsLayout = new QHBoxLayout(m_fieldsBox);
     fieldsLayout->setContentsMargins(8, 0, 0, 0);
     fieldsLayout->setSpacing(4);
-    const char* names[] = {"X", "Y"};
-    for (int i = 0; i < 2; ++i) {
+    const char* names[] = {"X", "Y", "Z"};
+    for (int i = 0; i < kFields; ++i) {
         auto* label = new QLabel(names[i], m_fieldsBox);
         label->setContentsMargins(6, 0, 0, 0);
         auto* field = new QLineEdit(m_fieldsBox);
@@ -225,7 +227,7 @@ void InputBar::startPoint(const QString& command, const QString& prompt)
     m_selecting = false;
     m_command->setText(command.toUpper());
     m_command->show();
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < kFields; ++i) {
         m_bypassed[static_cast<size_t>(i)] = false;
         m_fields[static_cast<size_t>(i)]->setText("0");
         setError(i, false);
@@ -253,6 +255,7 @@ void InputBar::showPrompt()
         QStringList unknown;
         if (m_bypassed[0]) unknown << "X";
         if (m_bypassed[1]) unknown << "Y";
+        if (m_bypassed[2]) unknown << "Z";
         text += QString(" – wskaż w widoku (%1 z kliknięcia)").arg(unknown.join(", "));
     }
     m_prompt->setText(text);
@@ -285,19 +288,23 @@ void InputBar::bypass(int field)
     setError(field, false);
     showPrompt();
     // Kolejne pole, którego jeszcze nie pominięto.
-    const int next = (field + 1) % 2;
-    if (!m_bypassed[static_cast<size_t>(next)])
-        focusField(next);
+    for (int step = 1; step < kFields; ++step) {
+        const int next = (field + step) % kFields;
+        if (!m_bypassed[static_cast<size_t>(next)]) {
+            focusField(next);
+            break;
+        }
+    }
 }
 
-std::optional<gp_Pnt> InputBar::resolveClick(double x, double y)
+std::optional<gp_Pnt> InputBar::resolveClick(double x, double y, double z)
 {
     // Bez pominiętych pól liczy się samo kliknięcie (jak w Alphacam).
     if (!anyBypassed())
-        return gp_Pnt(x, y, 0);
-    double v[2] = {x, y};
+        return gp_Pnt(x, y, z);
+    double v[kFields] = {x, y, z};
     bool ok = true;
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < kFields; ++i) {
         if (m_bypassed[static_cast<size_t>(i)])
             continue;
         if (const auto value = evaluateExpression(m_fields[static_cast<size_t>(i)]->text())) {
@@ -309,7 +316,7 @@ std::optional<gp_Pnt> InputBar::resolveClick(double x, double y)
     }
     if (!ok)
         return std::nullopt;
-    return gp_Pnt(v[0], v[1], 0);
+    return gp_Pnt(v[0], v[1], v[2]);
 }
 
 void InputBar::onOk()
@@ -325,9 +332,9 @@ void InputBar::onOk()
         showPrompt();
         return;
     }
-    double v[2] = {0, 0};
+    double v[kFields] = {0, 0, 0};
     bool ok = true;
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < kFields; ++i) {
         if (const auto value = evaluateExpression(m_fields[static_cast<size_t>(i)]->text())) {
             v[i] = *value;
         } else {
@@ -336,12 +343,12 @@ void InputBar::onOk()
         }
     }
     if (ok)
-        emit pointEntered(v[0], v[1], 0);
+        emit pointEntered(v[0], v[1], v[2]);
 }
 
 void InputBar::focusField(int field)
 {
-    QLineEdit* f = m_fields[static_cast<size_t>((field + 2) % 2)];
+    QLineEdit* f = m_fields[static_cast<size_t>((field + kFields) % kFields)];
     f->setFocus(Qt::TabFocusReason);
     f->selectAll();
 }
@@ -359,7 +366,12 @@ bool InputBar::handleViewKey(QKeyEvent* e)
         return true;
     }
     if (e->key() == Qt::Key_F1) {
-        bypass(m_bypassed[0] ? 1 : 0);
+        for (int i = 0; i < kFields; ++i) {
+            if (!m_bypassed[static_cast<size_t>(i)]) {
+                bypass(i); // pierwsze jeszcze niepominięte pole
+                break;
+            }
+        }
         return true;
     }
     // Pierwszy znak liczby lub wyrażenia: wpisujemy go od razu do pola X.
@@ -380,7 +392,7 @@ bool InputBar::eventFilter(QObject* watched, QEvent* event)
 {
     // F1 jest w Qt skrótem pomocy – przechwytujemy go, zanim pole go zignoruje.
     if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < kFields; ++i) {
             if (watched != m_fields[static_cast<size_t>(i)])
                 continue;
             auto* e = static_cast<QKeyEvent*>(event);

@@ -65,7 +65,7 @@ i geometrii. Otwarcie pliku, wyrównanie i ponowne rozpoznanie cech czyszczą hi
 
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
-pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X i Y z przyciskami „F1=?”,
+pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X, Y i Z z przyciskami „F1=?”,
 przycisk OK i przyciąganie. Punkt można wpisać w pola (OK lub Enter) albo kliknąć
 w widoku. F1 lub „F1=?” pomija nieznaną wartość – podpowiedź się zmienia, a brakująca
 współrzędna przychodzi z kliknięcia (wpisane zostają). Pisanie w widoku od razu trafia
