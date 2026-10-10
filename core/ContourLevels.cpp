@@ -3,6 +3,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <Bnd_Box.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
 #include <TopExp.hxx>
@@ -36,6 +37,46 @@ int horizontalSide(const TopoDS_Face& f, double& z)
         return 0;
     z = pln.Location().Z();
     return nz > 0 ? 1 : -1;
+}
+
+// Najwyższy punkt ścian bocznych konturu: ściany niepoziome, które stykają się
+// z jego krawędziami. Bez ścian bocznych kontur zostaje na wysokości z.
+double wallTop(const TopoDS_Wire& wire, const TopTools_IndexedDataMapOfShapeListOfShape& edgeFaces,
+               double z)
+{
+    double top = z;
+    for (TopExp_Explorer ex(wire, TopAbs_EDGE); ex.More(); ex.Next()) {
+        const TopTools_ListOfShape* faces = edgeFaces.Seek(ex.Current());
+        if (!faces)
+            continue;
+        for (const TopoDS_Shape& f : *faces) {
+            double fz;
+            if (horizontalSide(TopoDS::Face(f), fz) != 0)
+                continue;
+            Bnd_Box box;
+            BRepBndLib::AddOptimal(f, box, Standard_False, Standard_False);
+            double x0, y0, z0, x1, y1, z1;
+            box.Get(x0, y0, z0, x1, y1, z1);
+            top = std::max(top, z1);
+        }
+    }
+    return top;
+}
+
+TopoDS_Wire moveToZ(const TopoDS_Wire& wire, double fromZ, double toZ)
+{
+    if (std::abs(toZ - fromZ) < 1e-9)
+        return wire;
+    gp_Trsf t;
+    t.SetTranslation(gp_Vec(0, 0, toZ - fromZ));
+    return TopoDS::Wire(BRepBuilderAPI_Transform(wire, t, Standard_True).Shape());
+}
+
+bool same(const camcore::LevelContour& a, const camcore::LevelContour& b)
+{
+    return std::abs(a.x - b.x) < kTol && std::abs(a.y - b.y) < kTol
+           && std::abs(a.sizeX - b.sizeX) < kTol && std::abs(a.sizeY - b.sizeY) < kTol
+           && std::abs(a.diameter - b.diameter) < kTol;
 }
 
 // Wypełnia wymiary konturu i rozpoznaje pełny okrąg.
@@ -89,23 +130,32 @@ namespace camcore {
 
 std::vector<ContourLevel> buildContourLevels(const TopoDS_Shape& shape)
 {
+    // Sąsiedztwo w całej bryle: krawędź → ściany, które się na niej stykają.
+    TopTools_IndexedDataMapOfShapeListOfShape shapeEdgeFaces;
+    TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, shapeEdgeFaces);
+    Bnd_Box shapeBox;
+    BRepBndLib::AddOptimal(shape, shapeBox, Standard_False, Standard_False);
+    double bx0, by0, zBottom, bx1, by1, zTop;
+    shapeBox.Get(bx0, by0, zBottom, bx1, by1, zTop);
+
     // 1. Zbieramy poziome ściany i grupujemy je po wysokości i stronie.
     //    Klucz: (Z zaokrąglone do tolerancji, strona) – mapa sortuje od dołu.
-    //    Na tej samej wysokości najpierw poziom widziany od spodu.
+    //    Wierzch płyty pomijamy – jego kontury dają już ściany niższych poziomów.
     std::map<std::pair<long long, int>, std::vector<TopoDS_Face>> groups;
     std::map<std::pair<long long, int>, double> groupZ;
     for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) {
         const TopoDS_Face f = TopoDS::Face(ex.Current());
         double z;
         const int side = horizontalSide(f, z);
-        if (side == 0)
+        if (side == 0 || (side > 0 && std::abs(z - zTop) < kTol))
             continue;
         const std::pair<long long, int> key{std::llround(z / kTol), side};
         groups[key].push_back(f);
         groupZ[key] = z;
     }
 
-    std::vector<ContourLevel> levels;
+    // Kontury pogrupowane po wysokości, na której ostatecznie leżą.
+    std::map<long long, ContourLevel> byHeight;
     for (const auto& [key, faces] : groups) {
         // 2. Krawędzie wszystkich ścian poziomu. Krawędź wspólna dla dwóch ścian
         //    tego samego poziomu leży w środku (np. podział ściany w pliku) –
@@ -134,13 +184,27 @@ std::vector<ContourLevel> buildContourLevels(const TopoDS_Shape& shape)
         Handle(TopTools_HSequenceOfShape) wires;
         ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, kTol, Standard_False, wires);
 
-        ContourLevel level;
-        level.z = groupZ.at(key);
-        level.facingUp = key.second > 0;
-        for (int i = 1; i <= wires->Length(); ++i)
-            level.contours.push_back(describe(TopoDS::Wire(wires->Value(i))));
+        // 4. Każdy kontur przenosimy na wysokość najwyższej ze swoich ścian bocznych.
+        const double z = groupZ.at(key);
+        for (int i = 1; i <= wires->Length(); ++i) {
+            const TopoDS_Wire wire = TopoDS::Wire(wires->Value(i));
+            const double top = wallTop(wire, shapeEdgeFaces, z);
+            ContourLevel& level = byHeight[std::llround(top / kTol)];
+            level.z = top;
+            LevelContour c = describe(moveToZ(wire, z, top));
+            // Ten sam kontur mógł już przyjść z innego poziomu (np. otwór
+            // nieprzelotowy: brzeg dna i brzeg w ścianie wyżej) – zostawiamy jeden.
+            bool duplicate = false;
+            for (const LevelContour& other : level.contours)
+                duplicate = duplicate || same(other, c);
+            if (!duplicate)
+                level.contours.push_back(c);
+        }
+    }
 
-        // 4. Kontury wewnątrz innych (otwory, wnęki) oznaczamy jako wewnętrzne.
+    std::vector<ContourLevel> levels;
+    for (auto& [height, level] : byHeight) {
+        // 5. Kontury wewnątrz innych (otwory, wnęki) oznaczamy jako wewnętrzne.
         for (LevelContour& c : level.contours)
             for (const LevelContour& other : level.contours)
                 if (&c != &other && encloses(other, c)) {

@@ -275,10 +275,8 @@ void MainWindow::onRecognizeFeatures()
         const camcore::ContourLevel& level = m_levels[li];
         const Quantity_Color color = levelColor(li);
         auto* levelItem = new QTreeWidgetItem(m_featureTree);
-        levelItem->setText(0, QString("Poziom %1: Z %2 %3 (%4)")
-                                  .arg(li + 1)
+        levelItem->setText(0, QString("Wysokość Z %1 (%2)")
                                   .arg(num(level.z))
-                                  .arg(level.facingUp ? "↑ od góry" : "↓ od spodu")
                                   .arg(level.contours.size()));
         levelItem->setIcon(0, colorIcon(color));
         levelItem->setData(0, Qt::UserRole, -1); // <0 = cały poziom
