@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-#include "FeatureRecognition.h"
+#include "ContourLevels.h"
 #include "ModelAlign.h"
 #include "ModelImport.h"
 
@@ -42,7 +42,7 @@ private:
     QDockWidget* m_dock = nullptr;
     QTreeWidget* m_featureTree = nullptr;
     camcore::ImportedModel m_shown;          // model tak, jak jest teraz na ekranie
-    std::vector<camcore::Feature> m_features; // wynik ostatniego rozpoznawania
+    std::vector<camcore::ContourLevel> m_levels; // kontury z ostatniego rozpoznawania
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
     bool m_aligned = false; // czy pokazany model jest wyrównany

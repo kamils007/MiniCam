@@ -12,12 +12,13 @@ trafiają w 0,0,0. Przycisk Auto-Wyrównanie Części odwraca bryłę na drugą 
 (kolejne kliknięcie przywraca). Ustawienia zapisują się same i można je
 wyeksportować do pliku .ini.
 
-**Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): jak
-w Alphacam program rysuje z bryły geometrię 2D do obróbki – obrys detalu
-(niebieski), okręgi otworów (czerwone), obrysy kieszeni (zielone) i wycięć
-przelotowych (fioletowe). Każdy kontur leży na wysokości, z której wchodzi
-narzędzie (wierzch, spód albo dno kieszeni). Lista cech z wymiarami i głębokością
-pojawia się w oknie Dodatki; kliknięcie cechy podświetla jej kontur na pomarańczowo.
+**Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
+idzie od dołu do góry po poziomych płaskich powierzchniach bryły. Powierzchnie
+na tej samej wysokości Z (i patrzące w tę samą stronę) tworzą poziom, a ich brzeg
+to kontury 2D tego poziomu – leżą dokładnie na swojej wysokości, także poniżej
+wierzchu (dna kieszeni, stopnie, wręby). Każdy poziom ma swój kolor; w oknie
+Dodatki jest lista poziomów z konturami (wymiary, okręgi Ø), kliknięcie podświetla
+kontur albo cały poziom na pomarańczowo. Kod: `core/ContourLevels`.
 
 ```
 minicam/

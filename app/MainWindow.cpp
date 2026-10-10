@@ -10,6 +10,8 @@
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
+#include <QPixmap>
 #include <QMenu>
 #include <QMessageBox>
 #include <QStatusBar>
@@ -17,6 +19,7 @@
 #include <QTreeWidget>
 
 #include <cmath>
+#include <iterator>
 #include <exception>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -105,7 +108,7 @@ void MainWindow::createRibbon()
 
     QAction* recognizeAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogContentsView),
                                         "Rozpoznaj\ncechy", this);
-    recognizeAct->setToolTip("Narysuj geometrię 2D z bryły: obrys detalu, otwory,\nkieszenie i wycięcia przelotowe");
+    recognizeAct->setToolTip("Narysuj kontury 2D z bryły: od dołu, na każdej\npoziomej powierzchni");
     connect(recognizeAct, &QAction::triggered, this, &MainWindow::onRecognizeFeatures);
 
     QAction* settingsAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView),
@@ -207,55 +210,48 @@ void MainWindow::showModel(const camcore::ImportedModel& model)
 
 void MainWindow::clearFeatures()
 {
-    m_features.clear();
+    m_levels.clear();
     m_featureTree->clear();
-    auto* hint = new QTreeWidgetItem(m_featureTree, {"Cechy: Ekstrakcja → Rozpoznaj cechy"});
+    auto* hint = new QTreeWidgetItem(m_featureTree, {"Kontury: Ekstrakcja → Rozpoznaj cechy"});
     hint->setFlags(Qt::NoItemFlags);
     m_view->showGeometry({});
 }
 
 namespace {
 
-QString sideText(camcore::Feature::Side side)
-{
-    switch (side) {
-    case camcore::Feature::Side::Top:     return "z góry";
-    case camcore::Feature::Side::Bottom:  return "od spodu";
-    case camcore::Feature::Side::Through: return "przelotowy";
-    }
-    return {};
-}
-
 QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
 
-// Kolory geometrii jak "warstwy" w Alphacam – każdy rodzaj cechy osobno.
-Quantity_Color contourColor(camcore::Feature::Type type)
+// Kolor poziomu – kolejne poziomy od dołu dostają kolejne kolory z palety
+// (jak warstwy w Alphacam), żeby łatwo je odróżnić na bryle.
+Quantity_Color levelColor(size_t index)
 {
-    using T = camcore::Feature::Type;
-    switch (type) {
-    case T::Outline: return Quantity_Color(0.10, 0.45, 1.00, Quantity_TOC_sRGB); // niebieski
-    case T::Hole:    return Quantity_Color(0.90, 0.10, 0.10, Quantity_TOC_sRGB); // czerwony
-    case T::Pocket:  return Quantity_Color(0.00, 0.65, 0.20, Quantity_TOC_sRGB); // zielony
-    case T::Cutout:  return Quantity_Color(0.85, 0.10, 0.85, Quantity_TOC_sRGB); // fioletowy
-    }
-    return Quantity_Color(Quantity_NOC_WHITE);
+    static const double palette[][3] = {
+        {0.10, 0.45, 1.00}, // niebieski
+        {0.00, 0.65, 0.20}, // zielony
+        {0.90, 0.10, 0.10}, // czerwony
+        {0.85, 0.10, 0.85}, // fioletowy
+        {0.95, 0.55, 0.00}, // pomarańczowy
+        {0.00, 0.70, 0.75}, // turkusowy
+        {0.55, 0.35, 0.10}, // brązowy
+    };
+    const double* c = palette[index % std::size(palette)];
+    return Quantity_Color(c[0], c[1], c[2], Quantity_TOC_sRGB);
 }
 
-QString featureText(const camcore::Feature& f)
+QIcon colorIcon(const Quantity_Color& color)
 {
-    using T = camcore::Feature::Type;
-    if (f.type == T::Outline)
-        return num(f.sizeX) + " × " + num(f.sizeY) + ", grubość " + num(f.depth);
-    if (f.type == T::Hole) {
-        QString t = "Ø" + num(f.diameter);
-        return f.side == camcore::Feature::Side::Through
-                   ? t + ", przelotowy"
-                   : t + ", gł. " + num(f.depth) + " " + sideText(f.side);
-    }
-    const QString size = num(f.sizeX) + " × " + num(f.sizeY);
-    if (f.type == T::Cutout)
-        return size + ", przelotowe";
-    return size + ", gł. " + num(f.depth) + " " + sideText(f.side);
+    QPixmap pix(12, 12);
+    double r, g, b;
+    color.Values(r, g, b, Quantity_TOC_sRGB);
+    pix.fill(QColor::fromRgbF(r, g, b));
+    return QIcon(pix);
+}
+
+QString contourText(const camcore::LevelContour& c)
+{
+    QString t = c.diameter > 0 ? "Okrąg Ø" + num(c.diameter)
+                               : "Kontur " + num(c.sizeX) + " × " + num(c.sizeY);
+    return c.inner ? t + " (wewnętrzny)" : t;
 }
 
 } // namespace
@@ -268,39 +264,37 @@ void MainWindow::onRecognizeFeatures()
     }
     QApplication::setOverrideCursor(Qt::WaitCursor);
     clearFeatures();
-    m_features = camcore::recognizeFeatures(m_shown.shape);
+    m_levels = camcore::buildContourLevels(m_shown.shape);
     QApplication::restoreOverrideCursor();
 
-    // Geometria 2D: jeden kontur na cechę, w tej samej kolejności co m_features.
+    // Wszystkie kontury trafiają do widoku jedną listą; w drzewku każdy kontur
+    // pamięta swój numer na tej liście, a poziom – zakres numerów swoich konturów.
     std::vector<OccView::Contour> contours;
-    for (const camcore::Feature& f : m_features)
-        contours.push_back({f.contour, contourColor(f.type)});
-    m_view->showGeometry(contours);
-
     m_featureTree->clear();
-    using T = camcore::Feature::Type;
-    const std::pair<T, QString> groups[] = {{T::Outline, "Obrys detalu"},
-                                            {T::Hole, "Otwory"},
-                                            {T::Pocket, "Kieszenie"},
-                                            {T::Cutout, "Wycięcia przelotowe"}};
-    for (const auto& [type, name] : groups) {
-        auto* group = new QTreeWidgetItem(m_featureTree);
-        group->setData(0, Qt::UserRole, -1 - static_cast<int>(type)); // <0 = cała grupa
-        int count = 0;
-        for (size_t i = 0; i < m_features.size(); ++i) {
-            if (m_features[i].type != type)
-                continue;
-            auto* item = new QTreeWidgetItem(group, {featureText(m_features[i])});
-            item->setData(0, Qt::UserRole, static_cast<int>(i));
-            ++count;
+    for (size_t li = 0; li < m_levels.size(); ++li) {
+        const camcore::ContourLevel& level = m_levels[li];
+        const Quantity_Color color = levelColor(li);
+        auto* levelItem = new QTreeWidgetItem(m_featureTree);
+        levelItem->setText(0, QString("Poziom %1: Z %2 %3 (%4)")
+                                  .arg(li + 1)
+                                  .arg(num(level.z))
+                                  .arg(level.facingUp ? "↑ od góry" : "↓ od spodu")
+                                  .arg(level.contours.size()));
+        levelItem->setIcon(0, colorIcon(color));
+        levelItem->setData(0, Qt::UserRole, -1); // <0 = cały poziom
+        levelItem->setData(0, Qt::UserRole + 1, static_cast<int>(contours.size()));
+        for (const camcore::LevelContour& c : level.contours) {
+            auto* item = new QTreeWidgetItem(levelItem, {contourText(c)});
+            item->setData(0, Qt::UserRole, static_cast<int>(contours.size()));
+            contours.push_back({c.wire, color});
         }
-        group->setText(0, QString("%1 (%2)").arg(name).arg(count));
-        group->setExpanded(true);
-        if (count == 0)
-            group->setFlags(Qt::ItemIsEnabled);
+        levelItem->setData(0, Qt::UserRole + 2, static_cast<int>(contours.size()));
+        levelItem->setExpanded(true);
     }
-    statusBar()->showMessage(QString("Narysowano geometrię %1 cech – kliknij cechę na liście, żeby ją podświetlić")
-                                 .arg(m_features.size()));
+    m_view->showGeometry(contours);
+    statusBar()->showMessage(QString("Narysowano %1 konturów na %2 poziomach – kliknij na liście, żeby podświetlić")
+                                 .arg(contours.size())
+                                 .arg(m_levels.size()));
 }
 
 void MainWindow::onFeatureClicked(QTreeWidgetItem* item)
@@ -310,16 +304,14 @@ void MainWindow::onFeatureClicked(QTreeWidgetItem* item)
     const int id = item->data(0, Qt::UserRole).toInt();
     std::vector<int> selected;
     if (id >= 0) {
-        const camcore::Feature& f = m_features[static_cast<size_t>(id)];
         selected = {id};
-        statusBar()->showMessage(QString("%1 – środek X %2  Y %3 mm")
-                                     .arg(featureText(f), num(f.x), num(f.y)));
+        statusBar()->showMessage(item->parent()->text(0).section(" (", 0, 0) + " – " + item->text(0));
     } else {
-        // Kliknięcie w nazwę grupy podświetla geometrię wszystkich cech tego rodzaju.
-        const auto type = static_cast<camcore::Feature::Type>(-1 - id);
-        for (size_t i = 0; i < m_features.size(); ++i)
-            if (m_features[i].type == type)
-                selected.push_back(static_cast<int>(i));
+        // Kliknięcie w poziom podświetla wszystkie jego kontury.
+        const int first = item->data(0, Qt::UserRole + 1).toInt();
+        const int last = item->data(0, Qt::UserRole + 2).toInt();
+        for (int i = first; i < last; ++i)
+            selected.push_back(i);
         statusBar()->showMessage(item->text(0));
     }
     m_view->highlightGeometry(selected);

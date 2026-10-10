@@ -38,6 +38,8 @@ add_library(camcore STATIC
     core/ModelImport.h
     core/ModelAlign.cpp
     core/ModelAlign.h
+    core/ContourLevels.cpp
+    core/ContourLevels.h
     core/FeatureRecognition.cpp
     core/FeatureRecognition.h
 )
@@ -45,6 +47,7 @@ target_include_directories(camcore PUBLIC core ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(camcore PUBLIC
     ${MINICAM_OCC_IMPORT}
     TKXCAF TKLCAF TKCAF  # dokument XCAF: kolory i nazwy z pliku
+    TKShHealing # ShapeAnalysis – łączenie krawędzi w kontury
     TKTopAlgo   # BRepBndLib – prostopadłościan otaczający
     TKBRep      # TopoDS, BRepTools
     TKG3d TKGeomBase TKMath TKernel
