@@ -24,6 +24,8 @@
 #include <QStyle>
 #include <QToolBar>
 #include <QToolButton>
+#include <QUndoCommand>
+#include <QUndoStack>
 
 #include <algorithm>
 #include <cmath>
@@ -53,6 +55,31 @@ QIcon moveIcon()
     return QIcon(pix);
 }
 
+// Jedna zmiana na liście cofania: stan przed i po. Qt wywołuje redo() od razu przy
+// dodaniu na stos – wtedy zmiana jest już zrobiona, więc pierwszy raz nic nie robimy.
+class EditCommand : public QUndoCommand
+{
+public:
+    EditCommand(MainWindow* window, const QString& text, MainWindow::EditState before, MainWindow::EditState after)
+        : QUndoCommand(text), m_window(window), m_before(std::move(before)), m_after(std::move(after))
+    {
+    }
+    void undo() override { m_window->restoreEditState(m_before); }
+    void redo() override
+    {
+        if (m_first) {
+            m_first = false;
+            return;
+        }
+        m_window->restoreEditState(m_after);
+    }
+
+private:
+    MainWindow* m_window;
+    MainWindow::EditState m_before, m_after;
+    bool m_first = true;
+};
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -60,6 +87,7 @@ MainWindow::MainWindow(QWidget* parent)
 {
     setWindowTitle("MiniCAM");
 
+    m_undo = new QUndoStack(this);
     m_view = new OccView(this);
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
@@ -213,8 +241,31 @@ void MainWindow::createRibbon()
 
     RibbonPage* edit = ribbon->addPage("Edycja");
     RibbonGroup* editGroup = edit->addGroup("Edycja");
-    editGroup->addAction(soon(QStyle::SP_ArrowBack, "Cofnij"));
-    editGroup->addAction(soon(QStyle::SP_ArrowForward, "Ponów"));
+    QAction* undoAct = new QAction(style()->standardIcon(QStyle::SP_ArrowBack), "Cofnij", this);
+    undoAct->setShortcut(QKeySequence::Undo);
+    undoAct->setToolTip("Cofnij ostatnią zmianę (Ctrl+Z)");
+    undoAct->setEnabled(false);
+    connect(undoAct, &QAction::triggered, this, [this] {
+        cancelMove();
+        const QString what = m_undo->undoText();
+        m_undo->undo();
+        statusBar()->showMessage("Cofnięto: " + what);
+    });
+    connect(m_undo, &QUndoStack::canUndoChanged, undoAct, &QAction::setEnabled);
+    QAction* redoAct = new QAction(style()->standardIcon(QStyle::SP_ArrowForward), "Ponów", this);
+    redoAct->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
+    redoAct->setToolTip("Ponów cofniętą zmianę (Ctrl+Y)");
+    redoAct->setEnabled(false);
+    connect(redoAct, &QAction::triggered, this, [this] {
+        cancelMove();
+        const QString what = m_undo->redoText();
+        m_undo->redo();
+        statusBar()->showMessage("Ponowiono: " + what);
+    });
+    connect(m_undo, &QUndoStack::canRedoChanged, redoAct, &QAction::setEnabled);
+    addActions({undoAct, redoAct}); // skróty działają w całym oknie
+    editGroup->addAction(undoAct);
+    editGroup->addAction(redoAct);
     editGroup->addAction(soon(QStyle::SP_DialogDiscardButton, "Usuń"));
     RibbonGroup* clipboard = edit->addGroup("Schowek");
     clipboard->addAction(soon(QStyle::SP_FileIcon, "Kopiuj"));
@@ -296,6 +347,7 @@ void MainWindow::showAligned()
 void MainWindow::showModel(const camcore::ImportedModel& model)
 {
     m_shown = model;
+    m_undo->clear(); // nowa bryła albo nowe położenie – starej historii nie da się już cofnąć
     m_view->showModel(model);
     m_layers->setModelName(m_fileName);
     clearFeatures(); // cechy dotyczyły poprzedniego położenia bryły
@@ -364,6 +416,7 @@ void MainWindow::onRecognizeFeatures()
         statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
         return;
     }
+    m_undo->clear(); // geometrie budujemy od nowa – starych zmian nie da się już cofnąć
     QApplication::setOverrideCursor(Qt::WaitCursor);
     m_contours = camcore::buildPartContours(m_shown.shape);
     QApplication::restoreOverrideCursor();
@@ -587,6 +640,7 @@ void MainWindow::onPointEntered(double x, double y, double z)
 
 void MainWindow::applyMove(const gp_Vec& offset)
 {
+    const EditState before = editState();
     if (m_moveModel) {
         gp_Trsf t;
         t.SetTranslation(offset);
@@ -599,10 +653,21 @@ void MainWindow::applyMove(const gp_Vec& offset)
     }
     if (!m_moveGeometries.empty())
         showGeometries();
+    m_undo->push(new EditCommand(this, "Przesuń", before, editState()));
     finishMove(QString("Przesunięto o dX %1  dY %2  dZ %3 mm")
                    .arg(offset.X(), 0, 'f', 2)
                    .arg(offset.Y(), 0, 'f', 2)
                    .arg(offset.Z(), 0, 'f', 2));
+}
+
+void MainWindow::restoreEditState(const EditState& state)
+{
+    const bool modelChanged = !state.shown.shape.IsSame(m_shown.shape);
+    m_shown = state.shown;
+    m_geometries = state.geometries;
+    if (modelChanged)
+        m_view->updateModel(m_shown);
+    showGeometries();
 }
 
 void MainWindow::cancelMove()

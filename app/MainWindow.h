@@ -18,6 +18,7 @@ class QWidget;
 class QAction;
 class QLabel;
 class QToolBar;
+class QUndoStack;
 
 class MainWindow : public QMainWindow
 {
@@ -46,6 +47,18 @@ private:
     void createRibbon();
     void createDock();
     void createBottomBars();
+
+public:
+    // Stan, który da się cofnąć: bryła na ekranie i geometrie (Cofnij / Ponów).
+    struct EditState
+    {
+        camcore::ImportedModel shown;
+        std::vector<camcore::Geometry> geometries;
+    };
+    EditState editState() const { return {m_shown, m_geometries}; }
+    void restoreEditState(const EditState& state);
+
+private:
     void applyMove(const gp_Vec& offset);
     void finishMove(const QString& message);
     void dockToHome();
@@ -70,6 +83,7 @@ private:
     std::vector<int> m_moveGeometries; // wybrane geometrie
     bool m_moveModel = false;          // czy wybrano bryłę
     gp_Pnt m_moveBase;
+    QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)
     QToolBar* m_commandBar = nullptr;       // belka polecenia (druga od dołu)
     QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce
     InputBar* m_inputBar = nullptr;         // pasek wprowadzania (lewa strona belki)

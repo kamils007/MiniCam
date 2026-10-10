@@ -44,13 +44,16 @@ konturu) i ma wysokość swoich ścian: leży na ich górze, a pod nim rysowana 
 kolorowa ścianka do dołu ścian. Kliknięcie geometrii w panelu Warstwy podświetla ją
 na pomarańczowo. Kod: `core/PartContours`.
 
-**Przesuń** (Edycja → Przesuń): klikamy elementy do przesunięcia – bryłę i/lub
-geometrie (każde kliknięcie dokłada element, drugie kliknięcie go odejmuje).
-Wybrana bryła jest lekko podbarwiona na niebiesko, wybrana geometria jasnoniebieska.
-PPM (albo Enter, albo „Gotowe”) zatwierdza wybór. Potem wskazujemy punkt bazowy
-i punkt docelowy: klikając w widoku (płaszczyzna Z 0) albo wpisując je w pasku
-wprowadzania. Dokładne przesunięcie: punkt bazowy 0, 0, potem docelowy = dX, dY.
-Esc lub „Anuluj” przerywa.
+**Przesuń** (Edycja → Przesuń): na pasku wprowadzania „PRZESUŃ: Wskaż” i przyciski
+Poprzednie / Zakończ (ESC) / Wszystko (A) / Warstwy (L) (na razie bez działania).
+Geometria pod kursorem dostaje białą przerywaną linię, bryła pod kursorem się wyszarza.
+LPM dodaje element do wyboru (drugie kliknięcie odejmuje): wybrana geometria ma cienką
+ciągłą niebieską linię, wybrana bryła jest cała niebieska. PPM (albo Enter) kończy wybór.
+Potem przy kursorze jest krzyż linii X/Y/Z, a pasek wprowadzania czeka na punkt bazowy
+i docelowy: klik w widoku (płaszczyzna Z 0) albo wpisanie X/Y. Esc przerywa.
+
+**Cofnij / Ponów** (Edycja, Ctrl+Z / Ctrl+Y): cofa i ponawia przesunięcia bryły
+i geometrii. Otwarcie pliku, wyrównanie i ponowne rozpoznanie cech czyszczą historię.
 
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
