@@ -12,6 +12,7 @@
 #include "commands/Command.h"
 
 class OccView;
+class CommandBar;
 class QDockWidget;
 class LayersPanel;
 class InputBar;
@@ -82,8 +83,7 @@ private:
     QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
     QAction* m_repeatAct = nullptr;   // skrót spacji
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)
-    std::vector<QToolButton*> m_snapButtons; // uchwyty na belce polecenia
-    QToolBar* m_commandBar = nullptr;       // belka polecenia (druga od dołu)
+    CommandBar* m_commandBar = nullptr;     // belka polecenia (druga od dołu)
     QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce
     InputBar* m_inputBar = nullptr;         // pasek wprowadzania (lewa strona belki)
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)

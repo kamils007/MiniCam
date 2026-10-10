@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "AlignSettingsDialog.h"
+#include "BottomBars.h"
 #include "InputBar.h"
 #include "LayersPanel.h"
 #include "OccView.h"
@@ -80,73 +81,6 @@ private:
     EditState m_before, m_after;
     bool m_first = true;
 };
-
-// Ikony uchwytów (jak w Alphacam): szary element i pomarańczowy punkt przyciągania.
-QIcon snapIcon(int kind)
-{
-    QPixmap pix(18, 18);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    const QPen line(QColor(60, 60, 60), 1.6);
-    const QColor dot(240, 150, 20);
-    auto point = [&](double x, double y) {
-        p.setPen(QPen(QColor(120, 60, 0), 0.8));
-        p.setBrush(dot);
-        p.drawRect(QRectF(x - 2.2, y - 2.2, 4.4, 4.4));
-    };
-    p.setPen(line);
-    p.setBrush(Qt::NoBrush);
-    switch (kind) {
-    case 0: // auto: element z kilkoma punktami
-        p.drawLine(QPointF(3, 15), QPointF(15, 3));
-        point(3, 15);
-        point(9, 9);
-        point(15, 3);
-        break;
-    case 1: // koniec
-        p.drawLine(QPointF(4, 9), QPointF(16, 9));
-        point(4, 9);
-        break;
-    case 2: // środek
-        p.drawLine(QPointF(2, 9), QPointF(16, 9));
-        point(9, 9);
-        break;
-    case 3: // centrum okręgu
-        p.drawEllipse(QPointF(9, 9), 6.5, 6.5);
-        point(9, 9);
-        break;
-    case 8: // ćwiartki
-        p.drawEllipse(QPointF(9, 9), 6, 6);
-        point(9, 3);
-        point(15, 9);
-        point(9, 15);
-        point(3, 9);
-        break;
-    default:
-        break;
-    }
-    return QIcon(pix);
-}
-
-// Kursor przy uchwycie: strzałka, a obok niej (w ramce) ikonka wybranego uchwytu.
-QCursor snapCursor(int kind)
-{
-    QPixmap pix(40, 40);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    const QPointF arrow[] = {{1, 1}, {1, 17}, {5, 13}, {8, 20}, {11, 19}, {8, 12}, {13, 12}};
-    p.setPen(QPen(Qt::black, 1));
-    p.setBrush(Qt::white);
-    p.drawPolygon(arrow, 7);
-    const QRectF box(16, 16, 22, 22);
-    p.setPen(QPen(QColor(40, 40, 40), 1));
-    p.setBrush(QColor(255, 255, 255, 230));
-    p.drawRect(box);
-    snapIcon(kind).paint(&p, box.adjusted(2, 2, -2, -2).toRect());
-    return QCursor(pix, 1, 1);
-}
 
 } // namespace
 
@@ -542,173 +476,21 @@ void MainWindow::onRecognizeFeatures()
     statusBar()->showMessage(QString("Wyciągnięto %1 geometrii").arg(m_geometries.size()));
 }
 
-namespace {
-// Pusty przycisk – miejsce na przyszłą funkcję (na razie bez ikony i bez działania).
-QToolButton* placeholderButton(QWidget* parent, const QString& tip, int width = 26)
-{
-    auto* b = new QToolButton(parent);
-    b->setFixedSize(width, 24);
-    b->setToolTip(tip + " (wkrótce)");
-    b->setEnabled(false);
-    b->setProperty("placeholder", true);
-    return b;
-}
-} // namespace
-
 void MainWindow::createBottomBars()
 {
-    // Belka polecenia (druga od dołu, jak w Alphacam): po lewej pasek wprowadzania
-    // (podpowiedź i pola bieżącego polecenia), po prawej przyciąganie.
-    m_commandBar = new QToolBar("Polecenie", this);
-    m_commandBar->setObjectName("commandBar");
-    m_commandBar->setMovable(false);
-    m_commandBar->setFloatable(false);
-    m_commandBar->setContextMenuPolicy(Qt::PreventContextMenu);
-    m_commandBar->setMinimumHeight(32); // pusta belka (bez polecenia) zostaje na swoim miejscu
-    m_inputBar = new InputBar(m_commandBar);
-    m_commandBar->addWidget(m_inputBar);
+    m_commandBar = new CommandBar(this, this);
+    m_inputBar = m_commandBar->inputBar();
     connect(m_inputBar, &InputBar::pointEntered, this, &MainWindow::onPointEntered);
     connect(m_inputBar, &InputBar::selectionDone, this, [this] {
         if (m_command)
             m_command->selectionConfirmed();
     });
     connect(m_inputBar, &InputBar::cancelled, this, &MainWindow::cancelCommand);
-    auto* spacer = new QWidget(m_commandBar);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_commandBar->addWidget(spacer);
-    // Uchwyty (przyciąganie, Snaps) – jak w Alphacam widać je tylko wtedy, gdy polecenie
-    // czeka na punkt. Wybrany uchwyt: znika krzyż, a kursor klei się do takich punktów
-    // geometrii. Drugie kliknięcie tego samego uchwytu go wyłącza.
-    std::vector<QAction*> snaps;
-    snaps.push_back(m_commandBar->addSeparator());
-    snaps.push_back(m_commandBar->addWidget(new QLabel(" Uchwyty ", m_commandBar)));
-    struct SnapDef
-    {
-        const char* name;
-        OccView::Snap snap; // None = jeszcze bez działania
-        int key;            // skrót klawiszowy (0 = brak)
-    };
-    const SnapDef snapDefs[] = {
-        {"AUTO uchwyt (końce, środki, ćwiartki)", OccView::Snap::Auto, 0},
-        {"KONIEC elementu", OccView::Snap::End, Qt::Key_F6},
-        {"ŚRODEK elementu", OccView::Snap::Mid, Qt::Key_F7},
-        {"CENTRUM okręgu", OccView::Snap::Centre, Qt::Key_F8},
-        {"PRZECIĘCIE elementów", OccView::Snap::None, 0},
-        {"STYCZNA do łuku lub okręgu", OccView::Snap::None, 0},
-        {"PROSTOPADŁA do elementu", OccView::Snap::None, 0},
-        {"RÓWNOLEGŁA do elementu", OccView::Snap::None, 0},
-        {"ĆWIARTKI koła", OccView::Snap::Quadrant, 0},
-    };
-    for (int i = 0; i < 9; ++i) {
-        const SnapDef& d = snapDefs[i];
-        const QString name = QString::fromUtf8(d.name);
-        if (d.snap == OccView::Snap::None) {
-            snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, name)));
-            continue;
-        }
-        auto* b = new QToolButton(m_commandBar);
-        b->setObjectName("snapButton");
-        b->setIcon(snapIcon(i));
-        b->setIconSize(QSize(18, 18));
-        b->setFixedSize(26, 24);
-        b->setCheckable(true);
-        b->setFocusPolicy(Qt::NoFocus);
-        b->setToolTip(d.key ? name + "  " + QKeySequence(d.key).toString() : name);
-        const OccView::Snap snap = d.snap;
-        const QCursor cursor = snapCursor(i);
-        connect(b, &QToolButton::toggled, this, [this, b, snap, cursor](bool on) {
-            if (on) {
-                for (QToolButton* other : m_snapButtons)
-                    if (other != b)
-                        other->setChecked(false); // naraz działa jeden uchwyt
-                m_view->setSnap(snap, cursor);
-            } else if (std::none_of(m_snapButtons.begin(), m_snapButtons.end(),
-                                    [](QToolButton* x) { return x->isChecked(); })) {
-                m_view->setSnap(OccView::Snap::None);
-            }
-        });
-        if (d.key) {
-            // Skrót działa w całym oknie (także gdy kursor stoi w polu X/Y), ale tylko
-            // wtedy, gdy przycisk jest widoczny – czyli polecenie czeka na punkt.
-            auto* act = new QAction(this);
-            act->setShortcut(d.key);
-            connect(act, &QAction::triggered, b, [b] {
-                if (b->isVisible())
-                    b->toggle();
-            });
-            addAction(act);
-        }
-        m_snapButtons.push_back(b);
-        snaps.push_back(m_commandBar->addWidget(b));
-    }
-    snaps.push_back(m_commandBar->addWidget(new QLabel(" Filtry ", m_commandBar)));
-    snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, "Filtr 1")));
-    snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, "Filtr 2")));
-    connect(m_inputBar, &InputBar::activeChanged, this, [this, snaps](bool pointInput) {
-        for (QAction* a : snaps)
-            a->setVisible(pointInput);
-        if (!pointInput)
-            for (QToolButton* b : m_snapButtons)
-                b->setChecked(false); // koniec wskazywania – uchwyt się wyłącza
-    });
-    for (QAction* a : snaps)
-        a->setVisible(false);
+    connect(m_commandBar, &CommandBar::snapChanged, m_view, &OccView::setSnap);
     addToolBar(Qt::BottomToolBarArea, m_commandBar);
+    setStyleSheet(styleSheet() + bottomBarsStyleSheet());
 
-    // Belki odcinamy od siebie liniami i lekkim cieniem, a pola i przyciski mają
-    // wklęsłe ramki – żeby nic się nie zlewało z tłem. Kolory tekstu są stałe:
-    // przy ciemnym motywie Windows Qt dałby jasny tekst na naszym jasnym tle.
-    const QString barStyle = R"(
-        QToolBar#commandBar QLabel, QStatusBar, QStatusBar QLabel { color: black; }
-        QToolBar#commandBar QPushButton {
-            color: black;
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
-            border: 1px solid #a8a8a8; border-radius: 2px; padding: 2px 14px;
-        }
-        QToolBar#commandBar QPushButton:pressed { background: #cfe3f7; }
-        QToolBar#commandBar {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f7f7f7, stop:1 #e4e4e4);
-            border-top: 1px solid #8c8c8c; border-bottom: 1px solid #8c8c8c;
-            padding: 2px 4px; spacing: 3px;
-        }
-        QStatusBar {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ececec, stop:1 #dcdcdc);
-            border-top: 1px solid #ffffff;
-        }
-        QStatusBar::item { border: none; }
-        QToolButton[placeholder="true"] {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
-            border: 1px solid #a8a8a8; border-radius: 2px;
-        }
-        QToolButton#snapButton {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
-            border: 1px solid #a8a8a8; border-radius: 2px;
-        }
-        QToolButton#snapButton:hover { border-color: #3d7fd1; }
-        QToolButton#snapButton:checked { background: #9a9a9a; border: 1px solid #505050; }
-        QLabel#cursorLabel {
-            background: #fafafa; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 6px;
-        }
-        QWidget#barGroup { border-left: 1px solid #b0b0b0; }
-        QLabel#inputCommand { font-weight: bold; }
-        QWidget#inputBar QLineEdit {
-            color: black; background: #ffffff; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 3px;
-            selection-background-color: #3d7fd1; selection-color: white;
-        }
-        QWidget#inputBar QLineEdit[error="true"] { background: #ffd6d6; border-color: #c03030; }
-        QToolBar#commandBar QPushButton#inputHint {
-            color: #202020; background: #b4b4b4; border: 1px solid #7a7a7a; border-radius: 1px;
-            padding: 3px 12px;
-        }
-        QToolButton#inputF1 {
-            color: black;
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
-            border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 5px;
-        }
-    )";
-    setStyleSheet(styleSheet() + barStyle);
-
-    // Stopka (najniżej): komunikaty, współrzędne kursora, widoki i przełączniki.
+    // Stopka: komunikaty, współrzędne kursora, widoki i przełączniki.
     m_cursorLabel = new QLabel("X –   Y –", this);
     m_cursorLabel->setObjectName("cursorLabel");
     m_cursorLabel->setMinimumWidth(190);
@@ -717,30 +499,13 @@ void MainWindow::createBottomBars()
     connect(m_view, &OccView::cursorMoved, this, [this](double x, double y) {
         m_cursorLabel->setText(QString("X %1   Y %2").arg(x, 0, 'f', 3).arg(y, 0, 'f', 3));
     });
+    setupFooter(statusBar());
 
     // Esc przerywa polecenie także wtedy, gdy widok 3D nie ma fokusu.
     auto* escAct = new QAction(this);
     escAct->setShortcut(Qt::Key_Escape);
     connect(escAct, &QAction::triggered, this, &MainWindow::cancelCommand);
     addAction(escAct);
-
-    auto* views = new QWidget(this);
-    views->setObjectName("barGroup");
-    auto* viewsLayout = new QHBoxLayout(views);
-    viewsLayout->setContentsMargins(8, 0, 0, 0);
-    viewsLayout->setSpacing(1);
-    for (int i = 1; i <= 15; ++i)
-        viewsLayout->addWidget(placeholderButton(views, QString("Widok %1").arg(i), 22));
-    statusBar()->addPermanentWidget(views);
-
-    auto* toggles = new QWidget(this);
-    toggles->setObjectName("barGroup");
-    auto* togglesLayout = new QHBoxLayout(toggles);
-    togglesLayout->setContentsMargins(8, 0, 0, 0);
-    togglesLayout->setSpacing(1);
-    for (int i = 1; i <= 4; ++i)
-        togglesLayout->addWidget(placeholderButton(toggles, QString("Przełącznik %1").arg(i), 50));
-    statusBar()->addPermanentWidget(toggles);
 }
 
 void MainWindow::runCommand(Command* command)
@@ -797,8 +562,7 @@ void MainWindow::showMessage(const QString& message)
 
 void MainWindow::releaseSnap()
 {
-    for (QToolButton* b : m_snapButtons)
-        b->setChecked(false);
+    m_commandBar->releaseSnap();
 }
 
 void MainWindow::commitEdit(const QString& text, const EditState& before, const EditState& after)

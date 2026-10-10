@@ -65,8 +65,11 @@ qt_add_executable(minicam
     app/MainWindow.h
     app/OccView.cpp
     app/OccView.h
+    app/OccViewPick.cpp
     app/Ribbon.cpp
     app/Ribbon.h
+    app/BottomBars.cpp
+    app/BottomBars.h
     app/InputBar.cpp
     app/InputBar.h
     app/commands/Command.cpp

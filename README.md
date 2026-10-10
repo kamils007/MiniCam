@@ -89,8 +89,10 @@ minicam/
     ├── MainWindow.h/.cpp
     ├── Ribbon.h/.cpp              wstążka (zakładki, grupy, przyciski)
     ├── AlignSettingsDialog.h/.cpp okno Konfiguracja → Auto-wyrównanie
-    ├── InputBar.h/.cpp            pasek wprowadzania (belka polecenia)
-    ├── OccView.h/.cpp             widok 3D
+    ├── BottomBars.h/.cpp          dolne belki: belka polecenia (CommandBar) i stopka
+    ├── InputBar.h/.cpp            pasek wprowadzania (lewa część belki polecenia)
+    ├── OccView.h/.cpp             widok 3D: rysowanie, wybór, mysz
+    ├── OccViewPick.cpp            widok 3D: wskazywanie punktu, uchwyty, podgląd przesuwania
     └── commands/                  polecenia krok po kroku (jak w Alphacam)
         ├── Command.h/.cpp         klasa bazowa + CommandHost (co polecenie dostaje od okna)
         └── MoveCommand.h/.cpp     Przesuń

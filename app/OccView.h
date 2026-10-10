@@ -17,6 +17,8 @@
 #include "ModelImport.h"
 
 // Widżet Qt, w którym Open CASCADE rysuje scenę 3D.
+// Kod: OccView.cpp (rysowanie, wybór, mysz) i OccViewPick.cpp (wskazywanie punktu:
+// krzyż, uchwyty, podgląd przesuwania).
 // Sterowanie: LPM – obrót, ŚPM/PPM – przesuwanie, kółko – zoom.
 // W trybie wyboru kliknięcie LPM zaznacza element, kliknięcie PPM zatwierdza wybór;
 // w trybie wskazywania punktu kliknięcie LPM podaje punkt na płaszczyźnie Z = 0.
