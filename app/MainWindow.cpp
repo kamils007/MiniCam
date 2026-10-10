@@ -4,6 +4,7 @@
 #include "LayersPanel.h"
 #include "OccView.h"
 #include "Ribbon.h"
+#include "commands/MoveCommand.h"
 
 #include <QAction>
 #include <QHBoxLayout>
@@ -60,7 +61,7 @@ QIcon moveIcon()
 class EditCommand : public QUndoCommand
 {
 public:
-    EditCommand(MainWindow* window, const QString& text, MainWindow::EditState before, MainWindow::EditState after)
+    EditCommand(MainWindow* window, const QString& text, EditState before, EditState after)
         : QUndoCommand(text), m_window(window), m_before(std::move(before)), m_after(std::move(after))
     {
     }
@@ -76,7 +77,7 @@ public:
 
 private:
     MainWindow* m_window;
-    MainWindow::EditState m_before, m_after;
+    EditState m_before, m_after;
     bool m_first = true;
 };
 
@@ -162,13 +163,16 @@ MainWindow::MainWindow(QWidget* parent)
     createDock();
     createBottomBars();
     createRibbon();
-    connect(m_view, &OccView::selectionConfirmed, this, &MainWindow::onSelectionConfirmed);
+    // Zdarzenia z widoku trafiają do trwającego polecenia.
+    connect(m_view, &OccView::selectionConfirmed, this, [this] {
+        if (m_command)
+            m_command->selectionConfirmed();
+    });
     connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
-    connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelMove);
+    connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelCommand);
     connect(m_view, &OccView::selectionChanged, this, [this](int count) {
-        m_inputBar->setPrompt(QString("Wskaż (wybrano %1)").arg(count));
-        statusBar()->showMessage(QString("Przesuń: wybrano %1 – klikaj kolejne elementy, PPM zatwierdza, Esc anuluje")
-                                     .arg(count));
+        if (m_command)
+            m_command->selectionChanged(count);
     });
     // Klawiatura w widoku 3D trafia do paska wprowadzania (pisanie liczb, Enter, Tab).
     m_view->installEventFilter(this);
@@ -222,8 +226,8 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (m_inputBar->handleViewKey(e))
             return true;
         // Enter w trakcie wyboru elementów działa jak PPM.
-        if (m_moveStep == MoveStep::Selecting && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)) {
-            onSelectionConfirmed();
+        if (m_command && m_command->isSelecting() && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)) {
+            m_command->selectionConfirmed();
             return true;
         }
     }
@@ -304,7 +308,7 @@ void MainWindow::createRibbon()
     moveAct->setToolTip("Przesuń bryłę lub geometrie: wybierz elementy (LPM),\n"
                         "zatwierdź PPM, potem kliknij punkt bazowy i docelowy\n"
                         "albo wpisz przesunięcie dX/dY/dZ");
-    connect(moveAct, &QAction::triggered, this, &MainWindow::onMove);
+    connect(moveAct, &QAction::triggered, this, [this] { runCommand(new MoveCommand(*this, this)); });
 
     RibbonPage* edit = ribbon->addPage("Edycja");
     RibbonGroup* editGroup = edit->addGroup("Edycja");
@@ -313,7 +317,7 @@ void MainWindow::createRibbon()
     undoAct->setToolTip("Cofnij ostatnią zmianę (Ctrl+Z)");
     undoAct->setEnabled(false);
     connect(undoAct, &QAction::triggered, this, [this] {
-        cancelMove();
+        cancelCommand();
         const QString what = m_undo->undoText();
         m_undo->undo();
         statusBar()->showMessage("Cofnięto: " + what);
@@ -324,7 +328,7 @@ void MainWindow::createRibbon()
     redoAct->setToolTip("Ponów cofniętą zmianę (Ctrl+Y)");
     redoAct->setEnabled(false);
     connect(redoAct, &QAction::triggered, this, [this] {
-        cancelMove();
+        cancelCommand();
         const QString what = m_undo->redoText();
         m_undo->redo();
         statusBar()->showMessage("Ponowiono: " + what);
@@ -373,7 +377,7 @@ void MainWindow::createRibbon()
             statusBar()->showMessage("Spacja powtarza ostatnie polecenie – na razie żadnego nie było");
             return;
         }
-        if (m_moveStep != MoveStep::None || !m_lastCommand->isEnabled())
+        if (m_command || !m_lastCommand->isEnabled())
             return; // w trakcie polecenia spacja nic nie robi
         m_lastCommand->trigger();
     });
@@ -564,8 +568,11 @@ void MainWindow::createBottomBars()
     m_inputBar = new InputBar(m_commandBar);
     m_commandBar->addWidget(m_inputBar);
     connect(m_inputBar, &InputBar::pointEntered, this, &MainWindow::onPointEntered);
-    connect(m_inputBar, &InputBar::selectionDone, this, &MainWindow::onSelectionConfirmed);
-    connect(m_inputBar, &InputBar::cancelled, this, &MainWindow::cancelMove);
+    connect(m_inputBar, &InputBar::selectionDone, this, [this] {
+        if (m_command)
+            m_command->selectionConfirmed();
+    });
+    connect(m_inputBar, &InputBar::cancelled, this, &MainWindow::cancelCommand);
     auto* spacer = new QWidget(m_commandBar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_commandBar->addWidget(spacer);
@@ -714,7 +721,7 @@ void MainWindow::createBottomBars()
     // Esc przerywa polecenie także wtedy, gdy widok 3D nie ma fokusu.
     auto* escAct = new QAction(this);
     escAct->setShortcut(Qt::Key_Escape);
-    connect(escAct, &QAction::triggered, this, &MainWindow::cancelMove);
+    connect(escAct, &QAction::triggered, this, &MainWindow::cancelCommand);
     addAction(escAct);
 
     auto* views = new QWidget(this);
@@ -736,35 +743,14 @@ void MainWindow::createBottomBars()
     statusBar()->addPermanentWidget(toggles);
 }
 
-void MainWindow::onMove()
+void MainWindow::runCommand(Command* command)
 {
-    if (m_shown.shape.IsNull()) {
-        statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
-        return;
+    cancelCommand();
+    m_command = command;
+    if (!m_command->start()) {
+        m_command->deleteLater();
+        m_command = nullptr;
     }
-    m_moveStep = MoveStep::Selecting;
-    m_inputBar->startSelect("Przesuń:", "Wskaż");
-    m_view->clearSelection();
-    m_view->setInteraction(OccView::Interaction::Select);
-    m_view->setFocus();
-    statusBar()->showMessage("Przesuń: wskaż bryłę lub geometrie, PPM zatwierdza, Esc anuluje");
-}
-
-void MainWindow::onSelectionConfirmed()
-{
-    if (m_moveStep != MoveStep::Selecting)
-        return;
-    m_moveGeometries = m_view->selectedGeometries();
-    m_moveModel = m_view->isModelSelected();
-    if (m_moveGeometries.empty() && !m_moveModel) {
-        statusBar()->showMessage("Przesuń: nic nie wybrano – kliknij element (LPM), potem PPM");
-        return;
-    }
-    // Wybór zostaje podświetlony; teraz wskazujemy, o ile przesunąć.
-    m_moveStep = MoveStep::PickBase;
-    m_view->setInteraction(OccView::Interaction::PickPoint);
-    m_inputBar->startPoint("Przesuń:", "Punkt bazowy");
-    statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz go w pasku wprowadzania i Enter");
 }
 
 void MainWindow::onPointPicked(double x, double y, double z)
@@ -782,46 +768,43 @@ void MainWindow::onPointEntered(double x, double y, double z)
     // Po zatwierdzeniu punktu klawiatura wraca do widoku – kolejne pisanie
     // zaczyna się od pierwszego pola następnego punktu.
     m_view->setFocus();
-    if (m_moveStep == MoveStep::PickBase) {
-        m_moveBase = gp_Pnt(x, y, z);
-        m_moveStep = MoveStep::PickTarget;
-        // Uchwyt służył punktowi bazowemu – zwalniamy go (wraca krzyż), a kopia
-        // przesuwanych elementów jedzie za kursorem aż do kliknięcia celu.
-        for (QToolButton* b : m_snapButtons)
-            b->setChecked(false);
-        m_view->startMovePreview(m_moveBase, m_moveModel, m_moveGeometries);
-        m_inputBar->startPoint("Przesuń:", "Punkt docelowy");
-        statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 Z %3 – wskaż punkt docelowy")
-                                     .arg(x, 0, 'f', 2)
-                                     .arg(y, 0, 'f', 2)
-                                     .arg(z, 0, 'f', 2));
-    } else if (m_moveStep == MoveStep::PickTarget) {
-        applyMove(gp_Vec(m_moveBase, gp_Pnt(x, y, z)));
-    }
+    if (m_command)
+        m_command->pointEntered(gp_Pnt(x, y, z));
 }
 
-void MainWindow::applyMove(const gp_Vec& offset)
+void MainWindow::cancelCommand()
 {
-    const EditState before = editState();
-    if (m_moveModel) {
-        gp_Trsf t;
-        t.SetTranslation(offset);
-        m_shown = camcore::transformed(m_shown, t);
-        m_view->updateModel(m_shown);
+    if (m_command)
+        m_command->cancel();
+}
+
+void MainWindow::commandFinished(const QString& message)
+{
+    // Polecenie woła to ze swojej metody – usuwamy je dopiero po powrocie do pętli zdarzeń.
+    if (m_command) {
+        m_command->deleteLater();
+        m_command = nullptr;
     }
-    // Bryła jedzie także w Z; geometrie (kontury 2D) tylko w X i Y.
-    const gp_Vec flat(offset.X(), offset.Y(), 0.0);
-    for (int i : m_moveGeometries) {
-        camcore::Geometry& g = m_geometries[static_cast<size_t>(i)];
-        g.contour = camcore::translated(g.contour, flat);
-    }
-    if (!m_moveGeometries.empty())
-        showGeometries();
-    m_undo->push(new EditCommand(this, "Przesuń", before, editState()));
-    finishMove(QString("Przesunięto o dX %1  dY %2  dZ %3 mm")
-                   .arg(offset.X(), 0, 'f', 2)
-                   .arg(offset.Y(), 0, 'f', 2)
-                   .arg(offset.Z(), 0, 'f', 2));
+    m_inputBar->showIdle();
+    m_view->setInteraction(OccView::Interaction::Navigate);
+    statusBar()->showMessage(message);
+}
+
+void MainWindow::showMessage(const QString& message)
+{
+    statusBar()->showMessage(message);
+}
+
+void MainWindow::releaseSnap()
+{
+    for (QToolButton* b : m_snapButtons)
+        b->setChecked(false);
+}
+
+void MainWindow::commitEdit(const QString& text, const EditState& before, const EditState& after)
+{
+    restoreEditState(after);
+    m_undo->push(new EditCommand(this, text, before, after));
 }
 
 void MainWindow::restoreEditState(const EditState& state)
@@ -832,22 +815,6 @@ void MainWindow::restoreEditState(const EditState& state)
     if (modelChanged)
         m_view->updateModel(m_shown);
     showGeometries();
-}
-
-void MainWindow::cancelMove()
-{
-    if (m_moveStep != MoveStep::None)
-        finishMove("Przesuwanie anulowane");
-}
-
-void MainWindow::finishMove(const QString& message)
-{
-    m_moveStep = MoveStep::None;
-    m_moveGeometries.clear();
-    m_moveModel = false;
-    m_inputBar->showIdle();
-    m_view->setInteraction(OccView::Interaction::Navigate);
-    statusBar()->showMessage(message);
 }
 
 void MainWindow::onAutoAlign()

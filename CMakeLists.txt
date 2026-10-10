@@ -69,11 +69,16 @@ qt_add_executable(minicam
     app/Ribbon.h
     app/InputBar.cpp
     app/InputBar.h
+    app/commands/Command.cpp
+    app/commands/Command.h
+    app/commands/MoveCommand.cpp
+    app/commands/MoveCommand.h
     app/AlignSettingsDialog.cpp
     app/LayersPanel.cpp
     app/LayersPanel.h
     app/AlignSettingsDialog.h
 )
+target_include_directories(minicam PRIVATE app) # polecenia w app/commands widzą InputBar.h, OccView.h
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
     TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów

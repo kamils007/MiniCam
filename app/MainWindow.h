@@ -9,6 +9,7 @@
 #include "PartContours.h"
 #include "ModelAlign.h"
 #include "ModelImport.h"
+#include "commands/Command.h"
 
 class OccView;
 class QDockWidget;
@@ -21,7 +22,7 @@ class QToolBar;
 class QToolButton;
 class QUndoStack;
 
-class MainWindow : public QMainWindow
+class MainWindow : public QMainWindow, public CommandHost
 {
     Q_OBJECT
 
@@ -38,11 +39,9 @@ private slots:
     void onAutoAlign();
     void onAlignSettings();
     void onRecognizeFeatures();
-    void onMove();
-    void onSelectionConfirmed();
     void onPointPicked(double x, double y, double z);
     void onPointEntered(double x, double y, double z);
-    void cancelMove();
+    void cancelCommand();
 
 private:
     void createRibbon();
@@ -50,18 +49,20 @@ private:
     void createBottomBars();
 
 public:
-    // Stan, który da się cofnąć: bryła na ekranie i geometrie (Cofnij / Ponów).
-    struct EditState
-    {
-        camcore::ImportedModel shown;
-        std::vector<camcore::Geometry> geometries;
-    };
-    EditState editState() const { return {m_shown, m_geometries}; }
+    // CommandHost – to, czego potrzebują polecenia (app/commands).
+    OccView* view() override { return m_view; }
+    InputBar* inputBar() override { return m_inputBar; }
+    void showMessage(const QString& message) override;
+    void releaseSnap() override;
+    EditState editState() const override { return {m_shown, m_geometries}; }
+    void commitEdit(const QString& text, const EditState& before, const EditState& after) override;
+    void commandFinished(const QString& message) override;
+
     void restoreEditState(const EditState& state);
 
 private:
-    void applyMove(const gp_Vec& offset);
-    void finishMove(const QString& message);
+    // Uruchamia polecenie (poprzednie, jeśli trwa, zostaje przerwane).
+    void runCommand(Command* command);
     void dockToHome();
     void showAligned();
     void showModel(const camcore::ImportedModel& model);
@@ -77,13 +78,7 @@ private:
     std::vector<camcore::Geometry> m_geometries; // geometrie z właściwościami (warstwa, widoczność)
     camcore::LayerList m_layerList; // warstwy: APS + warstwy użytkownika
 
-    // Polecenie "Przesuń": wybór elementów → punkt bazowy → punkt docelowy
-    // (punkty klikane w widoku albo wpisane w pasku wprowadzania).
-    enum class MoveStep { None, Selecting, PickBase, PickTarget };
-    MoveStep m_moveStep = MoveStep::None;
-    std::vector<int> m_moveGeometries; // wybrane geometrie
-    bool m_moveModel = false;          // czy wybrano bryłę
-    gp_Pnt m_moveBase;
+    Command* m_command = nullptr;     // trwające polecenie (np. Przesuń) albo brak
     QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
     QAction* m_repeatAct = nullptr;   // skrót spacji
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)

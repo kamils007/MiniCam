@@ -89,7 +89,11 @@ minicam/
     ├── MainWindow.h/.cpp
     ├── Ribbon.h/.cpp              wstążka (zakładki, grupy, przyciski)
     ├── AlignSettingsDialog.h/.cpp okno Konfiguracja → Auto-wyrównanie
-    └── OccView.h/.cpp   widok 3D
+    ├── InputBar.h/.cpp            pasek wprowadzania (belka polecenia)
+    ├── OccView.h/.cpp             widok 3D
+    └── commands/                  polecenia krok po kroku (jak w Alphacam)
+        ├── Command.h/.cpp         klasa bazowa + CommandHost (co polecenie dostaje od okna)
+        └── MoveCommand.h/.cpp     Przesuń
 ```
 
 ## Sterowanie
