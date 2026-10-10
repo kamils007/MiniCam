@@ -128,6 +128,25 @@ QIcon snapIcon(int kind)
     return QIcon(pix);
 }
 
+// Kursor przy uchwycie: strzałka, a obok niej (w ramce) ikonka wybranego uchwytu.
+QCursor snapCursor(int kind)
+{
+    QPixmap pix(40, 40);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QPointF arrow[] = {{1, 1}, {1, 17}, {5, 13}, {8, 20}, {11, 19}, {8, 12}, {13, 12}};
+    p.setPen(QPen(Qt::black, 1));
+    p.setBrush(Qt::white);
+    p.drawPolygon(arrow, 7);
+    const QRectF box(16, 16, 22, 22);
+    p.setPen(QPen(QColor(40, 40, 40), 1));
+    p.setBrush(QColor(255, 255, 255, 230));
+    p.drawRect(box);
+    snapIcon(kind).paint(&p, box.adjusted(2, 2, -2, -2).toRect());
+    return QCursor(pix, 1, 1);
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -565,12 +584,13 @@ void MainWindow::createBottomBars()
         b->setFocusPolicy(Qt::NoFocus);
         b->setToolTip(d.key ? name + "  " + QKeySequence(d.key).toString() : name);
         const OccView::Snap snap = d.snap;
-        connect(b, &QToolButton::toggled, this, [this, b, snap](bool on) {
+        const QCursor cursor = snapCursor(i);
+        connect(b, &QToolButton::toggled, this, [this, b, snap, cursor](bool on) {
             if (on) {
                 for (QToolButton* other : m_snapButtons)
                     if (other != b)
                         other->setChecked(false); // naraz działa jeden uchwyt
-                m_view->setSnap(snap);
+                m_view->setSnap(snap, cursor);
             } else if (std::none_of(m_snapButtons.begin(), m_snapButtons.end(),
                                     [](QToolButton* x) { return x->isChecked(); })) {
                 m_view->setSnap(OccView::Snap::None);

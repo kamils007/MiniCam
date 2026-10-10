@@ -18,6 +18,7 @@
 #include <TopoDS.hxx>
 #include <Aspect_DisplayConnection.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
+#include <BRepPrimAPI_MakeSphere.hxx>
 #include <Geom_Axis2Placement.hxx>
 #include <Graphic3d_TransformPers.hxx>
 #include <OpenGl_GraphicDriver.hxx>
@@ -661,9 +662,10 @@ void OccView::showCrosshair(const QPoint& pos)
     m_view->Redraw();
 }
 
-void OccView::setSnap(Snap snap)
+void OccView::setSnap(Snap snap, const QCursor& cursor)
 {
     m_snap = snap;
+    m_snapCursor = cursor;
     if (!m_context.IsNull() && m_interaction == Interaction::PickPoint)
         updatePickFeedback(toPixels(mapFromGlobal(QCursor::pos())));
 }
@@ -701,22 +703,31 @@ void OccView::updatePickFeedback(const QPoint& pos)
     if (m_snap == Snap::None) {
         if (!m_snapMarker.IsNull())
             m_context->Erase(m_snapMarker, Standard_False);
+        setCursor(Qt::CrossCursor);
         showCrosshair(pos);
         return;
     }
-    // Uchwyt włączony: bez krzyża, biała kulka na punkcie, do którego klei się kursor.
+    // Uchwyt włączony: bez krzyża, zielona piłeczka na punkcie, do którego klei się kursor,
+    // a przy strzałce kursora ikonka uchwytu.
     hideCrosshair();
+    setCursor(m_snapCursor);
     gp_Pnt p;
     if (snapAt(pos, p)) {
-        if (!m_snapMarker.IsNull())
-            m_context->Remove(m_snapMarker, Standard_False);
-        Handle(AIS_Point) marker = new AIS_Point(new Geom_CartesianPoint(p));
-        marker->SetMarker(Aspect_TOM_BALL);
-        marker->SetColor(Quantity_NOC_WHITE);
-        marker->Attributes()->PointAspect()->SetScale(4.0);
-        marker->SetZLayer(Graphic3d_ZLayerId_Topmost);
-        m_snapMarker = marker;
-        m_context->Display(m_snapMarker, 0, -1, Standard_False); // -1: nie do zaznaczania
+        if (m_snapMarker.IsNull()) {
+            // Pomocnicza zielona, półprzezroczysta piłeczka o stałej wielkości na ekranie
+            // (ok. 22 px) – kula w (0,0,0), przesuwana do punktu przez TransformPers.
+            Handle(AIS_Shape) ball = new AIS_Shape(BRepPrimAPI_MakeSphere(11.0).Shape());
+            ball->SetColor(Quantity_Color(0.20, 0.85, 0.20, Quantity_TOC_sRGB));
+            ball->SetTransparency(0.25);
+            ball->Attributes()->SetFaceBoundaryDraw(Standard_False);
+            ball->SetZLayer(Graphic3d_ZLayerId_Topmost);
+            m_snapMarker = ball;
+        }
+        m_snapMarker->SetTransformPersistence(new Graphic3d_TransformPers(Graphic3d_TMF_ZoomPers, p));
+        if (m_context->IsDisplayed(m_snapMarker))
+            m_context->Redisplay(m_snapMarker, Standard_False);
+        else
+            m_context->Display(m_snapMarker, AIS_Shaded, -1, Standard_False); // -1: nie do zaznaczania
     } else if (!m_snapMarker.IsNull()) {
         m_context->Erase(m_snapMarker, Standard_False);
     }

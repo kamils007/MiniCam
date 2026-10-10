@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QCursor>
 #include <QPoint>
 #include <QWidget>
 
@@ -33,7 +34,7 @@ public:
     // Uchwyty (przyciąganie) przy wskazywaniu punktu: kursor "klei się" do wybranych
     // punktów geometrii (zamiast krzyża pokazuje znacznik), kliknięcie daje ten punkt.
     enum class Snap { None, Auto, End, Mid, Centre, Quadrant };
-    void setSnap(Snap snap);
+    void setSnap(Snap snap, const QCursor& cursor = QCursor());
 
     // Zaznaczone elementy (tryb wyboru): numery geometrii i czy bryła.
     std::vector<int> selectedGeometries() const;
@@ -122,6 +123,7 @@ private:
     Handle(AIS_Shape) m_crosshair;     // krzyż linii przy kursorze
     Handle(AIS_InteractiveObject) m_snapMarker; // znacznik punktu uchwytu (biała kulka)
     Snap m_snap = Snap::None;
+    QCursor m_snapCursor; // strzałka z ikonką aktywnego uchwytu
     struct SnapPoint
     {
         Snap kind; // End, Mid, Centre albo Quadrant
