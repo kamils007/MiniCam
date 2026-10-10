@@ -31,14 +31,15 @@ struct Pocket
 // Wynik rozbioru płyty na kontury.
 struct PartContours
 {
-    Contour outline;               // kontur po obrysie bryły
+    Contour outline;               // kontur po obrysie bryły (z rzutu bryły z góry)
     std::vector<Contour> inner;    // pozostałe wycięcia na wylot – kontury wewnętrzne
     std::vector<Pocket> pockets;   // wszystko, co nie przechodzi na wylot
 };
 
 // Rozbiera płytę (wyrównaną: grubość wzdłuż Z) na kontury i kieszenie.
-// Idzie po płaskich poziomych powierzchniach (bez wierzchu): spód daje obrys
-// i wycięcia na wylot, powierzchnie patrzące w górę to dna kieszeni.
+// Kontur zewnętrzny to obrys rzutu bryły z góry. Dalej idzie po płaskich
+// poziomych powierzchniach (bez wierzchu): spód daje wycięcia na wylot,
+// powierzchnie patrzące w górę to dna kieszeni.
 // Bierze tylko kontury, których ścianki rosną w Z do góry – kieszenie
 // od spodu płyty są pomijane.
 PartContours buildPartContours(const TopoDS_Shape& shape);

@@ -23,7 +23,9 @@ zielony, jak w Alphacam).
 
 **Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
 rozbiera płytę na kontury, idąc po płaskich poziomych powierzchniach (bez wierzchu):
-- **Kontur** – obrys bryły (zewnętrzny brzeg spodu).
+- **Kontur** – obrys bryły z rzutu z góry (dokładny algorytm HLR z OCCT: linie
+  i łuki zostają liniami i łukami; fazy i zaokrąglenia przy spodzie czy wierzchu
+  nie zmniejszają obrysu).
 - **Kontury wewnętrzne** – pozostałe wycięcia na wylot.
 - **Kieszenie** – wszystko powyżej Z 0. Kieszeń ma kontur zewnętrzny i może mieć
   kontury wewnętrzne (wyspy).

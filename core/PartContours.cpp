@@ -3,7 +3,18 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
+#include <BOPAlgo_Tools.hxx>
+#include <BRepLib.hxx>
+#include <BRep_Tool.hxx>
+#include <BRepTools.hxx>
+#include <BRep_Builder.hxx>
+#include <HLRAlgo_Projector.hxx>
+#include <HLRBRep_Algo.hxx>
+#include <HLRBRep_HLRToShape.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <TopoDS_Compound.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <Bnd_Box.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
@@ -49,10 +60,95 @@ void zRange(const TopoDS_Shape& s, double& z0, double& z1)
     box.Get(x0, y0, z0, x1, y1, z1);
 }
 
+// Obrys bryły z rzutu z góry (dokładny algorytm HLR – linie i łuki zostają
+// prawdziwymi liniami i łukami). Zwraca zamknięty drut w płaszczyźnie Z = 0
+// albo pusty drut, gdy się nie udało.
+TopoDS_Wire projectedOutline(const TopoDS_Shape& shape)
+{
+    // 1. Rzut wszystkich krawędzi bryły na XY, patrząc wzdłuż osi Z.
+    //    Bierzemy krawędzie widoczne z góry i linie sylwetki (np. brzeg walca
+    //    widziany z boku). Obrys widziany z góry nigdy nie jest zasłonięty, a
+    //    zasłonięte krawędzie nakładałyby się na widoczne (np. góra i dół
+    //    pionowej ściany dają w rzucie tę samą linię).
+    Handle(HLRBRep_Algo) hlr = new HLRBRep_Algo;
+    hlr->Add(shape);
+    hlr->Projector(HLRAlgo_Projector(gp_Ax2(gp::Origin(), gp::DZ(), gp::DX())));
+    hlr->Update();
+    hlr->Hide();
+    HLRBRep_HLRToShape toShape(hlr);
+    TopoDS_Compound edges;
+    BRep_Builder builder;
+    builder.MakeCompound(edges);
+    bool any = false;
+    for (const TopoDS_Shape& part : {toShape.VCompound(), toShape.OutLineVCompound(),
+                                     toShape.Rg1LineVCompound()}) {
+        if (part.IsNull())
+            continue;
+        // Krawędzie z rzutu mają tylko krzywe 2D na płaszczyźnie rzutu –
+        // dobudowujemy im krzywe 3D, których potrzebują dalsze algorytmy.
+        BRepLib::BuildCurves3d(part);
+        for (TopExp_Explorer ex(part, TopAbs_EDGE); ex.More(); ex.Next()) {
+            builder.Add(edges, ex.Current());
+            any = true;
+        }
+    }
+    if (!any)
+        return {};
+
+    // 2. Krawędzie rzutu dzielimy w miejscach przecięć, składamy w zamknięte
+    //    druty i z nich w płaskie obszary (ściany) – jak zamalowanie rysunku.
+    TopoDS_Shape wires, faces;
+    if (BOPAlgo_Tools::EdgesToWires(edges, wires, Standard_False) != 0
+        || !BOPAlgo_Tools::WiresToFaces(wires, faces))
+        return {};
+
+    // 3. Obrys całości: krawędzie należące tylko do jednego obszaru (krawędź
+    //    między dwoma obszarami leży w środku rzutu), połączone w druty.
+    //    Największy z nich to obrys bryły.
+    TopTools_IndexedDataMapOfShapeListOfShape edgeFaces;
+    TopExp::MapShapesAndAncestors(faces, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
+    Handle(TopTools_HSequenceOfShape) free = new TopTools_HSequenceOfShape;
+    for (int i = 1; i <= edgeFaces.Extent(); ++i) {
+        TopTools_IndexedMapOfShape distinct;
+        for (const TopoDS_Shape& f : edgeFaces(i))
+            distinct.Add(f);
+        if (distinct.Extent() == 1)
+            free->Append(edgeFaces.FindKey(i));
+    }
+    if (free->IsEmpty())
+        return {};
+    Handle(TopTools_HSequenceOfShape) loops;
+    ShapeAnalysis_FreeBounds::ConnectEdgesToWires(free, kTol, Standard_False, loops);
+    TopoDS_Wire best;
+    double bestArea = 0;
+    for (int i = 1; i <= loops->Length(); ++i) {
+        Bnd_Box wb;
+        BRepBndLib::Add(loops->Value(i), wb);
+        double a0, b0, c0, a1, b1, c1;
+        wb.Get(a0, b0, c0, a1, b1, c1);
+        if ((a1 - a0) * (b1 - b0) > bestArea) {
+            bestArea = (a1 - a0) * (b1 - b0);
+            best = TopoDS::Wire(loops->Value(i));
+        }
+    }
+    if (best.IsNull() || !BRep_Tool::IsClosed(best))
+        return {};
+
+    // 4. Krawędzie obrysu pocięte w miejscach, gdzie dochodziły inne linie
+    //    rzutu, sklejamy z powrotem (odcinki na jednej prostej, łuki jednego okręgu).
+    const TopoDS_Face region = BRepBuilderAPI_MakeFace(best, Standard_True).Face();
+    ShapeUpgrade_UnifySameDomain unify(region, Standard_True, Standard_True, Standard_False);
+    unify.Build();
+    for (TopExp_Explorer ux(unify.Shape(), TopAbs_FACE); ux.More(); ux.Next())
+        return BRepTools::OuterWire(TopoDS::Face(ux.Current()));
+    return best;
+}
+
 class Builder
 {
 public:
     explicit Builder(const TopoDS_Shape& shape)
+        : m_shape(shape)
     {
         TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, m_edgeFaces);
         zRange(shape, m_zBottom, m_zTop);
@@ -78,6 +174,12 @@ public:
         for (const auto& [key, faces] : groups)
             for (const std::vector<TopoDS_Face>& region : connectedRegions(faces))
                 addRegion(region, groupZ.at(key), key.second);
+
+        // Kontur zewnętrzny: obrys rzutu całej bryły z góry, na pełną grubość.
+        // Fazy i zaokrąglenia przy spodzie czy wierzchu nie zmniejszają go.
+        const TopoDS_Wire outline = projectedOutline(m_shape);
+        if (!outline.IsNull())
+            m_result.outline = makeContour(outline, 0.0, m_zBottom, m_zTop);
         return m_result;
     }
 
@@ -256,15 +358,14 @@ private:
             return;
 
         if (side < 0 && std::abs(z - m_zBottom) < kTol) {
-            // 2. Spód płyty: brzeg zewnętrzny to obrys bryły. Wewnętrzne brzegi,
-            //    których ściany nie kończą się na suficie, idą na wylot.
-            //    Pozostałe to wejścia do kieszeni od spodu – te pomijamy.
-            for (size_t i = 0; i < wires.size(); ++i) {
+            // 2. Spód płyty: brzeg zewnętrzny pomijamy – kontur zewnętrzny bierzemy
+            //    z rzutu bryły (przy fazie na spodzie ten brzeg jest mniejszy od bryły).
+            //    Wewnętrzne brzegi, których ściany nie kończą się na suficie, idą
+            //    na wylot. Pozostałe to wejścia do kieszeni od spodu – te pomijamy.
+            for (size_t i = 1; i < wires.size(); ++i) {
                 double bottom, top;
                 wallRange(wires[i], z, bottom, top);
-                if (i == 0 && m_result.outline.geometry.empty())
-                    m_result.outline = makeContour(wires[i], z, z, top);
-                else if (!wallsEndAtCeiling(wires[i]))
+                if (!wallsEndAtCeiling(wires[i]))
                     m_result.inner.push_back(makeContour(wires[i], z, z, top));
             }
             return;
@@ -293,6 +394,7 @@ private:
         m_result.pockets.push_back(std::move(pocket));
     }
 
+    TopoDS_Shape m_shape;
     double m_zTop = 0, m_zBottom = 0;
     TopTools_IndexedMapOfShape m_faces;
     TopTools_IndexedDataMapOfShapeListOfShape m_edgeFaces;

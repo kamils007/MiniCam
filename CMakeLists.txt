@@ -48,6 +48,8 @@ target_include_directories(camcore PUBLIC core ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(camcore PUBLIC
     ${MINICAM_OCC_IMPORT}
     TKXCAF TKLCAF TKCAF  # dokument XCAF: kolory i nazwy z pliku
+    TKHLR       # HLRBRep – rzut bryły z góry (obrys)
+    TKBO        # BOPAlgo_Tools – obszary z krawędzi rzutu (obrys)
     TKShHealing # ShapeAnalysis – łączenie krawędzi w kontury
     TKTopAlgo   # BRepBndLib – prostopadłościan otaczający
     TKBRep      # TopoDS, BRepTools
