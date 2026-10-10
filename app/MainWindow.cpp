@@ -16,6 +16,7 @@
 #include <QStatusBar>
 #include <QStyle>
 
+#include <algorithm>
 #include <cmath>
 #include <exception>
 
@@ -27,6 +28,8 @@ MainWindow::MainWindow(QWidget* parent)
     m_view = new OccView(this);
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
+    // Definicje warstw geometrii. Warstwy użytkownika pojawiają się w panelu
+    // dopiero wtedy, gdy trafi do nich geometria.
     m_geometryLayers = {
         {camcore::kApsLayer, camcore::kApsColor},
         {camcore::kOuterContourLayer, Quantity_Color(0.10, 0.45, 1.00, Quantity_TOC_sRGB)}, // niebieska
@@ -51,13 +54,6 @@ void MainWindow::createDock()
     connect(m_layers, &LayersPanel::modelVisibilityChanged, m_view, &OccView::setModelVisible);
     connect(m_layers, &LayersPanel::geometriesSelected, m_view, &OccView::highlightGeometry);
     m_dock->setWidget(m_layers);
-    std::vector<LayersPanel::LayerRow> userLayers;
-    for (size_t i = 1; i < m_geometryLayers.size(); ++i) {
-        double r, g, b;
-        m_geometryLayers[i].color.Values(r, g, b, Quantity_TOC_sRGB);
-        userLayers.push_back({QString::fromStdString(m_geometryLayers[i].name), QColor::fromRgbF(r, g, b)});
-    }
-    m_layers->setUserLayers(userLayers);
     m_dock->setMinimumWidth(220);
     // Tło trochę jaśniejsze niż pas ikon na wstążce, kolory niezależne od motywu Windows.
     m_dock->setStyleSheet(R"(
@@ -253,6 +249,21 @@ void MainWindow::showGeometries()
         contours.push_back({g.contour.wire, layerOf(g).color, g.contour.zTop - g.contour.zBottom});
         rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
     }
+    // Warstwa użytkownika powstaje dopiero, gdy trafia do niej jakaś geometria
+    // (np. userKonturWew tylko wtedy, gdy wykryto kontur wewnętrzny).
+    std::vector<LayersPanel::LayerRow> userLayers;
+    for (size_t i = 1; i < m_geometryLayers.size(); ++i) {
+        const camcore::Layer& layer = m_geometryLayers[i];
+        const bool used = std::any_of(m_geometries.begin(), m_geometries.end(),
+                                      [&](const camcore::Geometry& g) { return g.layer == layer.name; });
+        if (!used)
+            continue;
+        double r, g, b;
+        layer.color.Values(r, g, b, Quantity_TOC_sRGB);
+        userLayers.push_back({QString::fromStdString(layer.name), QColor::fromRgbF(r, g, b)});
+    }
+    m_layers->setUserLayers(userLayers);
+
     m_view->showGeometry(contours);
     for (size_t i = 0; i < m_geometries.size(); ++i)
         if (!m_geometries[i].visible)
