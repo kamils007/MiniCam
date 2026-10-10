@@ -168,6 +168,21 @@ InputBar::InputBar(QWidget* parent)
     }
     layout->addWidget(m_fieldsBox);
 
+    // Podpowiedzi przy wyborze elementów (jak w Alphacam) – na razie bez działania.
+    m_selectBox = new QWidget(this);
+    auto* selectLayout = new QHBoxLayout(m_selectBox);
+    selectLayout->setContentsMargins(8, 0, 0, 0);
+    selectLayout->setSpacing(6);
+    for (const char* name : {"Poprzednie", "Zakończ (ESC)", "Wszystko (A)", "Warstwy (L)"}) {
+        auto* b = new QPushButton(QString::fromUtf8(name), m_selectBox);
+        b->setObjectName("inputHint");
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setToolTip(b->text() + " (wkrótce)");
+        b->setEnabled(false);
+        selectLayout->addWidget(b);
+    }
+    layout->addWidget(m_selectBox);
+
     m_ok = new QPushButton("OK", this);
     m_ok->setFocusPolicy(Qt::NoFocus);
     connect(m_ok, &QPushButton::clicked, this, &InputBar::onOk);
@@ -186,6 +201,7 @@ void InputBar::showIdle()
     m_command->hide();
     m_prompt->hide();
     m_fieldsBox->hide();
+    m_selectBox->hide();
     m_ok->hide();
     emit activeChanged(false);
 }
@@ -198,7 +214,8 @@ void InputBar::startSelect(const QString& command, const QString& prompt)
     m_command->show();
     setPrompt(prompt);
     m_fieldsBox->hide();
-    m_ok->show();
+    m_selectBox->show();
+    m_ok->hide(); // wybór zatwierdza PPM lub Enter
     emit activeChanged(false);
 }
 
@@ -215,6 +232,7 @@ void InputBar::startPoint(const QString& command, const QString& prompt)
     }
     setPrompt(prompt);
     m_fieldsBox->show();
+    m_selectBox->hide();
     m_ok->show();
     emit activeChanged(true);
 }

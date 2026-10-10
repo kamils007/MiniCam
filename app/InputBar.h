@@ -32,7 +32,8 @@ public:
 
     // Brak polecenia – pusty pasek.
     void showIdle();
-    // Polecenie wybiera elementy: podpowiedź + OK (zatwierdza wybór).
+    // Polecenie wybiera elementy: podpowiedź i przyciski Poprzednie / Zakończ (ESC) /
+    // Wszystko (A) / Warstwy (L) – na razie bez działania; wybór zatwierdza PPM lub Enter.
     void startSelect(const QString& command, const QString& prompt);
     // Polecenie czeka na punkt: podpowiedź, pola X i Y, OK.
     void startPoint(const QString& command, const QString& prompt);
@@ -67,6 +68,7 @@ private:
     QLabel* m_command = nullptr;
     QLabel* m_prompt = nullptr;
     QWidget* m_fieldsBox = nullptr;
+    QWidget* m_selectBox = nullptr; // podpowiedzi przy wyborze: Poprzednie, Zakończ, Wszystko, Warstwy
     std::vector<QLineEdit*> m_fields;
     std::vector<bool> m_bypassed;
     QPushButton* m_ok = nullptr;

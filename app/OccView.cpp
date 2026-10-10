@@ -124,24 +124,29 @@ void OccView::showOriginAxes()
 
 namespace {
 // Wybrana bryła: kolory lekko przesunięte w stronę jasnoniebieskiego ("filtr").
-Quantity_Color tint(const Quantity_Color& c, bool on)
+// Bryła pod kursorem (przy wyborze): cała wyszarzona – kolory mocno rozjaśnione do szarości.
+Quantity_Color tint(const Quantity_Color& c, bool selected, bool hovered)
 {
-    if (!on)
-        return c;
     double r, g, b;
     c.Values(r, g, b, Quantity_TOC_sRGB);
-    return Quantity_Color(0.55 * r + 0.45 * 0.55, 0.55 * g + 0.45 * 0.80, 0.55 * b + 0.45 * 1.00,
-                          Quantity_TOC_sRGB);
+    if (hovered)
+        return Quantity_Color(0.2 * r + 0.8 * 0.95, 0.2 * g + 0.8 * 0.95, 0.2 * b + 0.8 * 0.95,
+                              Quantity_TOC_sRGB);
+    if (selected)
+        return Quantity_Color(0.55 * r + 0.45 * 0.55, 0.55 * g + 0.45 * 0.80, 0.55 * b + 0.45 * 1.00,
+                              Quantity_TOC_sRGB);
+    return c;
 }
 }
 
-Handle(AIS_InteractiveObject) OccView::makeModelPresentation(const camcore::ImportedModel& model, bool tinted) const
+Handle(AIS_InteractiveObject) OccView::makeModelPresentation(const camcore::ImportedModel& model, bool selected,
+                                                            bool hovered) const
 {
     // AIS_ColoredShape = bryła, której fragmenty mogą mieć różne kolory.
     // Geometria trafia na ekran dokładnie tam, gdzie leży w pliku – nic nie przesuwamy.
     Handle(AIS_ColoredShape) ais = new AIS_ColoredShape(model.shape);
     // Fragmenty bez koloru w pliku: neutralny jasnoszary.
-    ais->SetColor(tint(Quantity_Color(0.70, 0.70, 0.70, Quantity_TOC_sRGB), tinted));
+    ais->SetColor(tint(Quantity_Color(0.70, 0.70, 0.70, Quantity_TOC_sRGB), selected, hovered));
     // SetColor przemalowuje też krawędzie – przywracamy im czarny kolor.
     const Handle(Prs3d_LineAspect) blackEdges =
         new Prs3d_LineAspect(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 1.0);
@@ -151,7 +156,7 @@ Handle(AIS_InteractiveObject) OccView::makeModelPresentation(const camcore::Impo
     // Kolory z pliku. Każdy kolorowany fragment dostaje własny zestaw ustawień
     // (CustomAspects), więc czarne krawędzie trzeba mu ustawić osobno.
     for (const camcore::ShapeColor& c : model.colors) {
-        ais->SetCustomColor(c.shape, tint(c.color, tinted));
+        ais->SetCustomColor(c.shape, tint(c.color, selected, hovered));
         const Handle(AIS_ColoredDrawer)& aspects = ais->CustomAspects(c.shape);
         aspects->SetFaceBoundaryDraw(Standard_True);
         aspects->SetFaceBoundaryAspect(blackEdges);
@@ -171,7 +176,8 @@ void OccView::showModel(const camcore::ImportedModel& model)
     m_modelData = model;
     m_modelSelected = false;
     m_modelVisible = true;
-    m_model = makeModelPresentation(model, false);
+    m_modelHovered = false;
+    m_model = makeModelPresentation(model, false, false);
     m_context->Display(m_model, AIS_Shaded, 0, Standard_False);
 
     m_view->SetProj(V3d_XposYnegZpos); // widok izometryczny
@@ -267,12 +273,12 @@ void OccView::refreshGeometryLook()
         const int idx = static_cast<int>(i);
         Quantity_Color color = m_geometryColors[i];
         double width = kLineWidth;
+        bool dashed = false;
         if (has(m_selected, idx)) {
             color = Quantity_Color(0.62, 0.82, 1.00, Quantity_TOC_sRGB);
             width = kHighlightWidth;
         } else if (idx == m_hovered) {
-            color = Quantity_Color(1.00, 0.93, 0.62, Quantity_TOC_sRGB);
-            width = kHighlightWidth;
+            dashed = true; // pod kursorem: biała przerywana linia, ścianka w swoim kolorze
         } else if (has(m_highlighted, idx)) {
             color = Quantity_Color(Quantity_NOC_ORANGE);
             width = kHighlightWidth;
@@ -281,9 +287,13 @@ void OccView::refreshGeometryLook()
         const double transparency = g->Transparency();
         g->SetColor(color);
         g->SetWidth(width);
+        const Quantity_Color lineColor = dashed ? Quantity_Color(Quantity_NOC_WHITE) : color;
+        const Aspect_TypeOfLine lineType = dashed ? Aspect_TOL_DASH : Aspect_TOL_SOLID;
         if (g->Attributes()->FaceBoundaryDraw()) {
             g->SetTransparency(transparency); // SetColor przywraca nieprzezroczystość
-            g->Attributes()->SetFaceBoundaryAspect(new Prs3d_LineAspect(color, Aspect_TOL_SOLID, width));
+            g->Attributes()->SetFaceBoundaryAspect(new Prs3d_LineAspect(lineColor, lineType, width));
+        } else {
+            g->Attributes()->SetWireAspect(new Prs3d_LineAspect(lineColor, lineType, width));
         }
         m_context->Redisplay(g, Standard_False);
     }
@@ -348,7 +358,7 @@ void OccView::rebuildModel()
 {
     if (!m_model.IsNull())
         m_context->Remove(m_model, Standard_False);
-    m_model = makeModelPresentation(m_modelData, m_modelSelected);
+    m_model = makeModelPresentation(m_modelData, m_modelSelected, m_modelHovered);
     if (m_modelVisible)
         m_context->Display(m_model, AIS_Shaded, 0, Standard_False);
     m_view->Redraw();
@@ -502,6 +512,8 @@ void OccView::setInteraction(Interaction mode)
 {
     if (m_context.IsNull())
         return;
+    if (mode != Interaction::Select)
+        clearHover(); // podświetlenie pod kursorem tylko podczas wyboru
     m_interaction = mode;
     if (mode == Interaction::Select) {
         // Bryłę wskazuje OCCT (tryb 0 = cała bryła), geometrie – geometryAt.
@@ -555,8 +567,43 @@ void OccView::mouseMoveEvent(QMouseEvent* e)
         m_view->Pan(pos.x() - m_lastPos.x(), m_lastPos.y() - pos.y());
     }
     m_lastPos = pos;
+    if (m_interaction == Interaction::Select && !(e->buttons() & (Qt::LeftButton | Qt::MiddleButton | Qt::RightButton)))
+        updateHover(pos);
     const gp_Pnt p = pointOnTable(pos);
     emit cursorMoved(p.X(), p.Y());
+}
+
+void OccView::updateHover(const QPoint& pos)
+{
+    // Pod kursorem: najpierw geometria (po liniach), dopiero potem bryła.
+    const int g = geometryAt(pos);
+    const bool model = g < 0 && modelAt(pos);
+    if (g != m_hovered) {
+        m_hovered = g;
+        refreshGeometryLook();
+    }
+    if (model != m_modelHovered) {
+        m_modelHovered = model;
+        rebuildModel();
+    }
+}
+
+void OccView::clearHover()
+{
+    if (m_hovered >= 0) {
+        m_hovered = -1;
+        refreshGeometryLook();
+    }
+    if (m_modelHovered) {
+        m_modelHovered = false;
+        rebuildModel();
+    }
+}
+
+void OccView::leaveEvent(QEvent*)
+{
+    if (!m_view.IsNull())
+        clearHover();
 }
 
 void OccView::wheelEvent(QWheelEvent* e)

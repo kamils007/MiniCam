@@ -71,7 +71,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
     connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelMove);
     connect(m_view, &OccView::selectionChanged, this, [this](int count) {
-        m_inputBar->setPrompt(QString("Wybierz elementy (wybrano %1), PPM, Enter lub OK zatwierdza").arg(count));
+        m_inputBar->setPrompt(QString("Wskaż (wybrano %1)").arg(count));
         statusBar()->showMessage(QString("Przesuń: wybrano %1 – klikaj kolejne elementy, PPM zatwierdza, Esc anuluje")
                                      .arg(count));
     });
@@ -479,6 +479,10 @@ void MainWindow::createBottomBars()
             selection-background-color: #3d7fd1; selection-color: white;
         }
         QWidget#inputBar QLineEdit[error="true"] { background: #ffd6d6; border-color: #c03030; }
+        QToolBar#commandBar QPushButton#inputHint {
+            color: #202020; background: #b4b4b4; border: 1px solid #7a7a7a; border-radius: 1px;
+            padding: 3px 12px;
+        }
         QToolButton#inputF1 {
             color: black;
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
@@ -529,12 +533,11 @@ void MainWindow::onMove()
         return;
     }
     m_moveStep = MoveStep::Selecting;
-    m_inputBar->startSelect("Przesuń", "Wybierz elementy (LPM), PPM, Enter lub OK zatwierdza");
+    m_inputBar->startSelect("Przesuń:", "Wskaż");
     m_view->clearSelection();
     m_view->setInteraction(OccView::Interaction::Select);
     m_view->setFocus();
-    statusBar()->showMessage("Przesuń: wybierz elementy (LPM – bryła lub geometria, kolejne kliknięcia "
-                             "dokładają), PPM zatwierdza, Esc anuluje");
+    statusBar()->showMessage("Przesuń: wskaż bryłę lub geometrie, PPM zatwierdza, Esc anuluje");
 }
 
 void MainWindow::onSelectionConfirmed()
@@ -550,7 +553,7 @@ void MainWindow::onSelectionConfirmed()
     // Wybór zostaje podświetlony; teraz wskazujemy, o ile przesunąć.
     m_moveStep = MoveStep::PickBase;
     m_view->setInteraction(OccView::Interaction::PickPoint);
-    m_inputBar->startPoint("Przesuń", "Punkt bazowy");
+    m_inputBar->startPoint("Przesuń:", "Punkt bazowy");
     statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz go w pasku wprowadzania i Enter");
 }
 
@@ -572,7 +575,7 @@ void MainWindow::onPointEntered(double x, double y, double z)
     if (m_moveStep == MoveStep::PickBase) {
         m_moveBase = gp_Pnt(x, y, z);
         m_moveStep = MoveStep::PickTarget;
-        m_inputBar->startPoint("Przesuń", "Punkt docelowy");
+        m_inputBar->startPoint("Przesuń:", "Punkt docelowy");
         statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 Z %3 – wskaż punkt docelowy")
                                      .arg(x, 0, 'f', 2)
                                      .arg(y, 0, 'f', 2)

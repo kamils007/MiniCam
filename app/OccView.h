@@ -77,11 +77,13 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
     void wheelEvent(QWheelEvent* e) override;
+    void leaveEvent(QEvent* e) override;
 
 private:
     void initViewer();
     void showOriginAxes();
-    Handle(AIS_InteractiveObject) makeModelPresentation(const camcore::ImportedModel& model, bool tinted) const;
+    Handle(AIS_InteractiveObject) makeModelPresentation(const camcore::ImportedModel& model, bool selected,
+                                                        bool hovered) const;
     void rebuildModel(); // przerysowuje bryłę (np. po zmianie zaznaczenia)
     bool isSelectable(const Handle(AIS_InteractiveObject)& obj) const;
     void onClick(Qt::MouseButton button, const QPoint& pos);
@@ -89,6 +91,8 @@ private:
     bool modelAt(const QPoint& pos) const;   // czy pod kursorem jest bryła
     gp_Pnt pointOnTable(const QPoint& pos) const; // punkt spod kursora na płaszczyźnie Z = 0
     void refreshGeometryLook();
+    void updateHover(const QPoint& pos); // podświetla to, co jest pod kursorem (tryb wyboru)
+    void clearHover();
     QPoint toPixels(const QPointF& p) const;
 
     Handle(V3d_Viewer) m_viewer;
@@ -97,6 +101,7 @@ private:
     Handle(AIS_InteractiveObject) m_model; // wczytany detal
     camcore::ImportedModel m_modelData;    // jego dane – do przerysowania
     bool m_modelSelected = false;          // bryła wybrana (lekko podbarwiona)
+    bool m_modelHovered = false;           // bryła pod kursorem przy wyborze (wyszarzona)
     bool m_modelVisible = true;
     std::vector<Handle(AIS_Shape)> m_geometry; // narysowane kontury
     std::vector<Quantity_Color> m_geometryColors; // ich kolory bez podświetlenia
@@ -105,7 +110,7 @@ private:
     std::vector<bool> m_geometryVisible;
     std::vector<int> m_highlighted;    // podświetlone z panelu Warstwy (pomarańczowe)
     std::vector<int> m_selected;       // wybrane w trybie wyboru
-    int m_hovered = -1;                // geometria pod kursorem w trybie wyboru
+    int m_hovered = -1;                // geometria pod kursorem w trybie wyboru (przerywana linia)
     QPoint m_lastPos;
     QPoint m_pressPos; // gdzie wciśnięto przycisk – odróżnia kliknięcie od przeciągania
     Interaction m_interaction = Interaction::Navigate;
