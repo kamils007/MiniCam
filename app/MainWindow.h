@@ -2,14 +2,14 @@
 
 #include <QMainWindow>
 
+#include "Geometry.h"
 #include "PartContours.h"
 #include "ModelAlign.h"
 #include "ModelImport.h"
 
 class OccView;
 class QDockWidget;
-class QTreeWidget;
-class QTreeWidgetItem;
+class LayersPanel;
 
 class MainWindow : public QMainWindow
 {
@@ -28,7 +28,6 @@ private slots:
     void onAutoAlign();
     void onAlignSettings();
     void onRecognizeFeatures();
-    void onFeatureClicked(QTreeWidgetItem* item);
 
 private:
     void createRibbon();
@@ -37,12 +36,15 @@ private:
     void showAligned();
     void showModel(const camcore::ImportedModel& model);
     void clearFeatures();
+    void showGeometries();
+    void setGeometryVisible(int index, bool visible);
 
     OccView* m_view = nullptr;
     QDockWidget* m_dock = nullptr;
-    QTreeWidget* m_featureTree = nullptr;
+    LayersPanel* m_layers = nullptr;
     camcore::ImportedModel m_shown;          // model tak, jak jest teraz na ekranie
     camcore::PartContours m_contours; // kontury i kieszenie z ostatniego rozpoznawania
+    std::vector<camcore::Geometry> m_geometries; // geometrie z właściwościami (kolor, widoczność)
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
     bool m_aligned = false; // czy pokazany model jest wyrównany

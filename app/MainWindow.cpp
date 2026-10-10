@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "AlignSettingsDialog.h"
+#include "LayersPanel.h"
 #include "OccView.h"
 #include "Ribbon.h"
 
@@ -10,13 +11,10 @@
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QIcon>
-#include <QPixmap>
 #include <QMenu>
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QStyle>
-#include <QTreeWidget>
 
 #include <cmath>
 #include <exception>
@@ -39,22 +37,27 @@ void MainWindow::createDock()
 {
     // Dokowane okno po lewej – miejsce na późniejsze dodatki (np. lista operacji).
     // Można je przeciągnąć na prawą stronę, odczepić jako osobne okno albo zamknąć.
-    m_dock = new QDockWidget("Dodatki", this);
+    m_dock = new QDockWidget("Warstwy", this);
     m_dock->setObjectName("dodatkiDock"); // potrzebne do zapamiętania układu okien
     m_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    // Na razie okno pokazuje listę rozpoznanych cech (drzewko: grupa → cecha).
-    m_featureTree = new QTreeWidget(m_dock);
-    m_featureTree->setHeaderHidden(true);
-    connect(m_featureTree, &QTreeWidget::itemClicked, this, &MainWindow::onFeatureClicked);
-    m_dock->setWidget(m_featureTree);
-    clearFeatures();
+    // Panel warstw jak w Alphacam; checkboxy sterują widocznością w widoku 3D.
+    m_layers = new LayersPanel(m_dock);
+    connect(m_layers, &LayersPanel::geometryVisibilityChanged, this, &MainWindow::setGeometryVisible);
+    connect(m_layers, &LayersPanel::modelVisibilityChanged, m_view, &OccView::setModelVisible);
+    connect(m_layers, &LayersPanel::geometriesSelected, m_view, &OccView::highlightGeometry);
+    m_dock->setWidget(m_layers);
     m_dock->setMinimumWidth(220);
     // Tło trochę jaśniejsze niż pas ikon na wstążce, kolory niezależne od motywu Windows.
     m_dock->setStyleSheet(R"(
         QDockWidget { color: black; }
         QDockWidget::title { background: #d4d4d4; padding: 4px; }
         QDockWidget > QWidget { background: #efefef; color: black; border: none; }
+        QTreeWidget { background: #efefef; color: black; border: none; }
         QTreeWidget::item:selected { background: #cfe3f7; color: black; }
+        QToolBar { background: #e6e6e6; border: none; spacing: 2px; }
+        QToolBar#layersSide { border-right: 1px solid #c8c8c8; }
+        QToolBar#layersBar { border-bottom: 1px solid #c8c8c8; }
+        QToolButton:checked { background: #cfe3f7; border: 1px solid #7aa7d6; }
     )");
     addDockWidget(Qt::LeftDockWidgetArea, m_dock);
 
@@ -128,7 +131,7 @@ void MainWindow::createRibbon()
 
     // Akcja "pokaż/ukryj okno" gotowa od Qt – zaznaczona, gdy okno jest widoczne.
     QAction* dockAct = m_dock->toggleViewAction();
-    dockAct->setText("Okno\nDodatki");
+    dockAct->setText("Okno\nWarstwy");
     dockAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogListView));
 
     RibbonPage* home = ribbon->addPage("Narzędzia główne");
@@ -204,49 +207,60 @@ void MainWindow::showModel(const camcore::ImportedModel& model)
 {
     m_shown = model;
     m_view->showModel(model);
+    m_layers->setModelName(m_fileName);
     clearFeatures(); // cechy dotyczyły poprzedniego położenia bryły
 }
 
 void MainWindow::clearFeatures()
 {
     m_contours = {};
-    m_featureTree->clear();
-    auto* hint = new QTreeWidgetItem(m_featureTree, {"Kontury: Ekstrakcja → Rozpoznaj cechy"});
-    hint->setFlags(Qt::NoItemFlags);
-    m_view->showGeometry({});
+    m_geometries.clear();
+    showGeometries();
 }
 
 namespace {
 
 QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
 
-// Kolory jak warstwy w Alphacam: obrys, kontury wewnętrzne, kieszenie.
-const Quantity_Color kOutlineColor(0.10, 0.45, 1.00, Quantity_TOC_sRGB); // niebieski
-const Quantity_Color kInnerColor(0.85, 0.10, 0.85, Quantity_TOC_sRGB);   // fioletowy
-const Quantity_Color kPocketColor(0.00, 0.65, 0.20, Quantity_TOC_sRGB);  // zielony
-
-QIcon colorIcon(const Quantity_Color& color)
+QColor toQColor(const Quantity_Color& color)
 {
-    QPixmap pix(12, 12);
     double r, g, b;
     color.Values(r, g, b, Quantity_TOC_sRGB);
-    pix.fill(QColor::fromRgbF(r, g, b));
-    return QIcon(pix);
+    return QColor::fromRgbF(r, g, b);
 }
 
-QString shapeText(const camcore::Contour& c)
+QString geometryText(size_t index, const camcore::Contour& c)
 {
-    return c.diameter > 0 ? "Ø" + num(c.diameter) : num(c.sizeX) + " × " + num(c.sizeY);
-}
-
-QString contourText(const camcore::Contour& c)
-{
-    return QString("%1, wys. %2, geometrii: %3")
-        .arg(shapeText(c), num(c.zTop - c.zBottom))
-        .arg(c.geometry.size());
+    const QString shape = c.diameter > 0 ? "Ø" + num(c.diameter) : num(c.sizeX) + " × " + num(c.sizeY);
+    return QString("Geometria %1: %2, wys. %3").arg(index + 1).arg(shape, num(c.zTop - c.zBottom));
 }
 
 } // namespace
+
+// Rysuje geometrie według ich właściwości i odświeża warstwę APS w panelu.
+void MainWindow::showGeometries()
+{
+    std::vector<OccView::Contour> contours;
+    std::vector<LayersPanel::GeometryRow> rows;
+    for (size_t i = 0; i < m_geometries.size(); ++i) {
+        const camcore::Geometry& g = m_geometries[i];
+        contours.push_back({g.contour.wire, g.color, g.contour.zTop - g.contour.zBottom});
+        rows.push_back({geometryText(i, g.contour), toQColor(g.color), g.visible});
+    }
+    m_view->showGeometry(contours);
+    for (size_t i = 0; i < m_geometries.size(); ++i)
+        if (!m_geometries[i].visible)
+            m_view->setGeometryVisible(static_cast<int>(i), false);
+    m_layers->setGeometries(rows);
+}
+
+void MainWindow::setGeometryVisible(int index, bool visible)
+{
+    if (index < 0 || index >= static_cast<int>(m_geometries.size()))
+        return;
+    m_geometries[static_cast<size_t>(index)].visible = visible; // właściwość geometrii
+    m_view->setGeometryVisible(index, visible);
+}
 
 void MainWindow::onRecognizeFeatures()
 {
@@ -255,79 +269,29 @@ void MainWindow::onRecognizeFeatures()
         return;
     }
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    clearFeatures();
     m_contours = camcore::buildPartContours(m_shown.shape);
     QApplication::restoreOverrideCursor();
 
-    // Wszystkie kontury trafiają do widoku jedną listą. Element drzewka pamięta
-    // zakres numerów swoich konturów na tej liście [od, do) – kliknięcie go podświetla.
-    std::vector<OccView::Contour> contours;
-    auto addContour = [&](const camcore::Contour& c, const Quantity_Color& color) {
-        contours.push_back({c.wire, color, c.zTop - c.zBottom});
+    // Na razie wszystkie kontury to geometrie niesklasyfikowane – warstwa APS.
+    // Podział na kontur / kontury wewnętrzne / kieszenie zostaje w m_contours
+    // na później, gdy zaczniemy przypinać geometrie do warstw.
+    m_geometries.clear();
+    auto add = [this](const camcore::Contour& c) {
+        camcore::Geometry g;
+        g.contour = c;
+        m_geometries.push_back(g);
     };
-    auto setRange = [](QTreeWidgetItem* item, size_t first, size_t last) {
-        item->setData(0, Qt::UserRole, static_cast<int>(first));
-        item->setData(0, Qt::UserRole + 1, static_cast<int>(last));
-    };
-
-    m_featureTree->clear();
-    if (!m_contours.outline.geometry.empty()) {
-        auto* item = new QTreeWidgetItem(m_featureTree, {"Kontur: " + contourText(m_contours.outline)});
-        item->setIcon(0, colorIcon(kOutlineColor));
-        setRange(item, contours.size(), contours.size() + 1);
-        addContour(m_contours.outline, kOutlineColor);
-    }
-
-    auto* innerGroup = new QTreeWidgetItem(m_featureTree);
-    innerGroup->setText(0, QString("Kontury wewnętrzne (%1)").arg(m_contours.inner.size()));
-    innerGroup->setIcon(0, colorIcon(kInnerColor));
-    const size_t innerFirst = contours.size();
-    for (const camcore::Contour& c : m_contours.inner) {
-        auto* item = new QTreeWidgetItem(innerGroup, {contourText(c)});
-        setRange(item, contours.size(), contours.size() + 1);
-        addContour(c, kInnerColor);
-    }
-    setRange(innerGroup, innerFirst, contours.size());
-
-    auto* pocketGroup = new QTreeWidgetItem(m_featureTree);
-    pocketGroup->setText(0, QString("Kieszenie (%1)").arg(m_contours.pockets.size()));
-    pocketGroup->setIcon(0, colorIcon(kPocketColor));
-    const size_t pocketsFirst = contours.size();
-    for (size_t pi = 0; pi < m_contours.pockets.size(); ++pi) {
-        const camcore::Pocket& p = m_contours.pockets[pi];
-        auto* pocketItem = new QTreeWidgetItem(pocketGroup);
-        pocketItem->setText(0, QString("Kieszeń %1: %2, gł. %3")
-                                   .arg(pi + 1)
-                                   .arg(shapeText(p.contours.front()), num(p.depth)));
-        const size_t first = contours.size();
-        for (size_t ci = 0; ci < p.contours.size(); ++ci) {
-            const QString kind = ci == 0 ? "zewnętrzny" : "wewnętrzny";
-            auto* item = new QTreeWidgetItem(pocketItem, {"Kontur " + kind + ": " + contourText(p.contours[ci])});
-            setRange(item, contours.size(), contours.size() + 1);
-            addContour(p.contours[ci], kPocketColor);
-        }
-        setRange(pocketItem, first, contours.size());
-    }
-    setRange(pocketGroup, pocketsFirst, contours.size());
-    m_featureTree->expandAll();
-
-    m_view->showGeometry(contours);
-    statusBar()->showMessage(QString("Kontur, %1 konturów wewnętrznych, %2 kieszeni – kliknij na liście, żeby podświetlić")
-                                 .arg(m_contours.inner.size())
-                                 .arg(m_contours.pockets.size()));
-}
-
-void MainWindow::onFeatureClicked(QTreeWidgetItem* item)
-{
-    if (!item->data(0, Qt::UserRole).isValid())
-        return;
-    const int first = item->data(0, Qt::UserRole).toInt();
-    const int last = item->data(0, Qt::UserRole + 1).toInt();
-    std::vector<int> selected;
-    for (int i = first; i < last; ++i)
-        selected.push_back(i);
-    statusBar()->showMessage(item->text(0));
-    m_view->highlightGeometry(selected);
+    if (!m_contours.outline.geometry.empty())
+        add(m_contours.outline);
+    for (const camcore::Contour& c : m_contours.inner)
+        add(c);
+    for (const camcore::Pocket& p : m_contours.pockets)
+        for (const camcore::Contour& c : p.contours)
+            add(c);
+    showGeometries();
+    statusBar()->showMessage(QString("Wyciągnięto %1 geometrii do warstwy %2")
+                                 .arg(m_geometries.size())
+                                 .arg(camcore::kApsLayer));
 }
 
 void MainWindow::onAutoAlign()

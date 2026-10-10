@@ -12,6 +12,14 @@ trafiają w 0,0,0. Przycisk Auto-Wyrównanie Części odwraca bryłę na drugą 
 (kolejne kliknięcie przywraca). Ustawienia zapisują się same i można je
 wyeksportować do pliku .ini.
 
+**Panel Warstwy** (po lewej, dokowany): wygląd jak w Alphacam – pionowy pasek
+zakładek, pasek narzędzi warstw (przyciski na razie nieaktywne) i drzewo warstw
+z checkboxami: Geometrie APS, Konstrukcje, Drogi Narzędzia, Wymiary, Splajny,
+Powierzchnie, Tekst, Bryły, STL, Warstwy Użytkownika. Checkbox włącza/wyłącza
+widoczność warstwy albo pojedynczej geometrii. Wszystkie geometrie są na razie
+niesklasyfikowane i trafiają do „Geometrie APS”. Każda geometria ma właściwości
+(`core/Geometry.h`): warstwę, kolor i widoczność.
+
 **Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
 rozbiera płytę na kontury, idąc po płaskich poziomych powierzchniach (bez wierzchu):
 - **Kontur** – obrys bryły (zewnętrzny brzeg spodu).
@@ -22,8 +30,8 @@ rozbiera płytę na kontury, idąc po płaskich poziomych powierzchniach (bez wi
 Bierzemy tylko kontury, których ścianki rosną w Z do góry – kieszenie od spodu
 są pomijane. Każdy kontur składa się z geometrii (odcinki, łuki – po kolei wzdłuż
 konturu) i ma wysokość swoich ścian: leży na ich górze, a pod nim rysowana jest
-kolorowa ścianka do dołu ścian. Kliknięcie w oknie Dodatki podświetla kontur,
-kieszeń albo całą grupę. Kod: `core/PartContours`.
+kolorowa ścianka do dołu ścian. Kliknięcie geometrii w panelu Warstwy podświetla ją
+na pomarańczowo. Kod: `core/PartContours`.
 
 ```
 minicam/

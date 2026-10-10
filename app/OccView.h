@@ -39,6 +39,10 @@ public:
     // Wskazane kontury (indeksy z showGeometry) rysuje na pomarańczowo i grubiej.
     void highlightGeometry(const std::vector<int>& indices);
 
+    // Widoczność (checkboxy w panelu Warstwy).
+    void setGeometryVisible(int index, bool visible);
+    void setModelVisible(bool visible);
+
     // OCCT rysuje sam, Qt nie może malować po tym widżecie.
     QPaintEngine* paintEngine() const override { return nullptr; }
 

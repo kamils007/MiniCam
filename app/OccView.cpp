@@ -216,6 +216,29 @@ void OccView::highlightGeometry(const std::vector<int>& indices)
     m_view->Redraw();
 }
 
+void OccView::setGeometryVisible(int index, bool visible)
+{
+    if (index < 0 || index >= static_cast<int>(m_geometry.size()))
+        return;
+    const Handle(AIS_Shape)& g = m_geometry[static_cast<size_t>(index)];
+    if (visible)
+        m_context->Display(g, Standard_False); // wraca z tym samym trybem i warstwą
+    else
+        m_context->Erase(g, Standard_False);
+    m_view->Redraw();
+}
+
+void OccView::setModelVisible(bool visible)
+{
+    if (m_model.IsNull())
+        return;
+    if (visible)
+        m_context->Display(m_model, Standard_False);
+    else
+        m_context->Erase(m_model, Standard_False);
+    m_view->Redraw();
+}
+
 void OccView::fitAll()
 {
     if (m_view.IsNull())

@@ -38,6 +38,7 @@ add_library(camcore STATIC
     core/ModelImport.h
     core/ModelAlign.cpp
     core/ModelAlign.h
+    core/Geometry.h
     core/PartContours.cpp
     core/PartContours.h
     core/FeatureRecognition.cpp
@@ -64,6 +65,8 @@ qt_add_executable(minicam
     app/Ribbon.cpp
     app/Ribbon.h
     app/AlignSettingsDialog.cpp
+    app/LayersPanel.cpp
+    app/LayersPanel.h
     app/AlignSettingsDialog.h
 )
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets
