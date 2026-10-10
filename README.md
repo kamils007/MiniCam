@@ -44,6 +44,13 @@ konturu) i ma wysokość swoich ścian: leży na ich górze, a pod nim rysowana 
 kolorowa ścianka do dołu ścian. Kliknięcie geometrii w panelu Warstwy podświetla ją
 na pomarańczowo. Kod: `core/PartContours`.
 
+**Przesuń** (Edycja → Przesuń): klikamy elementy do przesunięcia – bryłę i/lub
+geometrie (każde kliknięcie dokłada element, drugie kliknięcie go odejmuje).
+Wybrana bryła jest lekko podbarwiona na niebiesko, wybrana geometria jasnoniebieska.
+PPM zatwierdza wybór. Potem albo klikamy punkt bazowy i punkt docelowy (na
+płaszczyźnie Z 0), albo wpisujemy dokładne przesunięcie dX/dY/dZ na pasku stanu
+i klikamy „Przesuń”. Esc lub „Anuluj” przerywa.
+
 ```
 minicam/
 ├── CMakeLists.txt

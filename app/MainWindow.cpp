@@ -5,6 +5,13 @@
 #include "Ribbon.h"
 
 #include <QAction>
+#include <QDoubleSpinBox>
+#include <QHBoxLayout>
+#include <QIcon>
+#include <QLabel>
+#include <QPainter>
+#include <QPixmap>
+#include <QPushButton>
 #include <QApplication>
 #include <QDockWidget>
 #include <QEvent>
@@ -20,6 +27,32 @@
 #include <cmath>
 #include <exception>
 
+namespace {
+
+// Ikona "Przesuń": strzałki w cztery strony.
+QIcon moveIcon()
+{
+    QPixmap pix(32, 32);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(QPen(QColor(200, 40, 30), 2.5));
+    p.drawLine(16, 4, 16, 28);
+    p.drawLine(4, 16, 28, 16);
+    p.setBrush(QColor(200, 40, 30));
+    const QPointF up[] = {{16, 1}, {11, 8}, {21, 8}};
+    const QPointF down[] = {{16, 31}, {11, 24}, {21, 24}};
+    const QPointF left[] = {{1, 16}, {8, 11}, {8, 21}};
+    const QPointF right[] = {{31, 16}, {24, 11}, {24, 21}};
+    p.drawPolygon(up, 3);
+    p.drawPolygon(down, 3);
+    p.drawPolygon(left, 3);
+    p.drawPolygon(right, 3);
+    return QIcon(pix);
+}
+
+} // namespace
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
@@ -30,7 +63,15 @@ MainWindow::MainWindow(QWidget* parent)
     m_alignSettings = loadAlignSettings();
 
     createDock();
+    createMovePanel();
     createRibbon();
+    connect(m_view, &OccView::selectionConfirmed, this, &MainWindow::onSelectionConfirmed);
+    connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
+    connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelMove);
+    connect(m_view, &OccView::selectionChanged, this, [this](int count) {
+        statusBar()->showMessage(QString("Przesuń: wybrano %1 – klikaj kolejne elementy, PPM zatwierdza, Esc anuluje")
+                                     .arg(count));
+    });
     statusBar()->showMessage("Otwórz bryłę: Plik → Otwórz (Ctrl+O)");
 }
 
@@ -140,6 +181,39 @@ void MainWindow::createRibbon()
     RibbonGroup* viewGroup = home->addGroup("Widok");
     viewGroup->addAction(fitAct);
     viewGroup->addAction(dockAct);
+
+    // Zakładka Edycja – układ grup jak w Alphacam. Na razie działa "Przesuń",
+    // pozostałe polecenia są widoczne, ale wyłączone (przyjdą później).
+    auto soon = [this](QStyle::StandardPixmap icon, const QString& text) {
+        auto* a = new QAction(style()->standardIcon(icon), text, this);
+        a->setEnabled(false);
+        a->setToolTip(QString(text).replace('\n', ' ') + " (wkrótce)");
+        return a;
+    };
+    QAction* moveAct = new QAction(moveIcon(), "Przesuń", this);
+    moveAct->setToolTip("Przesuń bryłę lub geometrie: wybierz elementy (LPM),\n"
+                        "zatwierdź PPM, potem kliknij punkt bazowy i docelowy\n"
+                        "albo wpisz przesunięcie dX/dY/dZ");
+    connect(moveAct, &QAction::triggered, this, &MainWindow::onMove);
+
+    RibbonPage* edit = ribbon->addPage("Edycja");
+    RibbonGroup* editGroup = edit->addGroup("Edycja");
+    editGroup->addAction(soon(QStyle::SP_ArrowBack, "Cofnij"));
+    editGroup->addAction(soon(QStyle::SP_ArrowForward, "Ponów"));
+    editGroup->addAction(soon(QStyle::SP_DialogDiscardButton, "Usuń"));
+    RibbonGroup* clipboard = edit->addGroup("Schowek");
+    clipboard->addAction(soon(QStyle::SP_FileIcon, "Kopiuj"));
+    clipboard->addAction(soon(QStyle::SP_DialogResetButton, "Wytnij"));
+    clipboard->addAction(soon(QStyle::SP_DialogSaveButton, "Wklej"));
+    RibbonGroup* moveGroup = edit->addGroup("Przesuń, kopiuj itd.");
+    moveGroup->addAction(moveAct);
+    moveGroup->addAction(soon(QStyle::SP_BrowserReload, "Obróć"));
+    moveGroup->addAction(soon(QStyle::SP_MediaSeekBackward, "Lustro"));
+    moveGroup->addAction(soon(QStyle::SP_TitleBarMaxButton, "Skaluj"));
+    RibbonGroup* breakGroup = edit->addGroup("Przerwij, połącz itd.");
+    breakGroup->addAction(soon(QStyle::SP_MediaPause, "Przerwij"));
+    breakGroup->addAction(soon(QStyle::SP_DialogCancelButton, "Przytnij"));
+    breakGroup->addAction(soon(QStyle::SP_DialogApplyButton, "Połącz"));
 
     RibbonPage* extraction = ribbon->addPage("Ekstrakcja modelu bryłowego");
     extraction->addGroup("Cechy")->addAction(recognizeAct);
@@ -303,6 +377,132 @@ void MainWindow::onRecognizeFeatures()
             add(c, camcore::layerForContour(c, false));
     showGeometries();
     statusBar()->showMessage(QString("Wyciągnięto %1 geometrii").arg(m_geometries.size()));
+}
+
+void MainWindow::createMovePanel()
+{
+    // Pasek w stopce okna, widoczny podczas przesuwania: dokładne przesunięcie
+    // wpisane z klawiatury zamiast klikania punktów.
+    m_movePanel = new QWidget(this);
+    auto* layout = new QHBoxLayout(m_movePanel);
+    layout->setContentsMargins(0, 0, 0, 0);
+    auto addField = [&](const QString& label) {
+        layout->addWidget(new QLabel(label, m_movePanel));
+        auto* box = new QDoubleSpinBox(m_movePanel);
+        box->setRange(-100000, 100000);
+        box->setDecimals(3);
+        box->setSuffix(" mm");
+        box->setMinimumWidth(110);
+        layout->addWidget(box);
+        return box;
+    };
+    m_moveDx = addField("dX");
+    m_moveDy = addField("dY");
+    m_moveDz = addField("dZ");
+    auto* ok = new QPushButton("Przesuń", m_movePanel);
+    auto* cancel = new QPushButton("Anuluj", m_movePanel);
+    layout->addWidget(ok);
+    layout->addWidget(cancel);
+    connect(ok, &QPushButton::clicked, this, &MainWindow::onMoveByValues);
+    connect(cancel, &QPushButton::clicked, this, &MainWindow::cancelMove);
+    statusBar()->addPermanentWidget(m_movePanel);
+    m_movePanel->hide();
+
+    // Esc przerywa przesuwanie także wtedy, gdy widok 3D nie ma fokusu.
+    auto* escAct = new QAction(this);
+    escAct->setShortcut(Qt::Key_Escape);
+    connect(escAct, &QAction::triggered, this, &MainWindow::cancelMove);
+    addAction(escAct);
+}
+
+void MainWindow::onMove()
+{
+    if (m_shown.shape.IsNull()) {
+        statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
+        return;
+    }
+    m_moveStep = MoveStep::Selecting;
+    m_movePanel->hide();
+    m_view->clearSelection();
+    m_view->setInteraction(OccView::Interaction::Select);
+    m_view->setFocus();
+    statusBar()->showMessage("Przesuń: wybierz elementy (LPM – bryła lub geometria, kolejne kliknięcia "
+                             "dokładają), PPM zatwierdza, Esc anuluje");
+}
+
+void MainWindow::onSelectionConfirmed()
+{
+    if (m_moveStep != MoveStep::Selecting)
+        return;
+    m_moveGeometries = m_view->selectedGeometries();
+    m_moveModel = m_view->isModelSelected();
+    if (m_moveGeometries.empty() && !m_moveModel) {
+        statusBar()->showMessage("Przesuń: nic nie wybrano – kliknij element (LPM), potem PPM");
+        return;
+    }
+    // Wybór zostaje podświetlony; teraz wskazujemy, o ile przesunąć.
+    m_moveStep = MoveStep::PickBase;
+    m_view->setInteraction(OccView::Interaction::PickPoint);
+    m_moveDx->setValue(0);
+    m_moveDy->setValue(0);
+    m_moveDz->setValue(0);
+    m_movePanel->show();
+    statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz przesunięcie");
+}
+
+void MainWindow::onPointPicked(double x, double y, double z)
+{
+    if (m_moveStep == MoveStep::PickBase) {
+        m_moveBase = gp_Pnt(x, y, z);
+        m_moveStep = MoveStep::PickTarget;
+        statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 – kliknij punkt docelowy")
+                                     .arg(x, 0, 'f', 2)
+                                     .arg(y, 0, 'f', 2));
+    } else if (m_moveStep == MoveStep::PickTarget) {
+        applyMove(gp_Vec(m_moveBase, gp_Pnt(x, y, z)));
+    }
+}
+
+void MainWindow::onMoveByValues()
+{
+    if (m_moveStep == MoveStep::PickBase || m_moveStep == MoveStep::PickTarget)
+        applyMove(gp_Vec(m_moveDx->value(), m_moveDy->value(), m_moveDz->value()));
+}
+
+void MainWindow::applyMove(const gp_Vec& offset)
+{
+    if (m_moveModel) {
+        gp_Trsf t;
+        t.SetTranslation(offset);
+        m_shown = camcore::transformed(m_shown, t);
+        m_view->updateModel(m_shown);
+    }
+    for (int i : m_moveGeometries) {
+        camcore::Geometry& g = m_geometries[static_cast<size_t>(i)];
+        g.contour = camcore::translated(g.contour, offset);
+    }
+    if (!m_moveGeometries.empty())
+        showGeometries();
+    finishMove(QString("Przesunięto o dX %1  dY %2  dZ %3 mm")
+                   .arg(offset.X(), 0, 'f', 2)
+                   .arg(offset.Y(), 0, 'f', 2)
+                   .arg(offset.Z(), 0, 'f', 2));
+}
+
+void MainWindow::cancelMove()
+{
+    if (m_moveStep != MoveStep::None)
+        finishMove("Przesuwanie anulowane");
+}
+
+void MainWindow::finishMove(const QString& message)
+{
+    m_moveStep = MoveStep::None;
+    m_moveGeometries.clear();
+    m_moveModel = false;
+    m_movePanel->hide();
+    m_view->setInteraction(OccView::Interaction::Navigate);
+    statusBar()->showMessage(message);
 }
 
 void MainWindow::onAutoAlign()

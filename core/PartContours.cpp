@@ -405,6 +405,25 @@ private:
 
 namespace camcore {
 
+Contour translated(const Contour& contour, const gp_Vec& offset)
+{
+    gp_Trsf t;
+    t.SetTranslation(offset);
+    Contour c = contour;
+    c.wire = TopoDS::Wire(BRepBuilderAPI_Transform(contour.wire, t, Standard_True).Shape());
+    c.geometry.clear();
+    for (BRepTools_WireExplorer ex(c.wire); ex.More(); ex.Next())
+        c.geometry.push_back(ex.Current());
+    if (c.geometry.empty())
+        for (TopExp_Explorer ex(c.wire, TopAbs_EDGE); ex.More(); ex.Next())
+            c.geometry.push_back(TopoDS::Edge(ex.Current()));
+    c.x += offset.X();
+    c.y += offset.Y();
+    c.zTop += offset.Z();
+    c.zBottom += offset.Z();
+    return c;
+}
+
 PartContours buildPartContours(const TopoDS_Shape& shape)
 {
     return Builder(shape).run();

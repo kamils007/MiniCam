@@ -3,6 +3,7 @@
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
+#include <gp_Vec.hxx>
 
 namespace camcore {
 
@@ -35,6 +36,9 @@ struct PartContours
     std::vector<Contour> inner;    // pozostałe wycięcia na wylot – kontury wewnętrzne
     std::vector<Pocket> pockets;   // wszystko, co nie przechodzi na wylot
 };
+
+// Kopia konturu przesunięta o wektor (geometrie, wysokości i wymiary razem z nią).
+Contour translated(const Contour& contour, const gp_Vec& offset);
 
 // Rozbiera płytę (wyrównaną: grubość wzdłuż Z) na kontury i kieszenie.
 // Kontur zewnętrzny to obrys rzutu bryły z góry. Dalej idzie po płaskich
