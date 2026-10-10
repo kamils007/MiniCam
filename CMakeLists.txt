@@ -38,6 +38,8 @@ add_library(camcore STATIC
     core/ModelImport.h
     core/ModelAlign.cpp
     core/ModelAlign.h
+    core/FeatureRecognition.cpp
+    core/FeatureRecognition.h
 )
 target_include_directories(camcore PUBLIC core ${OpenCASCADE_INCLUDE_DIR})
 target_link_libraries(camcore PUBLIC

@@ -3,7 +3,10 @@
 #include <QPoint>
 #include <QWidget>
 
+#include <vector>
+
 #include <AIS_InteractiveContext.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
@@ -22,6 +25,9 @@ public:
     // Pokazuje model w położeniu z pliku, z kolorami z pliku.
     void showModel(const camcore::ImportedModel& model);
     void fitAll();
+
+    // Podświetla wskazane ściany na pomarańczowo (pusta lista = zgaś podświetlenie).
+    void highlightFaces(const std::vector<TopoDS_Face>& faces);
 
     // OCCT rysuje sam, Qt nie może malować po tym widżecie.
     QPaintEngine* paintEngine() const override { return nullptr; }
@@ -42,5 +48,6 @@ private:
     Handle(V3d_View) m_view;
     Handle(AIS_InteractiveContext) m_context;
     Handle(AIS_InteractiveObject) m_model; // wczytany detal
+    Handle(AIS_InteractiveObject) m_highlight; // podświetlone ściany (nakładka)
     QPoint m_lastPos;
 };

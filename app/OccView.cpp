@@ -1,14 +1,18 @@
 #include "OccView.h"
 
 #include <AIS_ColoredShape.hxx>
+#include <AIS_Shape.hxx>
 #include <AIS_Trihedron.hxx>
-#include <Prs3d_DatumAspect.hxx>
+#include <Aspect_DisplayConnection.hxx>
+#include <BRep_Builder.hxx>
 #include <Geom_Axis2Placement.hxx>
 #include <Graphic3d_TransformPers.hxx>
-#include <Aspect_DisplayConnection.hxx>
 #include <OpenGl_GraphicDriver.hxx>
+#include <Prs3d_DatumAspect.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
+#include <Prs3d_ShadingAspect.hxx>
+#include <TopoDS_Compound.hxx>
 
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -113,6 +117,7 @@ void OccView::showModel(const camcore::ImportedModel& model)
 
     if (!m_model.IsNull())
         m_context->Remove(m_model, Standard_False); // osie zostają
+    highlightFaces({}); // podświetlenie dotyczyło starej bryły
 
     // AIS_ColoredShape = bryła, której fragmenty mogą mieć różne kolory.
     // Geometria trafia na ekran dokładnie tam, gdzie leży w pliku – nic nie przesuwamy.
@@ -142,6 +147,35 @@ void OccView::showModel(const camcore::ImportedModel& model)
     // bez tego FitAll liczyłby dopasowanie dla starego rozmiaru.
     m_view->MustBeResized();
     fitAll();
+}
+
+void OccView::highlightFaces(const std::vector<TopoDS_Face>& faces)
+{
+    if (m_context.IsNull())
+        return;
+    if (!m_highlight.IsNull()) {
+        m_context->Remove(m_highlight, Standard_False);
+        m_highlight.Nullify();
+    }
+    if (!faces.empty()) {
+        // Nakładka: kopia wskazanych ścian narysowana na pomarańczowo w tym samym
+        // miejscu co bryła. "Polygon offset" przesuwa ją minimalnie w stronę kamery,
+        // żeby nie migotała z oryginalnymi ścianami (z-fighting).
+        TopoDS_Compound compound;
+        BRep_Builder builder;
+        builder.MakeCompound(compound);
+        for (const TopoDS_Face& f : faces)
+            builder.Add(compound, f);
+        Handle(AIS_Shape) overlay = new AIS_Shape(compound);
+        overlay->SetColor(Quantity_NOC_ORANGE);
+        overlay->Attributes()->SetFaceBoundaryDraw(Standard_True);
+        overlay->Attributes()->SetFaceBoundaryAspect(
+            new Prs3d_LineAspect(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 1.0));
+        overlay->Attributes()->ShadingAspect()->Aspect()->SetPolygonOffsets(Aspect_POM_Fill, -1.0f, -1.0f);
+        m_highlight = overlay;
+        m_context->Display(m_highlight, AIS_Shaded, -1, Standard_False); // -1: nie do zaznaczania
+    }
+    m_view->Redraw();
 }
 
 void OccView::fitAll()

@@ -12,12 +12,18 @@ trafiają w 0,0,0. Przycisk Auto-Wyrównanie Części odwraca bryłę na drugą 
 (kolejne kliknięcie przywraca). Ustawienia zapisują się same i można je
 wyeksportować do pliku .ini.
 
+**Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
+szuka w wyrównanej płycie otworów (średnica, głębokość, z góry / od spodu /
+przelotowe), kieszeni (wymiary, głębokość, strona) i wycięć przelotowych. Lista
+pojawia się w oknie Dodatki; kliknięcie cechy podświetla ją na pomarańczowo.
+
 ```
 minicam/
 ├── CMakeLists.txt
 ├── core/            rdzeń (C++ + OCCT, bez Qt)
 │   ├── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
-│   └── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
+│   ├── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
+│   └── FeatureRecognition.h/.cpp  rozpoznawanie otworów, kieszeni, wycięć
 └── app/             GUI (Qt)
     ├── main.cpp
     ├── MainWindow.h/.cpp

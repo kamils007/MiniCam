@@ -7,7 +7,6 @@
 #include <QApplication>
 #include <QDockWidget>
 #include <QEvent>
-#include <QLabel>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -15,7 +14,9 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QStyle>
+#include <QTreeWidget>
 
+#include <cmath>
 #include <exception>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -39,16 +40,19 @@ void MainWindow::createDock()
     m_dock = new QDockWidget("Dodatki", this);
     m_dock->setObjectName("dodatkiDock"); // potrzebne do zapamiętania układu okien
     m_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    auto* placeholder = new QLabel("Tu pojawią się dodatki.", m_dock);
-    placeholder->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
-    placeholder->setMargin(12);
-    m_dock->setWidget(placeholder);
+    // Na razie okno pokazuje listę rozpoznanych cech (drzewko: grupa → cecha).
+    m_featureTree = new QTreeWidget(m_dock);
+    m_featureTree->setHeaderHidden(true);
+    connect(m_featureTree, &QTreeWidget::itemClicked, this, &MainWindow::onFeatureClicked);
+    m_dock->setWidget(m_featureTree);
+    clearFeatures();
     m_dock->setMinimumWidth(220);
     // Tło trochę jaśniejsze niż pas ikon na wstążce, kolory niezależne od motywu Windows.
     m_dock->setStyleSheet(R"(
         QDockWidget { color: black; }
         QDockWidget::title { background: #d4d4d4; padding: 4px; }
-        QDockWidget > QWidget { background: #efefef; color: black; }
+        QDockWidget > QWidget { background: #efefef; color: black; border: none; }
+        QTreeWidget::item:selected { background: #cfe3f7; color: black; }
     )");
     addDockWidget(Qt::LeftDockWidgetArea, m_dock);
 
@@ -99,6 +103,11 @@ void MainWindow::createRibbon()
                              "każde kolejne kliknięcie odwraca ją na drugą stronę");
     connect(autoAlignAct, &QAction::triggered, this, &MainWindow::onAutoAlign);
 
+    QAction* recognizeAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogContentsView),
+                                        "Rozpoznaj\ncechy", this);
+    recognizeAct->setToolTip("Znajdź otwory, kieszenie i wycięcia przelotowe");
+    connect(recognizeAct, &QAction::triggered, this, &MainWindow::onRecognizeFeatures);
+
     QAction* settingsAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView),
                                        "Rozpoznawanie\ncech modelu…", this);
     connect(settingsAct, &QAction::triggered, this, &MainWindow::onAlignSettings);
@@ -126,7 +135,8 @@ void MainWindow::createRibbon()
     viewGroup->addAction(fitAct);
     viewGroup->addAction(dockAct);
 
-    ribbon->addPage("Ekstrakcja modelu bryłowego"); // na razie pusta
+    RibbonPage* extraction = ribbon->addPage("Ekstrakcja modelu bryłowego");
+    extraction->addGroup("Cechy")->addAction(recognizeAct);
 
     RibbonPage* solids = ribbon->addPage("Bryły - Użytkowe");
     solids->addGroup("Wyrównanie")->addAction(autoAlignAct);
@@ -165,7 +175,7 @@ void MainWindow::openFile(const QString& path)
             showAligned();
             how = "wyrównano automatycznie";
         } else {
-            m_view->showModel(m_original);
+            showModel(m_original);
         }
         QApplication::restoreOverrideCursor();
 
@@ -185,7 +195,112 @@ void MainWindow::showAligned()
 {
     // Liczymy zawsze od oryginału z pliku – wynik zależy tylko od ustawień i m_flipped.
     const gp_Trsf trsf = camcore::computeAlignment(m_original.shape, m_alignSettings, m_flipped);
-    m_view->showModel(camcore::transformed(m_original, trsf));
+    showModel(camcore::transformed(m_original, trsf));
+}
+
+void MainWindow::showModel(const camcore::ImportedModel& model)
+{
+    m_shown = model;
+    m_view->showModel(model);
+    clearFeatures(); // cechy dotyczyły poprzedniego położenia bryły
+}
+
+void MainWindow::clearFeatures()
+{
+    m_features.clear();
+    m_featureTree->clear();
+    auto* hint = new QTreeWidgetItem(m_featureTree, {"Cechy: Ekstrakcja → Rozpoznaj cechy"});
+    hint->setFlags(Qt::NoItemFlags);
+    m_view->highlightFaces({});
+}
+
+namespace {
+
+QString sideText(camcore::Feature::Side side)
+{
+    switch (side) {
+    case camcore::Feature::Side::Top:     return "z góry";
+    case camcore::Feature::Side::Bottom:  return "od spodu";
+    case camcore::Feature::Side::Through: return "przelotowy";
+    }
+    return {};
+}
+
+QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
+
+QString featureText(const camcore::Feature& f)
+{
+    using T = camcore::Feature::Type;
+    if (f.type == T::Hole) {
+        QString t = "Ø" + num(f.diameter);
+        return f.side == camcore::Feature::Side::Through
+                   ? t + ", przelotowy"
+                   : t + ", gł. " + num(f.depth) + " " + sideText(f.side);
+    }
+    const QString size = num(f.sizeX) + " × " + num(f.sizeY);
+    if (f.type == T::Cutout)
+        return size + ", przelotowe";
+    return size + ", gł. " + num(f.depth) + " " + sideText(f.side);
+}
+
+} // namespace
+
+void MainWindow::onRecognizeFeatures()
+{
+    if (m_shown.shape.IsNull()) {
+        statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
+        return;
+    }
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    clearFeatures();
+    m_features = camcore::recognizeFeatures(m_shown.shape);
+    QApplication::restoreOverrideCursor();
+
+    m_featureTree->clear();
+    using T = camcore::Feature::Type;
+    const std::pair<T, QString> groups[] = {{T::Hole, "Otwory"},
+                                            {T::Pocket, "Kieszenie"},
+                                            {T::Cutout, "Wycięcia przelotowe"}};
+    for (const auto& [type, name] : groups) {
+        auto* group = new QTreeWidgetItem(m_featureTree);
+        group->setData(0, Qt::UserRole, -1 - static_cast<int>(type)); // <0 = cała grupa
+        int count = 0;
+        for (size_t i = 0; i < m_features.size(); ++i) {
+            if (m_features[i].type != type)
+                continue;
+            auto* item = new QTreeWidgetItem(group, {featureText(m_features[i])});
+            item->setData(0, Qt::UserRole, static_cast<int>(i));
+            ++count;
+        }
+        group->setText(0, QString("%1 (%2)").arg(name).arg(count));
+        group->setExpanded(true);
+        if (count == 0)
+            group->setFlags(Qt::ItemIsEnabled);
+    }
+    statusBar()->showMessage(QString("Rozpoznano %1 cech – kliknij cechę na liście, żeby ją podświetlić")
+                                 .arg(m_features.size()));
+}
+
+void MainWindow::onFeatureClicked(QTreeWidgetItem* item)
+{
+    if (!item->data(0, Qt::UserRole).isValid())
+        return;
+    const int id = item->data(0, Qt::UserRole).toInt();
+    std::vector<TopoDS_Face> faces;
+    if (id >= 0) {
+        const camcore::Feature& f = m_features[static_cast<size_t>(id)];
+        faces = f.faces;
+        statusBar()->showMessage(QString("%1 – środek X %2  Y %3 mm")
+                                     .arg(featureText(f), num(f.x), num(f.y)));
+    } else {
+        // Kliknięcie w nazwę grupy podświetla wszystkie cechy tego rodzaju.
+        const auto type = static_cast<camcore::Feature::Type>(-1 - id);
+        for (const camcore::Feature& f : m_features)
+            if (f.type == type)
+                faces.insert(faces.end(), f.faces.begin(), f.faces.end());
+        statusBar()->showMessage(item->text(0));
+    }
+    m_view->highlightFaces(faces);
 }
 
 void MainWindow::onAutoAlign()
