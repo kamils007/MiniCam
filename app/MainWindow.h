@@ -44,7 +44,8 @@ private:
     LayersPanel* m_layers = nullptr;
     camcore::ImportedModel m_shown;          // model tak, jak jest teraz na ekranie
     camcore::PartContours m_contours; // kontury i kieszenie z ostatniego rozpoznawania
-    std::vector<camcore::Geometry> m_geometries; // geometrie z właściwościami (kolor, widoczność)
+    std::vector<camcore::Geometry> m_geometries; // geometrie z właściwościami (warstwa, widoczność)
+    camcore::Layer m_apsLayer{camcore::kApsLayer, camcore::kApsColor}; // warstwa geometrii niesklasyfikowanych
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
     bool m_aligned = false; // czy pokazany model jest wyrównany

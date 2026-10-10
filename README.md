@@ -17,8 +17,9 @@ zakładek, pasek narzędzi warstw (przyciski na razie nieaktywne) i drzewo warst
 z checkboxami: Geometrie APS, Konstrukcje, Drogi Narzędzia, Wymiary, Splajny,
 Powierzchnie, Tekst, Bryły, STL, Warstwy Użytkownika. Checkbox włącza/wyłącza
 widoczność warstwy albo pojedynczej geometrii. Wszystkie geometrie są na razie
-niesklasyfikowane i trafiają do „Geometrie APS”. Każda geometria ma właściwości
-(`core/Geometry.h`): warstwę, kolor i widoczność.
+niesklasyfikowane i trafiają do „Geometrie APS”. Geometria ma właściwości
+(`core/Geometry.h`): warstwę i widoczność; kolor bierze z warstwy (APS – zawsze
+zielony, jak w Alphacam).
 
 **Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
 rozbiera płytę na kontury, idąc po płaskich poziomych powierzchniach (bez wierzchu):

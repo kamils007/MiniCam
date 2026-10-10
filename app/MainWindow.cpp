@@ -222,13 +222,6 @@ namespace {
 
 QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
 
-QColor toQColor(const Quantity_Color& color)
-{
-    double r, g, b;
-    color.Values(r, g, b, Quantity_TOC_sRGB);
-    return QColor::fromRgbF(r, g, b);
-}
-
 QString geometryText(size_t index, const camcore::Contour& c)
 {
     const QString shape = c.diameter > 0 ? "Ø" + num(c.diameter) : num(c.sizeX) + " × " + num(c.sizeY);
@@ -244,8 +237,9 @@ void MainWindow::showGeometries()
     std::vector<LayersPanel::GeometryRow> rows;
     for (size_t i = 0; i < m_geometries.size(); ++i) {
         const camcore::Geometry& g = m_geometries[i];
-        contours.push_back({g.contour.wire, g.color, g.contour.zTop - g.contour.zBottom});
-        rows.push_back({geometryText(i, g.contour), toQColor(g.color), g.visible});
+        // Kolor z warstwy geometrii (na razie wszystkie są w APS).
+        contours.push_back({g.contour.wire, m_apsLayer.color, g.contour.zTop - g.contour.zBottom});
+        rows.push_back({geometryText(i, g.contour), g.visible});
     }
     m_view->showGeometry(contours);
     for (size_t i = 0; i < m_geometries.size(); ++i)

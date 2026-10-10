@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QColor>
 #include <QString>
 #include <QWidget>
 
@@ -20,11 +19,10 @@ class LayersPanel : public QWidget
 public:
     explicit LayersPanel(QWidget* parent = nullptr);
 
-    // Geometria widoczna w drzewku: opis, kolor (kwadracik) i widoczność (checkbox).
+    // Geometria widoczna w drzewku: opis i widoczność (checkbox).
     struct GeometryRow
     {
         QString label;
-        QColor color;
         bool visible = true;
     };
     // Geometrie w warstwie APS – jedna pozycja na geometrię (pusta lista = brak).

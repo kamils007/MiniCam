@@ -186,9 +186,6 @@ void LayersPanel::setGeometries(const std::vector<GeometryRow>& rows)
         auto* item = new QTreeWidgetItem(m_aps, {rows[i].label});
         item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
         item->setCheckState(0, rows[i].visible ? Qt::Checked : Qt::Unchecked);
-        QPixmap swatch(12, 12);
-        swatch.fill(rows[i].color);
-        item->setIcon(0, QIcon(swatch));
         item->setData(0, Qt::UserRole, static_cast<int>(i)); // numer geometrii
     }
     updateCounts();
