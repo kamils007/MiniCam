@@ -80,6 +80,54 @@ private:
     bool m_first = true;
 };
 
+// Ikony uchwytów (jak w Alphacam): szary element i pomarańczowy punkt przyciągania.
+QIcon snapIcon(int kind)
+{
+    QPixmap pix(18, 18);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QPen line(QColor(60, 60, 60), 1.6);
+    const QColor dot(240, 150, 20);
+    auto point = [&](double x, double y) {
+        p.setPen(QPen(QColor(120, 60, 0), 0.8));
+        p.setBrush(dot);
+        p.drawRect(QRectF(x - 2.2, y - 2.2, 4.4, 4.4));
+    };
+    p.setPen(line);
+    p.setBrush(Qt::NoBrush);
+    switch (kind) {
+    case 0: // auto: element z kilkoma punktami
+        p.drawLine(QPointF(3, 15), QPointF(15, 3));
+        point(3, 15);
+        point(9, 9);
+        point(15, 3);
+        break;
+    case 1: // koniec
+        p.drawLine(QPointF(4, 9), QPointF(16, 9));
+        point(4, 9);
+        break;
+    case 2: // środek
+        p.drawLine(QPointF(2, 9), QPointF(16, 9));
+        point(9, 9);
+        break;
+    case 3: // centrum okręgu
+        p.drawEllipse(QPointF(9, 9), 6.5, 6.5);
+        point(9, 9);
+        break;
+    case 8: // ćwiartki
+        p.drawEllipse(QPointF(9, 9), 6, 6);
+        point(9, 3);
+        point(15, 9);
+        point(9, 15);
+        point(3, 9);
+        break;
+    default:
+        break;
+    }
+    return QIcon(pix);
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -478,20 +526,79 @@ void MainWindow::createBottomBars()
     auto* spacer = new QWidget(m_commandBar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_commandBar->addWidget(spacer);
-    // Przyciąganie (Snaps) – jak w Alphacam widać je tylko wtedy, gdy polecenie
-    // czeka na punkt. Przyciski na razie bez funkcji.
+    // Uchwyty (przyciąganie, Snaps) – jak w Alphacam widać je tylko wtedy, gdy polecenie
+    // czeka na punkt. Wybrany uchwyt: znika krzyż, a kursor klei się do takich punktów
+    // geometrii. Drugie kliknięcie tego samego uchwytu go wyłącza.
     std::vector<QAction*> snaps;
     snaps.push_back(m_commandBar->addSeparator());
-    snaps.push_back(m_commandBar->addWidget(new QLabel(" Przyciąganie ", m_commandBar)));
-    const char* snapNames[] = {"Auto przyciąganie (końce, środki, kwadranty)", "Koniec elementu",
-                               "Środek elementu", "Środek łuku lub okręgu", "Przecięcie elementów",
-                               "Styczna do łuku lub okręgu", "Prostopadła do elementu",
-                               "Równoległa do elementu", "Punkt kwadrantu (0°, 90°, 180°, 270°)"};
-    for (const char* name : snapNames)
-        snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, QString::fromUtf8(name))));
-    connect(m_inputBar, &InputBar::activeChanged, this, [snaps](bool pointInput) {
+    snaps.push_back(m_commandBar->addWidget(new QLabel(" Uchwyty ", m_commandBar)));
+    struct SnapDef
+    {
+        const char* name;
+        OccView::Snap snap; // None = jeszcze bez działania
+        int key;            // skrót klawiszowy (0 = brak)
+    };
+    const SnapDef snapDefs[] = {
+        {"AUTO uchwyt (końce, środki, ćwiartki)", OccView::Snap::Auto, 0},
+        {"KONIEC elementu", OccView::Snap::End, Qt::Key_F6},
+        {"ŚRODEK elementu", OccView::Snap::Mid, Qt::Key_F7},
+        {"CENTRUM okręgu", OccView::Snap::Centre, Qt::Key_F8},
+        {"PRZECIĘCIE elementów", OccView::Snap::None, 0},
+        {"STYCZNA do łuku lub okręgu", OccView::Snap::None, 0},
+        {"PROSTOPADŁA do elementu", OccView::Snap::None, 0},
+        {"RÓWNOLEGŁA do elementu", OccView::Snap::None, 0},
+        {"ĆWIARTKI koła", OccView::Snap::Quadrant, 0},
+    };
+    for (int i = 0; i < 9; ++i) {
+        const SnapDef& d = snapDefs[i];
+        const QString name = QString::fromUtf8(d.name);
+        if (d.snap == OccView::Snap::None) {
+            snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, name)));
+            continue;
+        }
+        auto* b = new QToolButton(m_commandBar);
+        b->setObjectName("snapButton");
+        b->setIcon(snapIcon(i));
+        b->setIconSize(QSize(18, 18));
+        b->setFixedSize(26, 24);
+        b->setCheckable(true);
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setToolTip(d.key ? name + "  " + QKeySequence(d.key).toString() : name);
+        const OccView::Snap snap = d.snap;
+        connect(b, &QToolButton::toggled, this, [this, b, snap](bool on) {
+            if (on) {
+                for (QToolButton* other : m_snapButtons)
+                    if (other != b)
+                        other->setChecked(false); // naraz działa jeden uchwyt
+                m_view->setSnap(snap);
+            } else if (std::none_of(m_snapButtons.begin(), m_snapButtons.end(),
+                                    [](QToolButton* x) { return x->isChecked(); })) {
+                m_view->setSnap(OccView::Snap::None);
+            }
+        });
+        if (d.key) {
+            // Skrót działa w całym oknie (także gdy kursor stoi w polu X/Y), ale tylko
+            // wtedy, gdy przycisk jest widoczny – czyli polecenie czeka na punkt.
+            auto* act = new QAction(this);
+            act->setShortcut(d.key);
+            connect(act, &QAction::triggered, b, [b] {
+                if (b->isVisible())
+                    b->toggle();
+            });
+            addAction(act);
+        }
+        m_snapButtons.push_back(b);
+        snaps.push_back(m_commandBar->addWidget(b));
+    }
+    snaps.push_back(m_commandBar->addWidget(new QLabel(" Filtry ", m_commandBar)));
+    snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, "Filtr 1")));
+    snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, "Filtr 2")));
+    connect(m_inputBar, &InputBar::activeChanged, this, [this, snaps](bool pointInput) {
         for (QAction* a : snaps)
             a->setVisible(pointInput);
+        if (!pointInput)
+            for (QToolButton* b : m_snapButtons)
+                b->setChecked(false); // koniec wskazywania – uchwyt się wyłącza
     });
     for (QAction* a : snaps)
         a->setVisible(false);
@@ -522,6 +629,12 @@ void MainWindow::createBottomBars()
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
             border: 1px solid #a8a8a8; border-radius: 2px;
         }
+        QToolButton#snapButton {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
+            border: 1px solid #a8a8a8; border-radius: 2px;
+        }
+        QToolButton#snapButton:hover { border-color: #3d7fd1; }
+        QToolButton#snapButton:checked { background: #9a9a9a; border: 1px solid #505050; }
         QLabel#cursorLabel {
             background: #fafafa; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 6px;
         }

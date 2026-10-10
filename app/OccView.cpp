@@ -4,6 +4,10 @@
 #include <SelectMgr_EntityOwner.hxx>
 #include <StdSelect_ViewerSelector3d.hxx>
 #include <AIS_Shape.hxx>
+#include <AIS_Point.hxx>
+#include <Prs3d_PointAspect.hxx>
+#include <Geom_CartesianPoint.hxx>
+#include <ElCLib.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
 #include <QCursor>
@@ -195,6 +199,7 @@ namespace {
 constexpr double kLineWidth = 2.5;
 constexpr double kHighlightWidth = 4.0;
 constexpr double kSelectedWidth = 1.5;
+constexpr double kHalfPi = 1.57079632679489661923;
 }
 
 void OccView::showGeometry(const std::vector<Contour>& contours)
@@ -206,6 +211,7 @@ void OccView::showGeometry(const std::vector<Contour>& contours)
     m_geometry.clear();
     m_geometryColors.clear();
     m_geometryLines.clear();
+    m_snapPoints.clear();
     m_geometryVisible.clear();
     m_highlighted.clear();
     m_selected.clear();
@@ -259,6 +265,38 @@ void OccView::showGeometry(const std::vector<Contour>& contours)
                 lines.push_back(bottom);
         }
         m_geometryLines.push_back(lines);
+
+        // Punkty uchwytów: końce i środki krawędzi, środki i ćwiartki łuków/okręgów –
+        // u góry ścianki i u dołu (przyciągamy i tak tylko X, Y).
+        std::vector<SnapPoint> snaps;
+        auto addSnap = [&](Snap kind, const gp_Pnt& p) {
+            snaps.push_back({kind, p});
+            if (c.height > 1e-6)
+                snaps.push_back({kind, gp_Pnt(p.X(), p.Y(), p.Z() - c.height)});
+        };
+        for (TopExp_Explorer ex(c.shape, TopAbs_EDGE); ex.More(); ex.Next()) {
+            const BRepAdaptor_Curve curve(TopoDS::Edge(ex.Current()));
+            const double t0 = curve.FirstParameter(), t1 = curve.LastParameter();
+            addSnap(Snap::End, curve.Value(t0));
+            addSnap(Snap::End, curve.Value(t1));
+            addSnap(Snap::Mid, curve.Value((t0 + t1) / 2));
+            if (curve.GetType() == GeomAbs_Circle) {
+                const gp_Circ circle = curve.Circle();
+                addSnap(Snap::Centre, circle.Location());
+                // Ćwiartki: 0°, 90°, 180°, 270° w układzie XY – o ile leżą na łuku.
+                for (int q = 0; q < 4; ++q) {
+                    const gp_Pnt p(circle.Location().X() + circle.Radius() * std::cos(q * kHalfPi),
+                                   circle.Location().Y() + circle.Radius() * std::sin(q * kHalfPi),
+                                   circle.Location().Z());
+                    double t = ElCLib::Parameter(circle, p);
+                    while (t < t0 - 1e-9)
+                        t += 4 * kHalfPi;
+                    if (t <= t1 + 1e-9)
+                        addSnap(Snap::Quadrant, p);
+                }
+            }
+        }
+        m_snapPoints.push_back(snaps);
     }
     m_view->Redraw();
 }
@@ -497,6 +535,13 @@ void OccView::onClick(Qt::MouseButton button, const QPoint& pos)
             emit selectionConfirmed();
         }
     } else if (m_interaction == Interaction::PickPoint && button == Qt::LeftButton) {
+        if (m_snap != Snap::None) {
+            // Z uchwytem liczy się tylko punkt przyciągnięty; bez niego kliknięcie nic nie daje.
+            gp_Pnt p;
+            if (snapAt(pos, p))
+                emit pointPicked(p.X(), p.Y(), 0.0);
+            return;
+        }
         const gp_Pnt p = pointOnTable(pos);
         emit pointPicked(p.X(), p.Y(), 0.0);
     }
@@ -529,10 +574,13 @@ void OccView::setInteraction(Interaction mode)
     } else if (mode == Interaction::Navigate) {
         clearSelection();
     }
-    if (mode == Interaction::PickPoint)
-        showCrosshair(toPixels(mapFromGlobal(QCursor::pos())));
-    else
+    if (mode == Interaction::PickPoint) {
+        updatePickFeedback(toPixels(mapFromGlobal(QCursor::pos())));
+    } else {
         hideCrosshair();
+        if (!m_snapMarker.IsNull())
+            m_context->Erase(m_snapMarker, Standard_False);
+    }
     m_context->ClearDetected(Standard_False);
     m_view->Redraw();
     setCursor(mode == Interaction::Navigate ? Qt::ArrowCursor : Qt::CrossCursor);
@@ -581,7 +629,7 @@ void OccView::mouseMoveEvent(QMouseEvent* e)
     if (m_interaction == Interaction::Select && !(e->buttons() & (Qt::LeftButton | Qt::MiddleButton | Qt::RightButton)))
         updateHover(pos);
     if (m_interaction == Interaction::PickPoint)
-        showCrosshair(pos);
+        updatePickFeedback(pos);
     const gp_Pnt p = pointOnTable(pos);
     emit cursorMoved(p.X(), p.Y());
 }
@@ -610,6 +658,68 @@ void OccView::showCrosshair(const QPoint& pos)
     if (!m_context->IsDisplayed(m_crosshair))
         m_context->Display(m_crosshair, AIS_WireFrame, -1, Standard_False); // -1: nie do zaznaczania
     m_context->SetLocation(m_crosshair, TopLoc_Location(move));
+    m_view->Redraw();
+}
+
+void OccView::setSnap(Snap snap)
+{
+    m_snap = snap;
+    if (!m_context.IsNull() && m_interaction == Interaction::PickPoint)
+        updatePickFeedback(toPixels(mapFromGlobal(QCursor::pos())));
+}
+
+bool OccView::snapAt(const QPoint& pos, gp_Pnt& out) const
+{
+    // Najbliższy na ekranie punkt wybranego rodzaju (Auto = końce, środki i ćwiartki).
+    const double maxDist = 20.0 * devicePixelRatioF();
+    double best = maxDist;
+    bool found = false;
+    for (size_t i = 0; i < m_snapPoints.size(); ++i) {
+        if (!m_geometryVisible[i])
+            continue;
+        for (const SnapPoint& sp : m_snapPoints[i]) {
+            const bool wanted = m_snap == Snap::Auto
+                                    ? (sp.kind == Snap::End || sp.kind == Snap::Mid || sp.kind == Snap::Quadrant)
+                                    : sp.kind == m_snap;
+            if (!wanted)
+                continue;
+            Standard_Integer x, y;
+            m_view->Convert(sp.point.X(), sp.point.Y(), sp.point.Z(), x, y);
+            const double d = std::hypot(pos.x() - x, pos.y() - y);
+            if (d < best) {
+                best = d;
+                out = sp.point;
+                found = true;
+            }
+        }
+    }
+    return found;
+}
+
+void OccView::updatePickFeedback(const QPoint& pos)
+{
+    if (m_snap == Snap::None) {
+        if (!m_snapMarker.IsNull())
+            m_context->Erase(m_snapMarker, Standard_False);
+        showCrosshair(pos);
+        return;
+    }
+    // Uchwyt włączony: bez krzyża, biała kulka na punkcie, do którego klei się kursor.
+    hideCrosshair();
+    gp_Pnt p;
+    if (snapAt(pos, p)) {
+        if (!m_snapMarker.IsNull())
+            m_context->Remove(m_snapMarker, Standard_False);
+        Handle(AIS_Point) marker = new AIS_Point(new Geom_CartesianPoint(p));
+        marker->SetMarker(Aspect_TOM_BALL);
+        marker->SetColor(Quantity_NOC_WHITE);
+        marker->Attributes()->PointAspect()->SetScale(4.0);
+        marker->SetZLayer(Graphic3d_ZLayerId_Topmost);
+        m_snapMarker = marker;
+        m_context->Display(m_snapMarker, 0, -1, Standard_False); // -1: nie do zaznaczania
+    } else if (!m_snapMarker.IsNull()) {
+        m_context->Erase(m_snapMarker, Standard_False);
+    }
     m_view->Redraw();
 }
 

@@ -18,6 +18,7 @@ class QWidget;
 class QAction;
 class QLabel;
 class QToolBar;
+class QToolButton;
 class QUndoStack;
 
 class MainWindow : public QMainWindow
@@ -84,6 +85,7 @@ private:
     bool m_moveModel = false;          // czy wybrano bryłę
     gp_Pnt m_moveBase;
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)
+    std::vector<QToolButton*> m_snapButtons; // uchwyty na belce polecenia
     QToolBar* m_commandBar = nullptr;       // belka polecenia (druga od dołu)
     QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce
     InputBar* m_inputBar = nullptr;         // pasek wprowadzania (lewa strona belki)

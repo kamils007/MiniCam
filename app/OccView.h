@@ -30,6 +30,11 @@ public:
     enum class Interaction { Navigate, Select, PickPoint };
     void setInteraction(Interaction mode);
 
+    // Uchwyty (przyciąganie) przy wskazywaniu punktu: kursor "klei się" do wybranych
+    // punktów geometrii (zamiast krzyża pokazuje znacznik), kliknięcie daje ten punkt.
+    enum class Snap { None, Auto, End, Mid, Centre, Quadrant };
+    void setSnap(Snap snap);
+
     // Zaznaczone elementy (tryb wyboru): numery geometrii i czy bryła.
     std::vector<int> selectedGeometries() const;
     bool isModelSelected() const;
@@ -95,6 +100,8 @@ private:
     void clearHover();
     void showCrosshair(const QPoint& pos); // krzyż linii X/Y/Z przy kursorze (wskazywanie punktu)
     void hideCrosshair();
+    void updatePickFeedback(const QPoint& pos);  // krzyż albo znacznik uchwytu pod kursorem
+    bool snapAt(const QPoint& pos, gp_Pnt& out) const; // najbliższy punkt uchwytu przy kursorze
     QPoint toPixels(const QPointF& p) const;
 
     Handle(V3d_Viewer) m_viewer;
@@ -113,6 +120,14 @@ private:
     std::vector<int> m_highlighted;    // podświetlone z panelu Warstwy (pomarańczowe)
     std::vector<int> m_selected;       // wybrane w trybie wyboru
     Handle(AIS_Shape) m_crosshair;     // krzyż linii przy kursorze
+    Handle(AIS_InteractiveObject) m_snapMarker; // znacznik punktu uchwytu (biała kulka)
+    Snap m_snap = Snap::None;
+    struct SnapPoint
+    {
+        Snap kind; // End, Mid, Centre albo Quadrant
+        gp_Pnt point;
+    };
+    std::vector<std::vector<SnapPoint>> m_snapPoints; // [geometria] – punkty do przyciągania
     int m_hovered = -1;                // geometria pod kursorem w trybie wyboru (przerywana linia)
     QPoint m_lastPos;
     QPoint m_pressPos; // gdzie wciśnięto przycisk – odróżnia kliknięcie od przeciągania
