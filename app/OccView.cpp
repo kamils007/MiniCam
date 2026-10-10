@@ -131,8 +131,7 @@ Quantity_Color tint(const Quantity_Color& c, bool selected, bool hovered)
     c.Values(r, g, b, Quantity_TOC_sRGB);
     // Wybrana bryła jest niebieska – także pod kursorem, żeby było widać, że już jest w wyborze.
     if (selected)
-        return Quantity_Color(0.3 * r + 0.7 * 0.25, 0.3 * g + 0.7 * 0.50, 0.3 * b + 0.7 * 1.00,
-                              Quantity_TOC_sRGB);
+        return Quantity_Color(0.0, 0.0, 0.85, Quantity_TOC_sRGB); // cała mocno niebieska, jak w Alphacam
     if (hovered)
         return Quantity_Color(0.2 * r + 0.8 * 0.95, 0.2 * g + 0.8 * 0.95, 0.2 * b + 0.8 * 0.95,
                               Quantity_TOC_sRGB);
@@ -191,6 +190,7 @@ void OccView::showModel(const camcore::ImportedModel& model)
 namespace {
 constexpr double kLineWidth = 2.5;
 constexpr double kHighlightWidth = 4.0;
+constexpr double kSelectedWidth = 1.5;
 }
 
 void OccView::showGeometry(const std::vector<Contour>& contours)
@@ -277,8 +277,8 @@ void OccView::refreshGeometryLook()
         bool dashed = false;
         bool keepFill = false; // ścianka zostaje w kolorze warstwy, zmienia się tylko linia
         if (has(m_selected, idx)) {
-            color = Quantity_Color(0.10, 0.40, 1.00, Quantity_TOC_sRGB); // wybrana: ciągła niebieska linia
-            width = kHighlightWidth;
+            color = Quantity_Color(0.0, 0.0, 1.0, Quantity_TOC_sRGB); // wybrana: cienka ciągła niebieska linia
+            width = kSelectedWidth;
             keepFill = true;
         } else if (idx == m_hovered) {
             dashed = true; // pod kursorem: biała przerywana linia, ścianka w swoim kolorze
