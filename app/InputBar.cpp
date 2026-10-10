@@ -1,6 +1,5 @@
 #include "InputBar.h"
 
-#include <QButtonGroup>
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -13,8 +12,6 @@
 #include <cmath>
 
 namespace {
-
-constexpr double kPi = 3.14159265358979323846;
 
 // Prosty parser rekurencyjny: wyrażenie = składnik {(+|-) składnik},
 // składnik = czynnik {(*|/) czynnik}, czynnik = [+|-] (liczba | "(" wyrażenie ")").
@@ -112,13 +109,6 @@ private:
     int m_pos = 0;
 };
 
-QString formatValue(double v)
-{
-    if (std::abs(v) < 0.0005)
-        v = 0; // bez "-0.000"
-    return QString::number(v, 'f', 3);
-}
-
 } // namespace
 
 std::optional<double> evaluateExpression(const QString& text)
@@ -143,231 +133,195 @@ InputBar::InputBar(QWidget* parent)
     layout->addWidget(m_command);
     layout->addWidget(m_prompt);
 
-    // Pola współrzędnych z przełącznikiem trybu.
+    // Pola X i Y, każde z przyciskiem "F1=?" (pomiń nieznaną wartość).
     m_fieldsBox = new QWidget(this);
     auto* fieldsLayout = new QHBoxLayout(m_fieldsBox);
-    fieldsLayout->setContentsMargins(6, 0, 0, 0);
-    fieldsLayout->setSpacing(3);
-    for (int i = 0; i < 3; ++i) {
-        auto* label = new QLabel(m_fieldsBox);
-        label->setMinimumWidth(24);
-        label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    fieldsLayout->setContentsMargins(8, 0, 0, 0);
+    fieldsLayout->setSpacing(4);
+    const char* names[] = {"X", "Y"};
+    for (int i = 0; i < 2; ++i) {
+        auto* label = new QLabel(names[i], m_fieldsBox);
+        label->setContentsMargins(6, 0, 0, 0);
         auto* field = new QLineEdit(m_fieldsBox);
         field->setFixedWidth(92);
-        field->setAlignment(Qt::AlignRight);
         field->installEventFilter(this);
-        // Wpisanie czegokolwiek przypina pole – przestaje iść za kursorem.
-        connect(field, &QLineEdit::textEdited, this, [this, i](const QString& text) {
-            setLocked(i, !text.trimmed().isEmpty());
+        connect(field, &QLineEdit::textEdited, this, [this, i] {
+            // Wpisanie wartości cofa pominięcie pola.
+            if (m_bypassed[static_cast<size_t>(i)]) {
+                m_bypassed[static_cast<size_t>(i)] = false;
+                showPrompt();
+            }
+            setError(i, false);
         });
-        connect(field, &QLineEdit::returnPressed, this, &InputBar::accept);
+        connect(field, &QLineEdit::returnPressed, this, &InputBar::onOk);
+        auto* f1 = new QToolButton(m_fieldsBox);
+        f1->setText("F1=?");
+        f1->setObjectName("inputF1");
+        f1->setToolTip("Nie znam tej wartości – weź ją z kliknięcia w widoku (F1)");
+        f1->setFocusPolicy(Qt::NoFocus);
+        connect(f1, &QToolButton::clicked, this, [this, i] { bypass(i); });
         fieldsLayout->addWidget(label);
         fieldsLayout->addWidget(field);
-        m_labels.push_back(label);
+        fieldsLayout->addWidget(f1);
         m_fields.push_back(field);
-        m_locked.push_back(false);
+        m_bypassed.push_back(false);
     }
-    fieldsLayout->addSpacing(6);
-    auto* group = new QButtonGroup(this);
-    const char* names[] = {"Abs", "Przyr", "Bieg"};
-    const char* tips[] = {"Współrzędne bezwzględne (X, Y, Z)",
-                          "Współrzędne przyrostowe od poprzedniego punktu (dX, dY, dZ)",
-                          "Współrzędne biegunowe od poprzedniego punktu (długość, kąt)"};
-    for (int i = 0; i < 3; ++i) {
-        auto* b = new QToolButton(m_fieldsBox);
-        b->setText(names[i]);
-        b->setToolTip(tips[i]);
-        b->setCheckable(true);
-        b->setFocusPolicy(Qt::NoFocus); // Tab krąży tylko po polach
-        b->setObjectName("inputMode");
-        group->addButton(b, i);
-        fieldsLayout->addWidget(b);
-        m_modeButtons[i] = b;
-    }
-    m_modeButtons[0]->setChecked(true);
-    connect(group, &QButtonGroup::idClicked, this, [this](int id) { setMode(static_cast<Mode>(id)); });
     layout->addWidget(m_fieldsBox);
 
-    m_done = new QPushButton("Gotowe", this);
-    m_done->setToolTip("Zatwierdź wybór (jak PPM lub Enter)");
-    m_cancel = new QPushButton("Anuluj", this);
-    m_cancel->setToolTip("Przerwij polecenie (Esc)");
-    m_done->setFocusPolicy(Qt::NoFocus);
-    m_cancel->setFocusPolicy(Qt::NoFocus);
-    connect(m_done, &QPushButton::clicked, this, &InputBar::selectionDone);
-    connect(m_cancel, &QPushButton::clicked, this, &InputBar::cancelled);
-    layout->addWidget(m_done);
-    layout->addWidget(m_cancel);
+    m_ok = new QPushButton("OK", this);
+    m_ok->setFocusPolicy(Qt::NoFocus);
+    connect(m_ok, &QPushButton::clicked, this, &InputBar::onOk);
+    layout->addWidget(m_ok);
 
-    updateLabels();
     showIdle();
 }
 
 void InputBar::showIdle()
 {
+    // Jak w Alphacam: bez polecenia miejsce paska jest puste.
     m_picking = false;
-    m_command->setText("Polecenie:");
-    m_prompt->setText("wybierz polecenie na wstążce");
-    m_prompt->setEnabled(false);
+    m_selecting = false;
+    m_command->clear();
+    m_prompt->clear();
+    m_command->hide();
+    m_prompt->hide();
     m_fieldsBox->hide();
-    m_done->hide();
-    m_cancel->hide();
+    m_ok->hide();
+    emit activeChanged(false);
 }
 
 void InputBar::startSelect(const QString& command, const QString& prompt)
 {
     m_picking = false;
-    m_command->setText(command + ":");
+    m_selecting = true;
+    m_command->setText(command.toUpper());
+    m_command->show();
     setPrompt(prompt);
     m_fieldsBox->hide();
-    m_done->show();
-    m_cancel->show();
+    m_ok->show();
+    emit activeChanged(false);
 }
 
-void InputBar::startPoint(const QString& command, const QString& prompt, std::optional<gp_Pnt> reference)
+void InputBar::startPoint(const QString& command, const QString& prompt)
 {
     m_picking = true;
-    m_reference = reference.value_or(gp_Pnt(0, 0, 0));
-    m_command->setText(command + ":");
+    m_selecting = false;
+    m_command->setText(command.toUpper());
+    m_command->show();
+    for (int i = 0; i < 2; ++i) {
+        m_bypassed[static_cast<size_t>(i)] = false;
+        m_fields[static_cast<size_t>(i)]->setText("0");
+        setError(i, false);
+    }
     setPrompt(prompt);
-    for (int i = 0; i < 3; ++i)
-        setLocked(i, false);
-    refreshTracked();
     m_fieldsBox->show();
-    m_done->hide();
-    m_cancel->show();
+    m_ok->show();
+    emit activeChanged(true);
 }
 
 void InputBar::setPrompt(const QString& prompt)
 {
-    m_prompt->setEnabled(true);
-    m_prompt->setText(prompt);
+    m_basePrompt = prompt;
+    showPrompt();
 }
 
-void InputBar::setMode(Mode mode)
+void InputBar::showPrompt()
 {
-    m_mode = mode;
-    m_modeButtons[static_cast<int>(mode)]->setChecked(true);
-    // Wpisane wartości znaczyły co innego w poprzednim trybie.
-    for (int i = 0; i < 3; ++i)
-        setLocked(i, false);
-    updateLabels();
-    refreshTracked();
+    QString text = m_basePrompt;
+    if (m_picking && anyBypassed()) {
+        // Podpowiedź zastępcza po pominięciu wartości (F1).
+        QStringList unknown;
+        if (m_bypassed[0]) unknown << "X";
+        if (m_bypassed[1]) unknown << "Y";
+        text += QString(" – wskaż w widoku (%1 z kliknięcia)").arg(unknown.join(", "));
+    }
+    m_prompt->setText(text);
+    m_prompt->show();
 }
 
-void InputBar::updateLabels()
+bool InputBar::anyBypassed() const
 {
-    static const char* abs[] = {"X", "Y", "Z"};
-    static const char* inc[] = {"dX", "dY", "dZ"};
-    static const char* pol[] = {"L", "Kąt", "dZ"};
-    const char** names = m_mode == Mode::Absolute ? abs : m_mode == Mode::Incremental ? inc : pol;
-    for (int i = 0; i < 3; ++i)
-        m_labels[static_cast<size_t>(i)]->setText(QString::fromUtf8(names[i]));
+    for (bool b : m_bypassed)
+        if (b)
+            return true;
+    return false;
 }
 
-void InputBar::setLocked(int field, bool locked)
+void InputBar::setError(int field, bool error)
 {
     QLineEdit* f = m_fields[static_cast<size_t>(field)];
-    m_locked[static_cast<size_t>(field)] = locked;
-    f->setProperty("locked", locked);
-    f->setProperty("error", false);
+    f->setProperty("error", error);
     f->style()->unpolish(f);
     f->style()->polish(f);
 }
 
-std::vector<double> InputBar::fieldsFor(const gp_Pnt& p) const
+void InputBar::bypass(int field)
 {
-    const double dx = p.X() - m_reference.X();
-    const double dy = p.Y() - m_reference.Y();
-    const double dz = p.Z() - m_reference.Z();
-    switch (m_mode) {
-    case Mode::Absolute:
-        return {p.X(), p.Y(), p.Z()};
-    case Mode::Incremental:
-        return {dx, dy, dz};
-    case Mode::Polar:
-        return {std::hypot(dx, dy), std::atan2(dy, dx) * 180.0 / kPi, dz};
-    }
-    return {0, 0, 0};
-}
-
-gp_Pnt InputBar::pointFrom(const std::vector<double>& v) const
-{
-    switch (m_mode) {
-    case Mode::Absolute:
-        return gp_Pnt(v[0], v[1], v[2]);
-    case Mode::Incremental:
-        return gp_Pnt(m_reference.X() + v[0], m_reference.Y() + v[1], m_reference.Z() + v[2]);
-    case Mode::Polar: {
-        const double a = v[1] * kPi / 180.0;
-        return gp_Pnt(m_reference.X() + v[0] * std::cos(a), m_reference.Y() + v[0] * std::sin(a),
-                      m_reference.Z() + v[2]);
-    }
-    }
-    return m_reference;
-}
-
-void InputBar::refreshTracked()
-{
-    // Kursor leży na płaszczyźnie stołu; w trybach względnych Z zostaje na
-    // wysokości poprzedniego punktu (dZ = 0).
-    gp_Pnt c = m_cursor;
-    c.SetZ(m_mode == Mode::Absolute ? 0.0 : m_reference.Z());
-    const std::vector<double> values = fieldsFor(c);
-    for (size_t i = 0; i < m_fields.size(); ++i)
-        if (!m_locked[i])
-            m_fields[i]->setText(formatValue(values[i]));
-}
-
-void InputBar::trackCursor(double x, double y)
-{
-    m_cursor = gp_Pnt(x, y, 0);
-    if (m_picking)
-        refreshTracked();
-}
-
-std::optional<gp_Pnt> InputBar::resolve(const gp_Pnt& cursor, bool markErrors)
-{
-    gp_Pnt c = cursor;
-    c.SetZ(m_mode == Mode::Absolute ? 0.0 : m_reference.Z());
-    std::vector<double> values = fieldsFor(c);
-    bool ok = true;
-    for (size_t i = 0; i < m_fields.size(); ++i) {
-        if (!m_locked[i])
-            continue;
-        const auto v = evaluateExpression(m_fields[i]->text());
-        if (v) {
-            values[i] = *v;
-        } else {
-            ok = false;
-            if (markErrors) {
-                m_fields[i]->setProperty("error", true);
-                m_fields[i]->style()->unpolish(m_fields[i]);
-                m_fields[i]->style()->polish(m_fields[i]);
-            }
-        }
-    }
-    if (!ok)
-        return std::nullopt;
-    return pointFrom(values);
+    if (!m_picking)
+        return;
+    m_bypassed[static_cast<size_t>(field)] = true;
+    QLineEdit* f = m_fields[static_cast<size_t>(field)];
+    f->setText("?");
+    setError(field, false);
+    showPrompt();
+    // Kolejne pole, którego jeszcze nie pominięto.
+    const int next = (field + 1) % 2;
+    if (!m_bypassed[static_cast<size_t>(next)])
+        focusField(next);
 }
 
 std::optional<gp_Pnt> InputBar::resolveClick(double x, double y)
 {
-    return resolve(gp_Pnt(x, y, 0), true);
+    // Bez pominiętych pól liczy się samo kliknięcie (jak w Alphacam).
+    if (!anyBypassed())
+        return gp_Pnt(x, y, 0);
+    double v[2] = {x, y};
+    bool ok = true;
+    for (int i = 0; i < 2; ++i) {
+        if (m_bypassed[static_cast<size_t>(i)])
+            continue;
+        if (const auto value = evaluateExpression(m_fields[static_cast<size_t>(i)]->text())) {
+            v[i] = *value;
+        } else {
+            setError(i, true);
+            ok = false;
+        }
+    }
+    if (!ok)
+        return std::nullopt;
+    return gp_Pnt(v[0], v[1], 0);
 }
 
-void InputBar::accept()
+void InputBar::onOk()
 {
+    if (m_selecting) {
+        emit selectionDone();
+        return;
+    }
     if (!m_picking)
         return;
-    if (const auto p = resolve(m_cursor, true))
-        emit pointEntered(p->X(), p->Y(), p->Z());
+    if (anyBypassed()) {
+        // Brakującej wartości nie da się zatwierdzić – musi przyjść z kliknięcia.
+        showPrompt();
+        return;
+    }
+    double v[2] = {0, 0};
+    bool ok = true;
+    for (int i = 0; i < 2; ++i) {
+        if (const auto value = evaluateExpression(m_fields[static_cast<size_t>(i)]->text())) {
+            v[i] = *value;
+        } else {
+            setError(i, true);
+            ok = false;
+        }
+    }
+    if (ok)
+        emit pointEntered(v[0], v[1], 0);
 }
 
 void InputBar::focusField(int field)
 {
-    QLineEdit* f = m_fields[static_cast<size_t>((field + 3) % 3)];
+    QLineEdit* f = m_fields[static_cast<size_t>((field + 2) % 2)];
     f->setFocus(Qt::TabFocusReason);
     f->selectAll();
 }
@@ -377,20 +331,26 @@ bool InputBar::handleViewKey(QKeyEvent* e)
     if (!m_picking)
         return false;
     if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
-        accept();
+        onOk();
         return true;
     }
     if (e->key() == Qt::Key_Tab) {
         focusField(0);
         return true;
     }
-    // Pierwszy znak liczby lub wyrażenia: wpisujemy go od razu do pola X (L).
+    if (e->key() == Qt::Key_F1) {
+        bypass(m_bypassed[0] ? 1 : 0);
+        return true;
+    }
+    // Pierwszy znak liczby lub wyrażenia: wpisujemy go od razu do pola X.
     const QString t = e->text();
     if (t.size() == 1 && (t[0].isDigit() || QString("-+.,(").contains(t[0]))) {
         QLineEdit* f = m_fields[0];
         f->setFocus(Qt::OtherFocusReason);
         f->setText(t);
-        setLocked(0, true);
+        m_bypassed[0] = false;
+        setError(0, false);
+        showPrompt();
         return true;
     }
     return false;
@@ -398,11 +358,21 @@ bool InputBar::handleViewKey(QKeyEvent* e)
 
 bool InputBar::eventFilter(QObject* watched, QEvent* event)
 {
-    if (event->type() == QEvent::KeyPress) {
-        for (int i = 0; i < 3; ++i) {
+    // F1 jest w Qt skrótem pomocy – przechwytujemy go, zanim pole go zignoruje.
+    if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
+        for (int i = 0; i < 2; ++i) {
             if (watched != m_fields[static_cast<size_t>(i)])
                 continue;
             auto* e = static_cast<QKeyEvent*>(event);
+            const bool press = event->type() == QEvent::KeyPress;
+            if (e->key() == Qt::Key_F1) {
+                if (press)
+                    bypass(i);
+                event->accept();
+                return true;
+            }
+            if (!press)
+                break;
             if (e->key() == Qt::Key_Tab) {
                 focusField(i + 1);
                 return true;

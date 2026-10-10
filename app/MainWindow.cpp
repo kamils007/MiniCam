@@ -71,7 +71,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
     connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelMove);
     connect(m_view, &OccView::selectionChanged, this, [this](int count) {
-        m_inputBar->setPrompt(QString("Wybierz elementy (wybrano %1), PPM lub Enter zatwierdza").arg(count));
+        m_inputBar->setPrompt(QString("Wybierz elementy (wybrano %1), PPM, Enter lub OK zatwierdza").arg(count));
         statusBar()->showMessage(QString("Przesuń: wybrano %1 – klikaj kolejne elementy, PPM zatwierdza, Esc anuluje")
                                      .arg(count));
     });
@@ -416,6 +416,7 @@ void MainWindow::createBottomBars()
     m_commandBar->setMovable(false);
     m_commandBar->setFloatable(false);
     m_commandBar->setContextMenuPolicy(Qt::PreventContextMenu);
+    m_commandBar->setMinimumHeight(32); // pusta belka (bez polecenia) zostaje na swoim miejscu
     m_inputBar = new InputBar(m_commandBar);
     m_commandBar->addWidget(m_inputBar);
     connect(m_inputBar, &InputBar::pointEntered, this, &MainWindow::onPointEntered);
@@ -424,10 +425,23 @@ void MainWindow::createBottomBars()
     auto* spacer = new QWidget(m_commandBar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_commandBar->addWidget(spacer);
-    m_commandBar->addSeparator();
-    m_commandBar->addWidget(new QLabel(" Przyciąganie ", m_commandBar));
-    for (int i = 1; i <= 9; ++i)
-        m_commandBar->addWidget(placeholderButton(m_commandBar, QString("Przyciąganie %1").arg(i)));
+    // Przyciąganie (Snaps) – jak w Alphacam widać je tylko wtedy, gdy polecenie
+    // czeka na punkt. Przyciski na razie bez funkcji.
+    std::vector<QAction*> snaps;
+    snaps.push_back(m_commandBar->addSeparator());
+    snaps.push_back(m_commandBar->addWidget(new QLabel(" Przyciąganie ", m_commandBar)));
+    const char* snapNames[] = {"Auto przyciąganie (końce, środki, kwadranty)", "Koniec elementu",
+                               "Środek elementu", "Środek łuku lub okręgu", "Przecięcie elementów",
+                               "Styczna do łuku lub okręgu", "Prostopadła do elementu",
+                               "Równoległa do elementu", "Punkt kwadrantu (0°, 90°, 180°, 270°)"};
+    for (const char* name : snapNames)
+        snaps.push_back(m_commandBar->addWidget(placeholderButton(m_commandBar, QString::fromUtf8(name))));
+    connect(m_inputBar, &InputBar::activeChanged, this, [snaps](bool pointInput) {
+        for (QAction* a : snaps)
+            a->setVisible(pointInput);
+    });
+    for (QAction* a : snaps)
+        a->setVisible(false);
     addToolBar(Qt::BottomToolBarArea, m_commandBar);
 
     // Belki odcinamy od siebie liniami i lekkim cieniem, a pola i przyciski mają
@@ -452,17 +466,14 @@ void MainWindow::createBottomBars()
         }
         QWidget#barGroup { border-left: 1px solid #b0b0b0; }
         QLabel#inputCommand { font-weight: bold; }
-        QLabel#inputPrompt:disabled { color: #808080; }
         QWidget#inputBar QLineEdit {
             background: #ffffff; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 3px;
         }
-        QWidget#inputBar QLineEdit[locked="true"] { font-weight: bold; background: #fff6cc; }
         QWidget#inputBar QLineEdit[error="true"] { background: #ffd6d6; border-color: #c03030; }
-        QToolButton#inputMode {
+        QToolButton#inputF1 {
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
             border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 5px;
         }
-        QToolButton#inputMode:checked { background: #cfe3f7; border-color: #7aa7d6; }
     )";
     setStyleSheet(styleSheet() + barStyle);
 
@@ -474,7 +485,6 @@ void MainWindow::createBottomBars()
     statusBar()->addPermanentWidget(m_cursorLabel);
     connect(m_view, &OccView::cursorMoved, this, [this](double x, double y) {
         m_cursorLabel->setText(QString("X %1   Y %2").arg(x, 0, 'f', 3).arg(y, 0, 'f', 3));
-        m_inputBar->trackCursor(x, y);
     });
 
     // Esc przerywa polecenie także wtedy, gdy widok 3D nie ma fokusu.
@@ -509,7 +519,7 @@ void MainWindow::onMove()
         return;
     }
     m_moveStep = MoveStep::Selecting;
-    m_inputBar->startSelect("Przesuń", "Wybierz elementy (LPM), PPM lub Enter zatwierdza");
+    m_inputBar->startSelect("Przesuń", "Wybierz elementy (LPM), PPM, Enter lub OK zatwierdza");
     m_view->clearSelection();
     m_view->setInteraction(OccView::Interaction::Select);
     m_view->setFocus();
@@ -552,9 +562,8 @@ void MainWindow::onPointEntered(double x, double y, double z)
     if (m_moveStep == MoveStep::PickBase) {
         m_moveBase = gp_Pnt(x, y, z);
         m_moveStep = MoveStep::PickTarget;
-        m_inputBar->startPoint("Przesuń", "Punkt docelowy", m_moveBase);
-        statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 Z %3 – wskaż punkt docelowy "
-                                         "(Przyr = przesunięcie od punktu bazowego)")
+        m_inputBar->startPoint("Przesuń", "Punkt docelowy");
+        statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 Z %3 – wskaż punkt docelowy")
                                      .arg(x, 0, 'f', 2)
                                      .arg(y, 0, 'f', 2)
                                      .arg(z, 0, 'f', 2));

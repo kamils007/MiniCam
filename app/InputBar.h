@@ -13,82 +13,67 @@ class QLineEdit;
 class QPushButton;
 class QToolButton;
 
-// Pasek wprowadzania (jak Input Bar w Alphacam), w belce polecenia.
-//  - Po lewej podpowiedź: nazwa polecenia i co teraz wskazać ("Przesuń: Punkt bazowy").
-//  - Pola X / Y / Z (albo dX / dY / dZ, albo L / Kąt / dZ) pokazują na żywo położenie
-//    kursora. Wpisana wartość "przypina" pole (pogrubione), a pozostałe pola dalej
-//    idą za kursorem. Kliknięcie w widoku bierze przypięte wartości z pól.
-//  - Tab / Shift+Tab przechodzi między polami, Enter zatwierdza punkt, Esc przerywa.
-//  - Pisanie w widoku 3D od razu trafia do pierwszego pola.
-//  - Przełącznik Abs / Przyr / Bieg: współrzędne bezwzględne, przyrostowe (od
-//    poprzedniego punktu) albo biegunowe (długość i kąt od poprzedniego punktu).
+// Pasek wprowadzania – jak Input Bar w Alphacam ("LINE From  X [0] F1=?  Y [0] F1=?  OK").
+//  - Bez polecenia pasek jest pusty.
+//  - Polecenie, które potrzebuje danych, pokazuje podpowiedź (np. "PRZESUŃ Punkt bazowy"),
+//    pola X i Y oraz przycisk OK. Punkt można wpisać w pola albo kliknąć w widoku.
 //  - W polach można wpisywać wyrażenia, np. 100/3+2*(5-1); przecinek = kropka.
+//  - F1 albo przycisk "F1=?" przy polu pomija wartość, której nie znamy. Pasek pokazuje
+//    wtedy inną podpowiedź: brakującą współrzędną bierzemy z kliknięcia w widoku,
+//    a wpisane zostają.
+//  - Enter = OK, Tab / Shift+Tab przechodzi między polami, Esc przerywa polecenie.
+//    Pisanie w widoku 3D od razu trafia do pola X.
 class InputBar : public QWidget
 {
     Q_OBJECT
 
 public:
-    enum class Mode { Absolute, Incremental, Polar };
-
     explicit InputBar(QWidget* parent = nullptr);
 
-    // Brak polecenia – sama szara podpowiedź.
+    // Brak polecenia – pusty pasek.
     void showIdle();
-    // Polecenie wybiera elementy: podpowiedź + przyciski "Gotowe" i "Anuluj".
+    // Polecenie wybiera elementy: podpowiedź + OK (zatwierdza wybór).
     void startSelect(const QString& command, const QString& prompt);
-    // Polecenie czeka na punkt. reference = poprzedni punkt (dla Przyr i Bieg);
-    // bez niego liczymy od 0,0,0.
-    void startPoint(const QString& command, const QString& prompt,
-                    std::optional<gp_Pnt> reference = std::nullopt);
+    // Polecenie czeka na punkt: podpowiedź, pola X i Y, OK.
+    void startPoint(const QString& command, const QString& prompt);
     void setPrompt(const QString& prompt);
 
     bool isPicking() const { return m_picking; }
 
-    // Kursor nad widokiem (płaszczyzna Z = 0) – nieprzypięte pola pokazują jego położenie.
-    void trackCursor(double x, double y);
-    // Punkt kliknięty w widoku z podstawionymi wartościami przypiętych pól.
+    // Punkt kliknięty w widoku. Gdy jakieś pole pominięto (F1), wpisane pola
+    // zastępują współrzędne kliknięcia. Brak wartości = błąd w polu.
     std::optional<gp_Pnt> resolveClick(double x, double y);
-    // Klawisz wciśnięty w widoku 3D: cyfry zaczynają wpisywanie, Enter zatwierdza,
-    // Tab przechodzi do pól. Zwraca true, gdy klawisz został obsłużony.
+    // Klawisz wciśnięty w widoku 3D: cyfry zaczynają wpisywanie, Enter = OK,
+    // Tab przechodzi do pól, F1 pomija pole X. Zwraca true, gdy klawisz obsłużono.
     bool handleViewKey(QKeyEvent* e);
 
-    Mode mode() const { return m_mode; }
-    void setMode(Mode mode);
-
 signals:
-    void pointEntered(double x, double y, double z); // punkt bezwzględny
-    void selectionDone();                            // "Gotowe" przy wyborze
-    void cancelled();                                // "Anuluj"
+    void pointEntered(double x, double y, double z); // punkt wpisany i zatwierdzony OK
+    void selectionDone();                            // OK przy wyborze elementów
+    void cancelled();                                // Esc w polu
+    void activeChanged(bool pointInput);             // pasek pokazuje pola punktu albo nie
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    void updateLabels();
-    void refreshTracked();
-    void setLocked(int field, bool locked);
+    void onOk();
+    void bypass(int field);
     void focusField(int field);
-    void accept();
-    // Wartości pól dla punktu bezwzględnego p w bieżącym trybie.
-    std::vector<double> fieldsFor(const gp_Pnt& p) const;
-    // Punkt bezwzględny z wartości pól w bieżącym trybie.
-    gp_Pnt pointFrom(const std::vector<double>& values) const;
-    std::optional<gp_Pnt> resolve(const gp_Pnt& cursor, bool markErrors);
+    void setError(int field, bool error);
+    bool anyBypassed() const;
+    void showPrompt();
 
     QLabel* m_command = nullptr;
     QLabel* m_prompt = nullptr;
     QWidget* m_fieldsBox = nullptr;
-    std::vector<QLabel*> m_labels;
     std::vector<QLineEdit*> m_fields;
-    std::vector<bool> m_locked;
-    QToolButton* m_modeButtons[3] = {};
-    QPushButton* m_done = nullptr;
-    QPushButton* m_cancel = nullptr;
+    std::vector<bool> m_bypassed;
+    QPushButton* m_ok = nullptr;
 
-    Mode m_mode = Mode::Absolute;
+    QString m_basePrompt;
     bool m_picking = false;
-    gp_Pnt m_reference{0, 0, 0};
-    gp_Pnt m_cursor{0, 0, 0};
+    bool m_selecting = false;
 };
 
 // Liczy wyrażenie z pola (+ - * / i nawiasy, przecinek jak kropka).

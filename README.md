@@ -49,17 +49,17 @@ geometrie (każde kliknięcie dokłada element, drugie kliknięcie go odejmuje).
 Wybrana bryła jest lekko podbarwiona na niebiesko, wybrana geometria jasnoniebieska.
 PPM (albo Enter, albo „Gotowe”) zatwierdza wybór. Potem wskazujemy punkt bazowy
 i punkt docelowy: klikając w widoku (płaszczyzna Z 0) albo wpisując je w pasku
-wprowadzania. Dokładne przesunięcie: punkt bazowy, potem tryb „Przyr” i dX/dY/dZ.
+wprowadzania. Dokładne przesunięcie: punkt bazowy 0, 0, potem docelowy = dX, dY.
 Esc lub „Anuluj” przerywa.
 
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
-`app/InputBar`): podpowiedź „Polecenie: krok” i pola punktu. Pola pokazują na żywo
-położenie kursora; wpisana wartość przypina pole (żółte, pogrubione), a reszta dalej
-idzie za kursorem – kliknięcie w widoku bierze wtedy wartości przypięte. Pisanie
-w widoku od razu trafia do pierwszego pola, Tab / Shift+Tab przechodzi między polami,
-Enter zatwierdza punkt, Esc przerywa. Tryby: **Abs** (X Y Z), **Przyr** (dX dY dZ od
-poprzedniego punktu), **Bieg** (długość L i kąt od poprzedniego punktu). W polach można
-pisać wyrażenia, np. `100/3+2*(5-1)`; przecinek działa jak kropka.
+`app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
+pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X i Y z przyciskami „F1=?”,
+przycisk OK i przyciąganie. Punkt można wpisać w pola (OK lub Enter) albo kliknąć
+w widoku. F1 lub „F1=?” pomija nieznaną wartość – podpowiedź się zmienia, a brakująca
+współrzędna przychodzi z kliknięcia (wpisane zostają). Pisanie w widoku od razu trafia
+do pola X, Tab / Shift+Tab przechodzi między polami, Esc przerywa. W polach można pisać
+wyrażenia, np. `100/3+2*(5-1)`; przecinek działa jak kropka.
 
 **Dolne belki** (jak w Alphacam): belka polecenia – po lewej pasek wprowadzania,
 po prawej przyciąganie (9 przycisków);
