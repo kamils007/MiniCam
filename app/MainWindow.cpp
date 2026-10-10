@@ -445,8 +445,16 @@ void MainWindow::createBottomBars()
     addToolBar(Qt::BottomToolBarArea, m_commandBar);
 
     // Belki odcinamy od siebie liniami i lekkim cieniem, a pola i przyciski mają
-    // wklęsłe ramki – żeby nic się nie zlewało z tłem.
+    // wklęsłe ramki – żeby nic się nie zlewało z tłem. Kolory tekstu są stałe:
+    // przy ciemnym motywie Windows Qt dałby jasny tekst na naszym jasnym tle.
     const QString barStyle = R"(
+        QToolBar#commandBar QLabel, QStatusBar, QStatusBar QLabel { color: black; }
+        QToolBar#commandBar QPushButton {
+            color: black;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
+            border: 1px solid #a8a8a8; border-radius: 2px; padding: 2px 14px;
+        }
+        QToolBar#commandBar QPushButton:pressed { background: #cfe3f7; }
         QToolBar#commandBar {
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f7f7f7, stop:1 #e4e4e4);
             border-top: 1px solid #8c8c8c; border-bottom: 1px solid #8c8c8c;
@@ -467,10 +475,12 @@ void MainWindow::createBottomBars()
         QWidget#barGroup { border-left: 1px solid #b0b0b0; }
         QLabel#inputCommand { font-weight: bold; }
         QWidget#inputBar QLineEdit {
-            background: #ffffff; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 3px;
+            color: black; background: #ffffff; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 3px;
+            selection-background-color: #3d7fd1; selection-color: white;
         }
         QWidget#inputBar QLineEdit[error="true"] { background: #ffd6d6; border-color: #c03030; }
         QToolButton#inputF1 {
+            color: black;
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
             border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 5px;
         }
