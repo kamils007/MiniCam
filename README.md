@@ -13,13 +13,17 @@ trafiają w 0,0,0. Przycisk Auto-Wyrównanie Części odwraca bryłę na drugą 
 wyeksportować do pliku .ini.
 
 **Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
-idzie od dołu do góry po poziomych płaskich powierzchniach bryły (bez wierzchu).
-Powierzchnie na tej samej wysokości tworzą poziom, a ich brzeg to kontury 2D.
-Każdy kontur trafia na wysokość najwyższej ze swoich ścian bocznych i ma wysokość
-swoich ścian – pod konturem rysowana jest kolorowa ścianka do dołu ścian; powtórzone
-kontury są usuwane. Kontury o tej samej wysokości mają wspólny kolor; w oknie
-Dodatki jest lista wysokości z konturami (wymiary, okręgi Ø), kliknięcie podświetla
-kontur albo całą wysokość na pomarańczowo. Kod: `core/ContourLevels`.
+rozbiera płytę na kontury, idąc po płaskich poziomych powierzchniach (bez wierzchu):
+- **Kontur** – obrys bryły (zewnętrzny brzeg spodu).
+- **Kontury wewnętrzne** – pozostałe wycięcia na wylot.
+- **Kieszenie** – wszystko powyżej Z 0. Kieszeń ma kontur zewnętrzny i może mieć
+  kontury wewnętrzne (wyspy).
+
+Bierzemy tylko kontury, których ścianki rosną w Z do góry – kieszenie od spodu
+są pomijane. Każdy kontur składa się z geometrii (odcinki, łuki – po kolei wzdłuż
+konturu) i ma wysokość swoich ścian: leży na ich górze, a pod nim rysowana jest
+kolorowa ścianka do dołu ścian. Kliknięcie w oknie Dodatki podświetla kontur,
+kieszeń albo całą grupę. Kod: `core/PartContours`.
 
 ```
 minicam/

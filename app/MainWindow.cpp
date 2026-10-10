@@ -19,7 +19,6 @@
 #include <QTreeWidget>
 
 #include <cmath>
-#include <iterator>
 #include <exception>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -210,7 +209,7 @@ void MainWindow::showModel(const camcore::ImportedModel& model)
 
 void MainWindow::clearFeatures()
 {
-    m_levels.clear();
+    m_contours = {};
     m_featureTree->clear();
     auto* hint = new QTreeWidgetItem(m_featureTree, {"Kontury: Ekstrakcja → Rozpoznaj cechy"});
     hint->setFlags(Qt::NoItemFlags);
@@ -221,22 +220,10 @@ namespace {
 
 QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
 
-// Kolor poziomu – kolejne poziomy od dołu dostają kolejne kolory z palety
-// (jak warstwy w Alphacam), żeby łatwo je odróżnić na bryle.
-Quantity_Color levelColor(size_t index)
-{
-    static const double palette[][3] = {
-        {0.10, 0.45, 1.00}, // niebieski
-        {0.00, 0.65, 0.20}, // zielony
-        {0.90, 0.10, 0.10}, // czerwony
-        {0.85, 0.10, 0.85}, // fioletowy
-        {0.95, 0.55, 0.00}, // pomarańczowy
-        {0.00, 0.70, 0.75}, // turkusowy
-        {0.55, 0.35, 0.10}, // brązowy
-    };
-    const double* c = palette[index % std::size(palette)];
-    return Quantity_Color(c[0], c[1], c[2], Quantity_TOC_sRGB);
-}
+// Kolory jak warstwy w Alphacam: obrys, kontury wewnętrzne, kieszenie.
+const Quantity_Color kOutlineColor(0.10, 0.45, 1.00, Quantity_TOC_sRGB); // niebieski
+const Quantity_Color kInnerColor(0.85, 0.10, 0.85, Quantity_TOC_sRGB);   // fioletowy
+const Quantity_Color kPocketColor(0.00, 0.65, 0.20, Quantity_TOC_sRGB);  // zielony
 
 QIcon colorIcon(const Quantity_Color& color)
 {
@@ -247,12 +234,16 @@ QIcon colorIcon(const Quantity_Color& color)
     return QIcon(pix);
 }
 
-QString contourText(const camcore::LevelContour& c, double height)
+QString shapeText(const camcore::Contour& c)
 {
-    QString t = c.diameter > 0 ? "Okrąg Ø" + num(c.diameter)
-                               : "Kontur " + num(c.sizeX) + " × " + num(c.sizeY);
-    t += ", wys. " + num(height);
-    return c.inner ? t + " (wewnętrzny)" : t;
+    return c.diameter > 0 ? "Ø" + num(c.diameter) : num(c.sizeX) + " × " + num(c.sizeY);
+}
+
+QString contourText(const camcore::Contour& c)
+{
+    return QString("%1, wys. %2, geometrii: %3")
+        .arg(shapeText(c), num(c.zTop - c.zBottom))
+        .arg(c.geometry.size());
 }
 
 } // namespace
@@ -265,54 +256,77 @@ void MainWindow::onRecognizeFeatures()
     }
     QApplication::setOverrideCursor(Qt::WaitCursor);
     clearFeatures();
-    m_levels = camcore::buildContourLevels(m_shown.shape);
+    m_contours = camcore::buildPartContours(m_shown.shape);
     QApplication::restoreOverrideCursor();
 
-    // Wszystkie kontury trafiają do widoku jedną listą; w drzewku każdy kontur
-    // pamięta swój numer na tej liście, a poziom – zakres numerów swoich konturów.
+    // Wszystkie kontury trafiają do widoku jedną listą. Element drzewka pamięta
+    // zakres numerów swoich konturów na tej liście [od, do) – kliknięcie go podświetla.
     std::vector<OccView::Contour> contours;
+    auto addContour = [&](const camcore::Contour& c, const Quantity_Color& color) {
+        contours.push_back({c.wire, color, c.zTop - c.zBottom});
+    };
+    auto setRange = [](QTreeWidgetItem* item, size_t first, size_t last) {
+        item->setData(0, Qt::UserRole, static_cast<int>(first));
+        item->setData(0, Qt::UserRole + 1, static_cast<int>(last));
+    };
+
     m_featureTree->clear();
-    for (size_t li = 0; li < m_levels.size(); ++li) {
-        const camcore::ContourLevel& level = m_levels[li];
-        const Quantity_Color color = levelColor(li);
-        auto* levelItem = new QTreeWidgetItem(m_featureTree);
-        levelItem->setText(0, QString("Wysokość Z %1 (%2)")
-                                  .arg(num(level.z))
-                                  .arg(level.contours.size()));
-        levelItem->setIcon(0, colorIcon(color));
-        levelItem->setData(0, Qt::UserRole, -1); // <0 = cały poziom
-        levelItem->setData(0, Qt::UserRole + 1, static_cast<int>(contours.size()));
-        for (const camcore::LevelContour& c : level.contours) {
-            auto* item = new QTreeWidgetItem(levelItem, {contourText(c, level.z - c.zBottom)});
-            item->setData(0, Qt::UserRole, static_cast<int>(contours.size()));
-            contours.push_back({c.wire, color, level.z - c.zBottom});
-        }
-        levelItem->setData(0, Qt::UserRole + 2, static_cast<int>(contours.size()));
-        levelItem->setExpanded(true);
+    if (!m_contours.outline.geometry.empty()) {
+        auto* item = new QTreeWidgetItem(m_featureTree, {"Kontur: " + contourText(m_contours.outline)});
+        item->setIcon(0, colorIcon(kOutlineColor));
+        setRange(item, contours.size(), contours.size() + 1);
+        addContour(m_contours.outline, kOutlineColor);
     }
+
+    auto* innerGroup = new QTreeWidgetItem(m_featureTree);
+    innerGroup->setText(0, QString("Kontury wewnętrzne (%1)").arg(m_contours.inner.size()));
+    innerGroup->setIcon(0, colorIcon(kInnerColor));
+    const size_t innerFirst = contours.size();
+    for (const camcore::Contour& c : m_contours.inner) {
+        auto* item = new QTreeWidgetItem(innerGroup, {contourText(c)});
+        setRange(item, contours.size(), contours.size() + 1);
+        addContour(c, kInnerColor);
+    }
+    setRange(innerGroup, innerFirst, contours.size());
+
+    auto* pocketGroup = new QTreeWidgetItem(m_featureTree);
+    pocketGroup->setText(0, QString("Kieszenie (%1)").arg(m_contours.pockets.size()));
+    pocketGroup->setIcon(0, colorIcon(kPocketColor));
+    const size_t pocketsFirst = contours.size();
+    for (size_t pi = 0; pi < m_contours.pockets.size(); ++pi) {
+        const camcore::Pocket& p = m_contours.pockets[pi];
+        auto* pocketItem = new QTreeWidgetItem(pocketGroup);
+        pocketItem->setText(0, QString("Kieszeń %1: %2, gł. %3")
+                                   .arg(pi + 1)
+                                   .arg(shapeText(p.contours.front()), num(p.depth)));
+        const size_t first = contours.size();
+        for (size_t ci = 0; ci < p.contours.size(); ++ci) {
+            const QString kind = ci == 0 ? "zewnętrzny" : "wewnętrzny";
+            auto* item = new QTreeWidgetItem(pocketItem, {"Kontur " + kind + ": " + contourText(p.contours[ci])});
+            setRange(item, contours.size(), contours.size() + 1);
+            addContour(p.contours[ci], kPocketColor);
+        }
+        setRange(pocketItem, first, contours.size());
+    }
+    setRange(pocketGroup, pocketsFirst, contours.size());
+    m_featureTree->expandAll();
+
     m_view->showGeometry(contours);
-    statusBar()->showMessage(QString("Narysowano %1 konturów na %2 poziomach – kliknij na liście, żeby podświetlić")
-                                 .arg(contours.size())
-                                 .arg(m_levels.size()));
+    statusBar()->showMessage(QString("Kontur, %1 konturów wewnętrznych, %2 kieszeni – kliknij na liście, żeby podświetlić")
+                                 .arg(m_contours.inner.size())
+                                 .arg(m_contours.pockets.size()));
 }
 
 void MainWindow::onFeatureClicked(QTreeWidgetItem* item)
 {
     if (!item->data(0, Qt::UserRole).isValid())
         return;
-    const int id = item->data(0, Qt::UserRole).toInt();
+    const int first = item->data(0, Qt::UserRole).toInt();
+    const int last = item->data(0, Qt::UserRole + 1).toInt();
     std::vector<int> selected;
-    if (id >= 0) {
-        selected = {id};
-        statusBar()->showMessage(item->parent()->text(0).section(" (", 0, 0) + " – " + item->text(0));
-    } else {
-        // Kliknięcie w poziom podświetla wszystkie jego kontury.
-        const int first = item->data(0, Qt::UserRole + 1).toInt();
-        const int last = item->data(0, Qt::UserRole + 2).toInt();
-        for (int i = first; i < last; ++i)
-            selected.push_back(i);
-        statusBar()->showMessage(item->text(0));
-    }
+    for (int i = first; i < last; ++i)
+        selected.push_back(i);
+    statusBar()->showMessage(item->text(0));
     m_view->highlightGeometry(selected);
 }
 
