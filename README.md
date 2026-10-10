@@ -16,10 +16,13 @@ wyeksportować do pliku .ini.
 zakładek, pasek narzędzi warstw (przyciski na razie nieaktywne) i drzewo warstw
 z checkboxami: Geometrie APS, Konstrukcje, Drogi Narzędzia, Wymiary, Splajny,
 Powierzchnie, Tekst, Bryły, STL, Warstwy Użytkownika. Checkbox włącza/wyłącza
-widoczność warstwy albo pojedynczej geometrii. Kontur zewnętrzny (obrys bryły)
-trafia do warstwy użytkownika „userKonturZew” (niebieska), kontury wewnętrzne
-(wycięcia na wylot) do „userKonturWew” (fioletowa), reszta to na razie geometrie
-niesklasyfikowane w „Geometrie APS”. Warstwy trzyma `camcore::LayerList`
+widoczność warstwy albo pojedynczej geometrii. Rozpoznawanie przypina geometrie
+do warstw użytkownika (`layerForContour` w `core/Geometry.h`):
+- obrys bryły → „userKonturZew” (niebieska),
+- okręgi o średnicach wierteł 2–15 mm (na wylot czy nie) → „userOtwory” (czerwona),
+- pozostałe na wylot, wewnątrz obrysu → „userKonturWew” (fioletowa),
+- pozostałe okręgi → „userKieszenOkragla” (pomarańczowa),
+- reszta na razie niesklasyfikowana → „Geometrie APS” (zielona). Warstwy trzyma `camcore::LayerList`
 (`core/Layers.h`): zawsze jest w niej APS, a warstwy użytkownika dochodzą przez
 `createLayer` – dziś z rozpoznawania cech (warstwa powstaje przy pierwszej
 geometrii, która do niej trafia), później także ręcznie z panelu. Geometria ma właściwości

@@ -279,18 +279,16 @@ void MainWindow::onRecognizeFeatures()
     m_contours = camcore::buildPartContours(m_shown.shape);
     QApplication::restoreOverrideCursor();
 
-    // Kontur zewnętrzny (obrys bryły) idzie do warstwy użytkownika userKonturZew,
-    // kontury wewnętrzne (wycięcia na wylot) do userKonturWew, reszta to na razie
-    // geometrie niesklasyfikowane – warstwa APS. Kieszenie zostają w m_contours na później.
+    // Kontur zewnętrzny (obrys bryły) idzie do warstwy userKonturZew, pozostałe
+    // kontury dostają warstwę według reguł z layerForContour (otwory, kontury
+    // wewnętrzne, kieszenie okrągłe); reszta to na razie geometrie niesklasyfikowane – APS.
     m_geometries.clear();
     m_layerList.clearUserLayers();
     // Geometria trafia do warstwy; warstwa użytkownika powstaje przy pierwszej
     // geometrii, która do niej trafia (createLayer zwraca istniejącą, jeśli już jest).
-    auto add = [this](const camcore::Contour& c, const char* layer = camcore::kApsLayer) {
-        if (layer == std::string(camcore::kOuterContourLayer))
-            m_layerList.createLayer(layer, camcore::kOuterContourColor);
-        else if (layer == std::string(camcore::kInnerContourLayer))
-            m_layerList.createLayer(layer, camcore::kInnerContourColor);
+    auto add = [this](const camcore::Contour& c, const std::string& layer) {
+        if (layer != camcore::kApsLayer)
+            m_layerList.createLayer(layer, camcore::autoLayerColor(layer));
         camcore::Geometry g;
         g.contour = c;
         g.layer = layer;
@@ -299,14 +297,12 @@ void MainWindow::onRecognizeFeatures()
     if (!m_contours.outline.geometry.empty())
         add(m_contours.outline, camcore::kOuterContourLayer);
     for (const camcore::Contour& c : m_contours.inner)
-        add(c, camcore::kInnerContourLayer);
+        add(c, camcore::layerForContour(c, true));
     for (const camcore::Pocket& p : m_contours.pockets)
         for (const camcore::Contour& c : p.contours)
-            add(c);
+            add(c, camcore::layerForContour(c, false));
     showGeometries();
-    statusBar()->showMessage(QString("Wyciągnięto %1 geometrii (obrys → %2, wycięcia na wylot → %3, reszta → %4)")
-                                 .arg(m_geometries.size())
-                                 .arg(camcore::kOuterContourLayer, camcore::kInnerContourLayer, camcore::kApsLayer));
+    statusBar()->showMessage(QString("Wyciągnięto %1 geometrii").arg(m_geometries.size()));
 }
 
 void MainWindow::onAutoAlign()
