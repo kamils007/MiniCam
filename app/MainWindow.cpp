@@ -1,17 +1,17 @@
 #include "MainWindow.h"
 #include "AlignSettingsDialog.h"
+#include "InputBar.h"
 #include "LayersPanel.h"
 #include "OccView.h"
 #include "Ribbon.h"
 
 #include <QAction>
-#include <QDoubleSpinBox>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
 #include <QPainter>
 #include <QPixmap>
-#include <QPushButton>
+#include <QKeyEvent>
 #include <QApplication>
 #include <QDockWidget>
 #include <QEvent>
@@ -66,15 +66,17 @@ MainWindow::MainWindow(QWidget* parent)
 
     createDock();
     createBottomBars();
-    createMovePanel();
     createRibbon();
     connect(m_view, &OccView::selectionConfirmed, this, &MainWindow::onSelectionConfirmed);
     connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
     connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelMove);
     connect(m_view, &OccView::selectionChanged, this, [this](int count) {
+        m_inputBar->setPrompt(QString("Wybierz elementy (wybrano %1), PPM lub Enter zatwierdza").arg(count));
         statusBar()->showMessage(QString("Przesuń: wybrano %1 – klikaj kolejne elementy, PPM zatwierdza, Esc anuluje")
                                      .arg(count));
     });
+    // Klawiatura w widoku 3D trafia do paska wprowadzania (pisanie liczb, Enter, Tab).
+    m_view->installEventFilter(this);
     statusBar()->showMessage("Otwórz bryłę: Plik → Otwórz (Ctrl+O)");
 }
 
@@ -120,6 +122,16 @@ void MainWindow::dockToHome()
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
+    if (watched == m_view && event->type() == QEvent::KeyPress) {
+        auto* e = static_cast<QKeyEvent*>(event);
+        if (m_inputBar->handleViewKey(e))
+            return true;
+        // Enter w trakcie wyboru elementów działa jak PPM.
+        if (m_moveStep == MoveStep::Selecting && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)) {
+            onSelectionConfirmed();
+            return true;
+        }
+    }
     if (watched == m_dock && m_dock->isFloating()
         && (event->type() == QEvent::NonClientAreaMouseButtonDblClick
             || event->type() == QEvent::MouseButtonDblClick)) {
@@ -397,16 +409,21 @@ QToolButton* placeholderButton(QWidget* parent, const QString& tip, int width = 
 
 void MainWindow::createBottomBars()
 {
-    // Belka polecenia (druga od dołu, jak w Alphacam): po lewej pola aktualnego
-    // polecenia (np. dX/dY/dZ przy przesuwaniu), po prawej przyciąganie.
+    // Belka polecenia (druga od dołu, jak w Alphacam): po lewej pasek wprowadzania
+    // (podpowiedź i pola bieżącego polecenia), po prawej przyciąganie.
     m_commandBar = new QToolBar("Polecenie", this);
     m_commandBar->setObjectName("commandBar");
     m_commandBar->setMovable(false);
     m_commandBar->setFloatable(false);
     m_commandBar->setContextMenuPolicy(Qt::PreventContextMenu);
+    m_inputBar = new InputBar(m_commandBar);
+    m_commandBar->addWidget(m_inputBar);
+    connect(m_inputBar, &InputBar::pointEntered, this, &MainWindow::onPointEntered);
+    connect(m_inputBar, &InputBar::selectionDone, this, &MainWindow::onSelectionConfirmed);
+    connect(m_inputBar, &InputBar::cancelled, this, &MainWindow::cancelMove);
     auto* spacer = new QWidget(m_commandBar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_commandBarSpacer = m_commandBar->addWidget(spacer);
+    m_commandBar->addWidget(spacer);
     m_commandBar->addSeparator();
     m_commandBar->addWidget(new QLabel(" Przyciąganie ", m_commandBar));
     for (int i = 1; i <= 9; ++i)
@@ -434,6 +451,18 @@ void MainWindow::createBottomBars()
             background: #fafafa; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 6px;
         }
         QWidget#barGroup { border-left: 1px solid #b0b0b0; }
+        QLabel#inputCommand { font-weight: bold; }
+        QLabel#inputPrompt:disabled { color: #808080; }
+        QWidget#inputBar QLineEdit {
+            background: #ffffff; border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 3px;
+        }
+        QWidget#inputBar QLineEdit[locked="true"] { font-weight: bold; background: #fff6cc; }
+        QWidget#inputBar QLineEdit[error="true"] { background: #ffd6d6; border-color: #c03030; }
+        QToolButton#inputMode {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #e6e6e6);
+            border: 1px solid #a8a8a8; border-radius: 2px; padding: 1px 5px;
+        }
+        QToolButton#inputMode:checked { background: #cfe3f7; border-color: #7aa7d6; }
     )";
     setStyleSheet(styleSheet() + barStyle);
 
@@ -445,7 +474,14 @@ void MainWindow::createBottomBars()
     statusBar()->addPermanentWidget(m_cursorLabel);
     connect(m_view, &OccView::cursorMoved, this, [this](double x, double y) {
         m_cursorLabel->setText(QString("X %1   Y %2").arg(x, 0, 'f', 3).arg(y, 0, 'f', 3));
+        m_inputBar->trackCursor(x, y);
     });
+
+    // Esc przerywa polecenie także wtedy, gdy widok 3D nie ma fokusu.
+    auto* escAct = new QAction(this);
+    escAct->setShortcut(Qt::Key_Escape);
+    connect(escAct, &QAction::triggered, this, &MainWindow::cancelMove);
+    addAction(escAct);
 
     auto* views = new QWidget(this);
     views->setObjectName("barGroup");
@@ -466,43 +502,6 @@ void MainWindow::createBottomBars()
     statusBar()->addPermanentWidget(toggles);
 }
 
-void MainWindow::createMovePanel()
-{
-    // Pasek w stopce okna, widoczny podczas przesuwania: dokładne przesunięcie
-    // wpisane z klawiatury zamiast klikania punktów.
-    m_movePanel = new QWidget(this);
-    auto* layout = new QHBoxLayout(m_movePanel);
-    layout->setContentsMargins(0, 0, 0, 0);
-    auto addField = [&](const QString& label) {
-        layout->addWidget(new QLabel(label, m_movePanel));
-        auto* box = new QDoubleSpinBox(m_movePanel);
-        box->setRange(-100000, 100000);
-        box->setDecimals(3);
-        box->setSuffix(" mm");
-        box->setMinimumWidth(110);
-        layout->addWidget(box);
-        return box;
-    };
-    m_moveDx = addField("dX");
-    m_moveDy = addField("dY");
-    m_moveDz = addField("dZ");
-    auto* ok = new QPushButton("Przesuń", m_movePanel);
-    auto* cancel = new QPushButton("Anuluj", m_movePanel);
-    layout->addWidget(ok);
-    layout->addWidget(cancel);
-    connect(ok, &QPushButton::clicked, this, &MainWindow::onMoveByValues);
-    connect(cancel, &QPushButton::clicked, this, &MainWindow::cancelMove);
-    // W pasku narzędzi widocznością widżetu steruje jego akcja.
-    m_movePanelAction = m_commandBar->insertWidget(m_commandBarSpacer, m_movePanel);
-    m_movePanelAction->setVisible(false);
-
-    // Esc przerywa przesuwanie także wtedy, gdy widok 3D nie ma fokusu.
-    auto* escAct = new QAction(this);
-    escAct->setShortcut(Qt::Key_Escape);
-    connect(escAct, &QAction::triggered, this, &MainWindow::cancelMove);
-    addAction(escAct);
-}
-
 void MainWindow::onMove()
 {
     if (m_shown.shape.IsNull()) {
@@ -510,7 +509,7 @@ void MainWindow::onMove()
         return;
     }
     m_moveStep = MoveStep::Selecting;
-    m_movePanelAction->setVisible(false);
+    m_inputBar->startSelect("Przesuń", "Wybierz elementy (LPM), PPM lub Enter zatwierdza");
     m_view->clearSelection();
     m_view->setInteraction(OccView::Interaction::Select);
     m_view->setFocus();
@@ -531,30 +530,37 @@ void MainWindow::onSelectionConfirmed()
     // Wybór zostaje podświetlony; teraz wskazujemy, o ile przesunąć.
     m_moveStep = MoveStep::PickBase;
     m_view->setInteraction(OccView::Interaction::PickPoint);
-    m_moveDx->setValue(0);
-    m_moveDy->setValue(0);
-    m_moveDz->setValue(0);
-    m_movePanelAction->setVisible(true);
-    statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz przesunięcie");
+    m_inputBar->startPoint("Przesuń", "Punkt bazowy");
+    statusBar()->showMessage("Przesuń: kliknij punkt bazowy albo wpisz go w pasku wprowadzania i Enter");
 }
 
-void MainWindow::onPointPicked(double x, double y, double z)
+void MainWindow::onPointPicked(double x, double y, double /*z*/)
 {
+    // Kliknięcie w widoku: wartości wpisane (przypięte) w pasku wprowadzania
+    // zastępują odpowiednie współrzędne kursora.
+    if (const auto p = m_inputBar->resolveClick(x, y))
+        onPointEntered(p->X(), p->Y(), p->Z());
+    else
+        statusBar()->showMessage("Błędna wartość w pasku wprowadzania – popraw pole zaznaczone na czerwono");
+}
+
+void MainWindow::onPointEntered(double x, double y, double z)
+{
+    // Po zatwierdzeniu punktu klawiatura wraca do widoku – kolejne pisanie
+    // zaczyna się od pierwszego pola następnego punktu.
+    m_view->setFocus();
     if (m_moveStep == MoveStep::PickBase) {
         m_moveBase = gp_Pnt(x, y, z);
         m_moveStep = MoveStep::PickTarget;
-        statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 – kliknij punkt docelowy")
+        m_inputBar->startPoint("Przesuń", "Punkt docelowy", m_moveBase);
+        statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 Z %3 – wskaż punkt docelowy "
+                                         "(Przyr = przesunięcie od punktu bazowego)")
                                      .arg(x, 0, 'f', 2)
-                                     .arg(y, 0, 'f', 2));
+                                     .arg(y, 0, 'f', 2)
+                                     .arg(z, 0, 'f', 2));
     } else if (m_moveStep == MoveStep::PickTarget) {
         applyMove(gp_Vec(m_moveBase, gp_Pnt(x, y, z)));
     }
-}
-
-void MainWindow::onMoveByValues()
-{
-    if (m_moveStep == MoveStep::PickBase || m_moveStep == MoveStep::PickTarget)
-        applyMove(gp_Vec(m_moveDx->value(), m_moveDy->value(), m_moveDz->value()));
 }
 
 void MainWindow::applyMove(const gp_Vec& offset)
@@ -588,7 +594,7 @@ void MainWindow::finishMove(const QString& message)
     m_moveStep = MoveStep::None;
     m_moveGeometries.clear();
     m_moveModel = false;
-    m_movePanelAction->setVisible(false);
+    m_inputBar->showIdle();
     m_view->setInteraction(OccView::Interaction::Navigate);
     statusBar()->showMessage(message);
 }

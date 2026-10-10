@@ -13,7 +13,7 @@
 class OccView;
 class QDockWidget;
 class LayersPanel;
-class QDoubleSpinBox;
+class InputBar;
 class QWidget;
 class QAction;
 class QLabel;
@@ -39,14 +39,13 @@ private slots:
     void onMove();
     void onSelectionConfirmed();
     void onPointPicked(double x, double y, double z);
-    void onMoveByValues();
+    void onPointEntered(double x, double y, double z);
     void cancelMove();
 
 private:
     void createRibbon();
     void createDock();
     void createBottomBars();
-    void createMovePanel();
     void applyMove(const gp_Vec& offset);
     void finishMove(const QString& message);
     void dockToHome();
@@ -65,20 +64,15 @@ private:
     camcore::LayerList m_layerList; // warstwy: APS + warstwy użytkownika
 
     // Polecenie "Przesuń": wybór elementów → punkt bazowy → punkt docelowy
-    // (albo przesunięcie wpisane w pola dX/dY/dZ).
+    // (punkty klikane w widoku albo wpisane w pasku wprowadzania).
     enum class MoveStep { None, Selecting, PickBase, PickTarget };
     MoveStep m_moveStep = MoveStep::None;
     std::vector<int> m_moveGeometries; // wybrane geometrie
     bool m_moveModel = false;          // czy wybrano bryłę
     gp_Pnt m_moveBase;
     QToolBar* m_commandBar = nullptr;       // belka polecenia (druga od dołu)
-    QAction* m_commandBarSpacer = nullptr;  // pola polecenia wstawiamy przed nim
     QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce
-    QWidget* m_movePanel = nullptr;
-    QAction* m_movePanelAction = nullptr;   // pokazuje/ukrywa m_movePanel w belce
-    QDoubleSpinBox* m_moveDx = nullptr;
-    QDoubleSpinBox* m_moveDy = nullptr;
-    QDoubleSpinBox* m_moveDz = nullptr;
+    InputBar* m_inputBar = nullptr;         // pasek wprowadzania (lewa strona belki)
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
     bool m_aligned = false; // czy pokazany model jest wyrównany

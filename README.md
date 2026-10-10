@@ -47,12 +47,22 @@ na pomarańczowo. Kod: `core/PartContours`.
 **Przesuń** (Edycja → Przesuń): klikamy elementy do przesunięcia – bryłę i/lub
 geometrie (każde kliknięcie dokłada element, drugie kliknięcie go odejmuje).
 Wybrana bryła jest lekko podbarwiona na niebiesko, wybrana geometria jasnoniebieska.
-PPM zatwierdza wybór. Potem albo klikamy punkt bazowy i punkt docelowy (na
-płaszczyźnie Z 0), albo wpisujemy dokładne przesunięcie dX/dY/dZ na pasku stanu
-i klikamy „Przesuń”. Esc lub „Anuluj” przerywa.
+PPM (albo Enter, albo „Gotowe”) zatwierdza wybór. Potem wskazujemy punkt bazowy
+i punkt docelowy: klikając w widoku (płaszczyzna Z 0) albo wpisując je w pasku
+wprowadzania. Dokładne przesunięcie: punkt bazowy, potem tryb „Przyr” i dX/dY/dZ.
+Esc lub „Anuluj” przerywa.
 
-**Dolne belki** (jak w Alphacam): belka polecenia – po lewej pola aktualnego
-polecenia (np. dX/dY/dZ przy przesuwaniu), po prawej przyciąganie (9 przycisków);
+**Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
+`app/InputBar`): podpowiedź „Polecenie: krok” i pola punktu. Pola pokazują na żywo
+położenie kursora; wpisana wartość przypina pole (żółte, pogrubione), a reszta dalej
+idzie za kursorem – kliknięcie w widoku bierze wtedy wartości przypięte. Pisanie
+w widoku od razu trafia do pierwszego pola, Tab / Shift+Tab przechodzi między polami,
+Enter zatwierdza punkt, Esc przerywa. Tryby: **Abs** (X Y Z), **Przyr** (dX dY dZ od
+poprzedniego punktu), **Bieg** (długość L i kąt od poprzedniego punktu). W polach można
+pisać wyrażenia, np. `100/3+2*(5-1)`; przecinek działa jak kropka.
+
+**Dolne belki** (jak w Alphacam): belka polecenia – po lewej pasek wprowadzania,
+po prawej przyciąganie (9 przycisków);
 stopka – komunikaty, współrzędne kursora na płaszczyźnie Z 0, 15 przycisków
 widoków i 4 przełączniki. Przyciski są na razie puste, bez funkcji.
 

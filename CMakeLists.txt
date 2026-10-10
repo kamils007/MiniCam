@@ -67,6 +67,8 @@ qt_add_executable(minicam
     app/OccView.h
     app/Ribbon.cpp
     app/Ribbon.h
+    app/InputBar.cpp
+    app/InputBar.h
     app/AlignSettingsDialog.cpp
     app/LayersPanel.cpp
     app/LayersPanel.h
