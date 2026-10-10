@@ -123,17 +123,18 @@ void OccView::showOriginAxes()
 }
 
 namespace {
-// Wybrana bryła: kolory lekko przesunięte w stronę jasnoniebieskiego ("filtr").
 // Bryła pod kursorem (przy wyborze): cała wyszarzona – kolory mocno rozjaśnione do szarości.
+// Bryła wybrana: niebieska.
 Quantity_Color tint(const Quantity_Color& c, bool selected, bool hovered)
 {
     double r, g, b;
     c.Values(r, g, b, Quantity_TOC_sRGB);
+    // Wybrana bryła jest niebieska – także pod kursorem, żeby było widać, że już jest w wyborze.
+    if (selected)
+        return Quantity_Color(0.3 * r + 0.7 * 0.25, 0.3 * g + 0.7 * 0.50, 0.3 * b + 0.7 * 1.00,
+                              Quantity_TOC_sRGB);
     if (hovered)
         return Quantity_Color(0.2 * r + 0.8 * 0.95, 0.2 * g + 0.8 * 0.95, 0.2 * b + 0.8 * 0.95,
-                              Quantity_TOC_sRGB);
-    if (selected)
-        return Quantity_Color(0.55 * r + 0.45 * 0.55, 0.55 * g + 0.45 * 0.80, 0.55 * b + 0.45 * 1.00,
                               Quantity_TOC_sRGB);
     return c;
 }
@@ -274,9 +275,11 @@ void OccView::refreshGeometryLook()
         Quantity_Color color = m_geometryColors[i];
         double width = kLineWidth;
         bool dashed = false;
+        bool keepFill = false; // ścianka zostaje w kolorze warstwy, zmienia się tylko linia
         if (has(m_selected, idx)) {
-            color = Quantity_Color(0.62, 0.82, 1.00, Quantity_TOC_sRGB);
+            color = Quantity_Color(0.10, 0.40, 1.00, Quantity_TOC_sRGB); // wybrana: ciągła niebieska linia
             width = kHighlightWidth;
+            keepFill = true;
         } else if (idx == m_hovered) {
             dashed = true; // pod kursorem: biała przerywana linia, ścianka w swoim kolorze
         } else if (has(m_highlighted, idx)) {
@@ -285,7 +288,7 @@ void OccView::refreshGeometryLook()
         }
         const Handle(AIS_Shape)& g = m_geometry[i];
         const double transparency = g->Transparency();
-        g->SetColor(color);
+        g->SetColor(keepFill ? m_geometryColors[i] : color);
         g->SetWidth(width);
         const Quantity_Color lineColor = dashed ? Quantity_Color(Quantity_NOC_WHITE) : color;
         const Aspect_TypeOfLine lineType = dashed ? Aspect_TOL_DASH : Aspect_TOL_SOLID;
