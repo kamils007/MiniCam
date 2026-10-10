@@ -162,7 +162,8 @@ LayersPanel::LayersPanel(QWidget* parent)
     addLayer("Tekst", Text);
     m_solids = addLayer("Bryły", Solid);
     addLayer("STL", Stl);
-    addLayer("Warstwy Użytkownika", UserLayers);
+    m_user = addLayer("Warstwy Użytkownika", UserLayers);
+    m_aps->setData(0, Qt::UserRole + 2, true); // warstwa z geometriami
 
     connect(m_tree, &QTreeWidget::itemChanged, this, &LayersPanel::onItemChanged);
     connect(m_tree, &QTreeWidget::itemClicked, this, &LayersPanel::onItemClicked);
@@ -178,12 +179,57 @@ QTreeWidgetItem* LayersPanel::addLayer(const QString& name, int iconKind)
     return item;
 }
 
+namespace {
+constexpr int kGeometryLayerRole = Qt::UserRole + 2;
+}
+
+bool LayersPanel::isGeometryLayer(const QTreeWidgetItem* item)
+{
+    return item && item->data(0, kGeometryLayerRole).toBool();
+}
+
+std::vector<QTreeWidgetItem*> LayersPanel::geometryLayers() const
+{
+    std::vector<QTreeWidgetItem*> out{m_aps};
+    for (int i = 0; i < m_user->childCount(); ++i)
+        out.push_back(m_user->child(i));
+    return out;
+}
+
+QTreeWidgetItem* LayersPanel::geometryLayer(const QString& name) const
+{
+    for (QTreeWidgetItem* layer : geometryLayers())
+        if (layer->data(0, Qt::UserRole + 1).toString() == name)
+            return layer;
+    return m_aps; // nieznana warstwa – geometria trafia do APS
+}
+
+void LayersPanel::setUserLayers(const std::vector<LayerRow>& layers)
+{
+    m_updating = true;
+    qDeleteAll(m_user->takeChildren());
+    for (const LayerRow& l : layers) {
+        auto* item = new QTreeWidgetItem(m_user, {l.name});
+        QPixmap swatch(12, 12);
+        swatch.fill(l.color); // kolor warstwy – w nim rysują się jej geometrie
+        item->setIcon(0, QIcon(swatch));
+        item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+        item->setCheckState(0, Qt::Checked);
+        item->setData(0, Qt::UserRole + 1, l.name);
+        item->setData(0, kGeometryLayerRole, true);
+    }
+    m_user->setExpanded(true);
+    updateCounts();
+    m_updating = false;
+}
+
 void LayersPanel::setGeometries(const std::vector<GeometryRow>& rows)
 {
     m_updating = true;
-    qDeleteAll(m_aps->takeChildren());
+    for (QTreeWidgetItem* layer : geometryLayers())
+        qDeleteAll(layer->takeChildren());
     for (size_t i = 0; i < rows.size(); ++i) {
-        auto* item = new QTreeWidgetItem(m_aps, {rows[i].label});
+        auto* item = new QTreeWidgetItem(geometryLayer(rows[i].layer), {rows[i].label});
         item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
         item->setCheckState(0, rows[i].visible ? Qt::Checked : Qt::Unchecked);
         item->setData(0, Qt::UserRole, static_cast<int>(i)); // numer geometrii
@@ -209,9 +255,21 @@ void LayersPanel::setModelName(const QString& name)
 void LayersPanel::updateCounts()
 {
     // Warstwy z zawartością pokazują liczbę elementów, np. "Geometrie APS (8)".
-    for (QTreeWidgetItem* layer : {m_aps, m_solids}) {
+    std::vector<QTreeWidgetItem*> layers = geometryLayers();
+    layers.push_back(m_solids);
+    for (QTreeWidgetItem* layer : layers) {
         const QString name = layer->data(0, Qt::UserRole + 1).toString();
         layer->setText(0, layer->childCount() ? QString("%1 (%2)").arg(name).arg(layer->childCount()) : name);
+    }
+}
+
+// Checkbox warstwy z geometriami: wszystkie jej geometrie razem.
+void LayersPanel::setLayerChecked(QTreeWidgetItem* layer, Qt::CheckState state)
+{
+    layer->setCheckState(0, state);
+    for (int i = 0; i < layer->childCount(); ++i) {
+        layer->child(i)->setCheckState(0, state);
+        emit geometryVisibilityChanged(layer->child(i)->data(0, Qt::UserRole).toInt(), state == Qt::Checked);
     }
 }
 
@@ -221,14 +279,14 @@ void LayersPanel::onItemChanged(QTreeWidgetItem* item)
         return;
     m_updating = true;
     const bool on = item->checkState(0) == Qt::Checked;
-    if (item == m_aps) {
-        // Cała warstwa: wszystkie jej geometrie razem.
-        for (int i = 0; i < m_aps->childCount(); ++i) {
-            m_aps->child(i)->setCheckState(0, item->checkState(0));
-            emit geometryVisibilityChanged(i, on);
-        }
-    } else if (item->parent() == m_aps) {
+    if (isGeometryLayer(item)) {
+        setLayerChecked(item, item->checkState(0));
+    } else if (isGeometryLayer(item->parent())) {
         emit geometryVisibilityChanged(item->data(0, Qt::UserRole).toInt(), on);
+    } else if (item == m_user) {
+        // "Warstwy Użytkownika": wszystkie warstwy użytkownika razem.
+        for (int i = 0; i < m_user->childCount(); ++i)
+            setLayerChecked(m_user->child(i), item->checkState(0));
     } else if (item == m_solids || item->parent() == m_solids) {
         // Bryła jest jedna – checkbox warstwy i bryły działają razem.
         m_solids->setCheckState(0, item->checkState(0));
@@ -242,10 +300,10 @@ void LayersPanel::onItemChanged(QTreeWidgetItem* item)
 void LayersPanel::onItemClicked(QTreeWidgetItem* item)
 {
     std::vector<int> indices;
-    if (item == m_aps) {
-        for (int i = 0; i < m_aps->childCount(); ++i)
-            indices.push_back(i);
-    } else if (item->parent() == m_aps) {
+    if (isGeometryLayer(item)) {
+        for (int i = 0; i < item->childCount(); ++i)
+            indices.push_back(item->child(i)->data(0, Qt::UserRole).toInt());
+    } else if (isGeometryLayer(item->parent())) {
         indices.push_back(item->data(0, Qt::UserRole).toInt());
     }
     emit geometriesSelected(indices); // pusta lista gasi podświetlenie

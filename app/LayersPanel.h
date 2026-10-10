@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QString>
 #include <QWidget>
 
@@ -19,13 +20,22 @@ class LayersPanel : public QWidget
 public:
     explicit LayersPanel(QWidget* parent = nullptr);
 
-    // Geometria widoczna w drzewku: opis i widoczność (checkbox).
+    // Warstwa użytkownika (pod "Warstwy Użytkownika"): nazwa i kolor.
+    struct LayerRow
+    {
+        QString name;
+        QColor color;
+    };
+    void setUserLayers(const std::vector<LayerRow>& layers);
+
+    // Geometria widoczna w drzewku: opis, warstwa i widoczność (checkbox).
     struct GeometryRow
     {
         QString label;
+        QString layer; // "Geometrie APS" albo nazwa warstwy użytkownika
         bool visible = true;
     };
-    // Geometrie w warstwie APS – jedna pozycja na geometrię (pusta lista = brak).
+    // Geometrie trafiają pod swoje warstwy – jedna pozycja na geometrię.
     void setGeometries(const std::vector<GeometryRow>& rows);
     // Bryła w warstwie Bryły (pusty tekst = brak bryły).
     void setModelName(const QString& name);
@@ -41,10 +51,15 @@ private slots:
 
 private:
     QTreeWidgetItem* addLayer(const QString& name, int iconKind);
+    QTreeWidgetItem* geometryLayer(const QString& name) const;
+    std::vector<QTreeWidgetItem*> geometryLayers() const;
+    static bool isGeometryLayer(const QTreeWidgetItem* item);
+    void setLayerChecked(QTreeWidgetItem* layer, Qt::CheckState state);
     void updateCounts();
 
     QTreeWidget* m_tree = nullptr;
     QTreeWidgetItem* m_aps = nullptr;    // Geometrie APS
     QTreeWidgetItem* m_solids = nullptr; // Bryły
+    QTreeWidgetItem* m_user = nullptr;   // Warstwy Użytkownika
     bool m_updating = false; // zmieniamy checkboxy z kodu – nie reagujemy na itemChanged
 };

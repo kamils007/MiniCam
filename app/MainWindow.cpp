@@ -27,6 +27,11 @@ MainWindow::MainWindow(QWidget* parent)
     m_view = new OccView(this);
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
+    m_geometryLayers = {
+        {camcore::kApsLayer, camcore::kApsColor},
+        {camcore::kOuterContourLayer, Quantity_Color(0.10, 0.45, 1.00, Quantity_TOC_sRGB)}, // niebieska
+        {camcore::kInnerContourLayer, Quantity_Color(0.85, 0.10, 0.85, Quantity_TOC_sRGB)}, // fioletowa
+    };
 
     createDock();
     createRibbon();
@@ -46,6 +51,13 @@ void MainWindow::createDock()
     connect(m_layers, &LayersPanel::modelVisibilityChanged, m_view, &OccView::setModelVisible);
     connect(m_layers, &LayersPanel::geometriesSelected, m_view, &OccView::highlightGeometry);
     m_dock->setWidget(m_layers);
+    std::vector<LayersPanel::LayerRow> userLayers;
+    for (size_t i = 1; i < m_geometryLayers.size(); ++i) {
+        double r, g, b;
+        m_geometryLayers[i].color.Values(r, g, b, Quantity_TOC_sRGB);
+        userLayers.push_back({QString::fromStdString(m_geometryLayers[i].name), QColor::fromRgbF(r, g, b)});
+    }
+    m_layers->setUserLayers(userLayers);
     m_dock->setMinimumWidth(220);
     // Tło trochę jaśniejsze niż pas ikon na wstążce, kolory niezależne od motywu Windows.
     m_dock->setStyleSheet(R"(
@@ -237,15 +249,23 @@ void MainWindow::showGeometries()
     std::vector<LayersPanel::GeometryRow> rows;
     for (size_t i = 0; i < m_geometries.size(); ++i) {
         const camcore::Geometry& g = m_geometries[i];
-        // Kolor z warstwy geometrii (na razie wszystkie są w APS).
-        contours.push_back({g.contour.wire, m_apsLayer.color, g.contour.zTop - g.contour.zBottom});
-        rows.push_back({geometryText(i, g.contour), g.visible});
+        // Kolor z warstwy geometrii.
+        contours.push_back({g.contour.wire, layerOf(g).color, g.contour.zTop - g.contour.zBottom});
+        rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
     }
     m_view->showGeometry(contours);
     for (size_t i = 0; i < m_geometries.size(); ++i)
         if (!m_geometries[i].visible)
             m_view->setGeometryVisible(static_cast<int>(i), false);
     m_layers->setGeometries(rows);
+}
+
+const camcore::Layer& MainWindow::layerOf(const camcore::Geometry& g) const
+{
+    for (const camcore::Layer& l : m_geometryLayers)
+        if (l.name == g.layer)
+            return l;
+    return m_geometryLayers.front(); // nieznana warstwa – jak APS
 }
 
 void MainWindow::setGeometryVisible(int index, bool visible)
@@ -266,26 +286,27 @@ void MainWindow::onRecognizeFeatures()
     m_contours = camcore::buildPartContours(m_shown.shape);
     QApplication::restoreOverrideCursor();
 
-    // Na razie wszystkie kontury to geometrie niesklasyfikowane – warstwa APS.
-    // Podział na kontur / kontury wewnętrzne / kieszenie zostaje w m_contours
-    // na później, gdy zaczniemy przypinać geometrie do warstw.
+    // Kontur zewnętrzny (obrys bryły) idzie do warstwy użytkownika userKonturZew,
+    // kontury wewnętrzne (wycięcia na wylot) do userKonturWew, reszta to na razie
+    // geometrie niesklasyfikowane – warstwa APS. Kieszenie zostają w m_contours na później.
     m_geometries.clear();
-    auto add = [this](const camcore::Contour& c) {
+    auto add = [this](const camcore::Contour& c, const char* layer = camcore::kApsLayer) {
         camcore::Geometry g;
         g.contour = c;
+        g.layer = layer;
         m_geometries.push_back(g);
     };
     if (!m_contours.outline.geometry.empty())
-        add(m_contours.outline);
+        add(m_contours.outline, camcore::kOuterContourLayer);
     for (const camcore::Contour& c : m_contours.inner)
-        add(c);
+        add(c, camcore::kInnerContourLayer);
     for (const camcore::Pocket& p : m_contours.pockets)
         for (const camcore::Contour& c : p.contours)
             add(c);
     showGeometries();
-    statusBar()->showMessage(QString("Wyciągnięto %1 geometrii do warstwy %2")
+    statusBar()->showMessage(QString("Wyciągnięto %1 geometrii (obrys → %2, wycięcia na wylot → %3, reszta → %4)")
                                  .arg(m_geometries.size())
-                                 .arg(camcore::kApsLayer));
+                                 .arg(camcore::kOuterContourLayer, camcore::kInnerContourLayer, camcore::kApsLayer));
 }
 
 void MainWindow::onAutoAlign()

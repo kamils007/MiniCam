@@ -16,8 +16,10 @@ wyeksportować do pliku .ini.
 zakładek, pasek narzędzi warstw (przyciski na razie nieaktywne) i drzewo warstw
 z checkboxami: Geometrie APS, Konstrukcje, Drogi Narzędzia, Wymiary, Splajny,
 Powierzchnie, Tekst, Bryły, STL, Warstwy Użytkownika. Checkbox włącza/wyłącza
-widoczność warstwy albo pojedynczej geometrii. Wszystkie geometrie są na razie
-niesklasyfikowane i trafiają do „Geometrie APS”. Geometria ma właściwości
+widoczność warstwy albo pojedynczej geometrii. Kontur zewnętrzny (obrys bryły)
+trafia do warstwy użytkownika „userKonturZew” (niebieska), kontury wewnętrzne
+(wycięcia na wylot) do „userKonturWew” (fioletowa), reszta to na razie geometrie
+niesklasyfikowane w „Geometrie APS”. Geometria ma właściwości
 (`core/Geometry.h`): warstwę i widoczność; kolor bierze z warstwy (APS – zawsze
 zielony, jak w Alphacam).
 

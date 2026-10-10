@@ -11,6 +11,11 @@ inline const char* const kApsLayer = "Geometrie APS";
 // Geometrie APS są zawsze zielone, jak w Alphacam.
 inline const Quantity_Color kApsColor(0.00, 0.75, 0.00, Quantity_TOC_sRGB);
 
+// Warstwa użytkownika na kontur zewnętrzny (obrys bryły).
+inline const char* const kOuterContourLayer = "userKonturZew";
+// Warstwa użytkownika na kontury wewnętrzne (pozostałe wycięcia na wylot).
+inline const char* const kInnerContourLayer = "userKonturWew";
+
 // Warstwa: nazwa, kolor i widoczność. Geometrie rysują się kolorem swojej warstwy.
 struct Layer
 {
