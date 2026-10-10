@@ -68,6 +68,7 @@ qt_add_executable(minicam
 )
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
+    TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów
 )
 
 if(WIN32)

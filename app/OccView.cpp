@@ -4,12 +4,14 @@
 #include <AIS_Shape.hxx>
 #include <AIS_Trihedron.hxx>
 #include <Aspect_DisplayConnection.hxx>
+#include <BRepPrimAPI_MakePrism.hxx>
 #include <Geom_Axis2Placement.hxx>
 #include <Graphic3d_TransformPers.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_DatumAspect.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
+#include <Prs3d_ShadingAspect.hxx>
 
 #include <QMouseEvent>
 
@@ -163,15 +165,33 @@ void OccView::showGeometry(const std::vector<Contour>& contours)
     m_geometryColors.clear();
 
     for (const Contour& c : contours) {
-        // Sam kontur (krawędzie) – AIS_Shape rysuje go jako linie.
-        Handle(AIS_Shape) line = new AIS_Shape(c.shape);
-        line->SetColor(c.color);
-        line->SetWidth(kLineWidth);
+        Handle(AIS_Shape) item;
+        if (c.height > 1e-6) {
+            // Kontur "wyciągnięty" w dół o wysokość ścian (pryzmat): ścianka
+            // od górnego do dolnego konturu, z krawędziami u góry, u dołu i w narożach.
+            const TopoDS_Shape walls =
+                BRepPrimAPI_MakePrism(c.shape, gp_Vec(0, 0, -c.height)).Shape();
+            item = new AIS_Shape(walls);
+            item->SetColor(c.color);
+            item->SetTransparency(0.35);
+            item->Attributes()->SetFaceBoundaryDraw(Standard_True);
+            item->Attributes()->SetFaceBoundaryAspect(
+                new Prs3d_LineAspect(c.color, Aspect_TOL_SOLID, kLineWidth));
+            // Ścianka leży dokładnie na ścianach bryły – przesuwamy ją minimalnie
+            // w stronę kamery, żeby nie migotała (z-fighting).
+            item->Attributes()->ShadingAspect()->Aspect()->SetPolygonOffsets(Aspect_POM_Fill, -1.0f, -1.0f);
+        } else {
+            // Kontur bez wysokości – same linie.
+            item = new AIS_Shape(c.shape);
+            item->SetColor(c.color);
+            item->SetWidth(kLineWidth);
+        }
         // Warstwa "Top": rysowana po bryle, więc linie leżące na ścianach
         // nie giną pod czarnymi krawędziami. Bryła dalej zasłania to, co za nią.
-        line->SetZLayer(Graphic3d_ZLayerId_Top);
-        m_context->Display(line, AIS_WireFrame, -1, Standard_False); // -1: nie do zaznaczania
-        m_geometry.push_back(line);
+        item->SetZLayer(Graphic3d_ZLayerId_Top);
+        m_context->Display(item, c.height > 1e-6 ? AIS_Shaded : AIS_WireFrame, -1,
+                           Standard_False); // -1: nie do zaznaczania
+        m_geometry.push_back(item);
         m_geometryColors.push_back(c.color);
     }
     m_view->Redraw();
@@ -181,8 +201,16 @@ void OccView::highlightGeometry(const std::vector<int>& indices)
 {
     for (size_t i = 0; i < m_geometry.size(); ++i) {
         const bool on = std::find(indices.begin(), indices.end(), static_cast<int>(i)) != indices.end();
-        m_geometry[i]->SetColor(on ? Quantity_Color(Quantity_NOC_ORANGE) : m_geometryColors[i]);
-        m_geometry[i]->SetWidth(on ? kHighlightWidth : kLineWidth);
+        const Quantity_Color color = on ? Quantity_Color(Quantity_NOC_ORANGE) : m_geometryColors[i];
+        const double width = on ? kHighlightWidth : kLineWidth;
+        const Handle(AIS_Shape)& g = m_geometry[i];
+        const double transparency = g->Transparency();
+        g->SetColor(color);
+        g->SetWidth(width);
+        if (g->Attributes()->FaceBoundaryDraw()) {
+            g->SetTransparency(transparency); // SetColor przywraca nieprzezroczystość
+            g->Attributes()->SetFaceBoundaryAspect(new Prs3d_LineAspect(color, Aspect_TOL_SOLID, width));
+        }
         m_context->Redisplay(m_geometry[i], Standard_False);
     }
     m_view->Redraw();

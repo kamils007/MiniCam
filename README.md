@@ -15,7 +15,8 @@ wyeksportować do pliku .ini.
 **Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
 idzie od dołu do góry po poziomych płaskich powierzchniach bryły (bez wierzchu).
 Powierzchnie na tej samej wysokości tworzą poziom, a ich brzeg to kontury 2D.
-Każdy kontur trafia na wysokość najwyższej ze swoich ścian bocznych; powtórzone
+Każdy kontur trafia na wysokość najwyższej ze swoich ścian bocznych i ma wysokość
+swoich ścian – pod konturem rysowana jest kolorowa ścianka do dołu ścian; powtórzone
 kontury są usuwane. Kontury o tej samej wysokości mają wspólny kolor; w oknie
 Dodatki jest lista wysokości z konturami (wymiary, okręgi Ø), kliknięcie podświetla
 kontur albo całą wysokość na pomarańczowo. Kod: `core/ContourLevels`.

@@ -247,10 +247,11 @@ QIcon colorIcon(const Quantity_Color& color)
     return QIcon(pix);
 }
 
-QString contourText(const camcore::LevelContour& c)
+QString contourText(const camcore::LevelContour& c, double height)
 {
     QString t = c.diameter > 0 ? "Okrąg Ø" + num(c.diameter)
                                : "Kontur " + num(c.sizeX) + " × " + num(c.sizeY);
+    t += ", wys. " + num(height);
     return c.inner ? t + " (wewnętrzny)" : t;
 }
 
@@ -282,9 +283,9 @@ void MainWindow::onRecognizeFeatures()
         levelItem->setData(0, Qt::UserRole, -1); // <0 = cały poziom
         levelItem->setData(0, Qt::UserRole + 1, static_cast<int>(contours.size()));
         for (const camcore::LevelContour& c : level.contours) {
-            auto* item = new QTreeWidgetItem(levelItem, {contourText(c)});
+            auto* item = new QTreeWidgetItem(levelItem, {contourText(c, level.z - c.zBottom)});
             item->setData(0, Qt::UserRole, static_cast<int>(contours.size()));
-            contours.push_back({c.wire, color});
+            contours.push_back({c.wire, color, level.z - c.zBottom});
         }
         levelItem->setData(0, Qt::UserRole + 2, static_cast<int>(contours.size()));
         levelItem->setExpanded(true);

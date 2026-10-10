@@ -12,6 +12,7 @@ struct LevelContour
     double x = 0, y = 0;         // środek obrysu [mm]
     double sizeX = 0, sizeY = 0; // wymiary obrysu w X i Y [mm]
     double diameter = 0;         // > 0, gdy kontur jest pełnym okręgiem [mm]
+    double zBottom = 0;          // dół ścian bocznych – kontur leży na górze (ContourLevel::z) [mm]
     bool inner = false;          // leży wewnątrz innego konturu tego poziomu (otwór, wnęka)
 };
 

@@ -27,11 +27,13 @@ public:
     void showModel(const camcore::ImportedModel& model);
     void fitAll();
 
-    // Geometria 2D (kontury) rysowana grubymi liniami na bryle – wynik rozpoznania cech.
+    // Kontury rysowane grubymi liniami na bryle – wynik rozpoznania cech. Kontur
+    // z wysokością dostaje pod sobą przezroczystą ściankę aż do dołu swoich ścian.
     struct Contour
     {
-        TopoDS_Shape shape;
+        TopoDS_Shape shape;   // kontur na górze ścian
         Quantity_Color color;
+        double height = 0;    // wysokość ścian pod konturem [mm]
     };
     void showGeometry(const std::vector<Contour>& contours); // pusta lista = usuń geometrię
     // Wskazane kontury (indeksy z showGeometry) rysuje na pomarańczowo i grubiej.

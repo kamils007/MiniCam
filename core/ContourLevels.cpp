@@ -39,12 +39,12 @@ int horizontalSide(const TopoDS_Face& f, double& z)
     return nz > 0 ? 1 : -1;
 }
 
-// Najwyższy punkt ścian bocznych konturu: ściany niepoziome, które stykają się
-// z jego krawędziami. Bez ścian bocznych kontur zostaje na wysokości z.
-double wallTop(const TopoDS_Wire& wire, const TopTools_IndexedDataMapOfShapeListOfShape& edgeFaces,
-               double z)
+// Zakres wysokości ścian bocznych konturu: ściany niepoziome, które stykają się
+// z jego krawędziami. Bez ścian bocznych zakres to sama wysokość z.
+void wallRange(const TopoDS_Wire& wire, const TopTools_IndexedDataMapOfShapeListOfShape& edgeFaces,
+               double z, double& bottom, double& top)
 {
-    double top = z;
+    bottom = top = z;
     for (TopExp_Explorer ex(wire, TopAbs_EDGE); ex.More(); ex.Next()) {
         const TopTools_ListOfShape* faces = edgeFaces.Seek(ex.Current());
         if (!faces)
@@ -57,10 +57,10 @@ double wallTop(const TopoDS_Wire& wire, const TopTools_IndexedDataMapOfShapeList
             BRepBndLib::AddOptimal(f, box, Standard_False, Standard_False);
             double x0, y0, z0, x1, y1, z1;
             box.Get(x0, y0, z0, x1, y1, z1);
+            bottom = std::min(bottom, z0);
             top = std::max(top, z1);
         }
     }
-    return top;
 }
 
 TopoDS_Wire moveToZ(const TopoDS_Wire& wire, double fromZ, double toZ)
@@ -184,19 +184,25 @@ std::vector<ContourLevel> buildContourLevels(const TopoDS_Shape& shape)
         Handle(TopTools_HSequenceOfShape) wires;
         ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, kTol, Standard_False, wires);
 
-        // 4. Każdy kontur przenosimy na wysokość najwyższej ze swoich ścian bocznych.
+        // 4. Każdy kontur przenosimy na wysokość najwyższej ze swoich ścian bocznych
+        //    i zapamiętujemy, gdzie te ściany się kończą na dole.
         const double z = groupZ.at(key);
         for (int i = 1; i <= wires->Length(); ++i) {
             const TopoDS_Wire wire = TopoDS::Wire(wires->Value(i));
-            const double top = wallTop(wire, shapeEdgeFaces, z);
+            double bottom, top;
+            wallRange(wire, shapeEdgeFaces, z, bottom, top);
             ContourLevel& level = byHeight[std::llround(top / kTol)];
             level.z = top;
             LevelContour c = describe(moveToZ(wire, z, top));
+            c.zBottom = bottom;
             // Ten sam kontur mógł już przyjść z innego poziomu (np. otwór
             // nieprzelotowy: brzeg dna i brzeg w ścianie wyżej) – zostawiamy jeden.
             bool duplicate = false;
-            for (const LevelContour& other : level.contours)
-                duplicate = duplicate || same(other, c);
+            for (LevelContour& other : level.contours)
+                if (same(other, c)) {
+                    other.zBottom = std::min(other.zBottom, c.zBottom);
+                    duplicate = true;
+                }
             if (!duplicate)
                 level.contours.push_back(c);
         }
