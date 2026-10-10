@@ -55,7 +55,7 @@ i docelowy: klik w widoku (płaszczyzna Z 0) albo wpisanie X/Y. Esc przerywa.
 **Uchwyty** (przy wskazywaniu punktu, na belce polecenia): AUTO (końce, środki,
 ćwiartki), KONIEC elementu (F6), ŚRODEK elementu (F7), CENTRUM okręgu (F8), ĆWIARTKI
 koła. Po wybraniu uchwytu znika krzyż, a kursor klei się do takich punktów widocznych
-geometrii (biała kulka); kliknięcie bierze ten punkt (X, Y). Drugie kliknięcie wyłącza
+geometrii i krawędzi bryły (zielona piłeczka); kliknięcie bierze ten punkt (X, Y). Drugie kliknięcie wyłącza
 uchwyt. Przecięcie, styczna, prostopadła, równoległa i Filtry – na razie bez działania.
 
 **Cofnij / Ponów** (Edycja, Ctrl+Z / Ctrl+Y): cofa i ponawia przesunięcia bryły

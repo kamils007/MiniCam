@@ -15,6 +15,10 @@
 #include <AIS_Trihedron.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopoDS_Edge.hxx>
+#include <BRep_Tool.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <Aspect_DisplayConnection.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
@@ -183,6 +187,8 @@ void OccView::showModel(const camcore::ImportedModel& model)
     showGeometry({}); // geometria dotyczyła starej bryły
 
     m_modelData = model;
+    m_modelSnapPoints.clear();
+    addSnapPoints(model.shape, 0.0, m_modelSnapPoints);
     m_modelSelected = false;
     m_modelVisible = true;
     m_modelHovered = false;
@@ -267,36 +273,9 @@ void OccView::showGeometry(const std::vector<Contour>& contours)
         }
         m_geometryLines.push_back(lines);
 
-        // Punkty uchwytów: końce i środki krawędzi, środki i ćwiartki łuków/okręgów –
-        // u góry ścianki i u dołu (przyciągamy i tak tylko X, Y).
+        // Punkty uchwytów – u góry ścianki i u dołu (przyciągamy i tak tylko X, Y).
         std::vector<SnapPoint> snaps;
-        auto addSnap = [&](Snap kind, const gp_Pnt& p) {
-            snaps.push_back({kind, p});
-            if (c.height > 1e-6)
-                snaps.push_back({kind, gp_Pnt(p.X(), p.Y(), p.Z() - c.height)});
-        };
-        for (TopExp_Explorer ex(c.shape, TopAbs_EDGE); ex.More(); ex.Next()) {
-            const BRepAdaptor_Curve curve(TopoDS::Edge(ex.Current()));
-            const double t0 = curve.FirstParameter(), t1 = curve.LastParameter();
-            addSnap(Snap::End, curve.Value(t0));
-            addSnap(Snap::End, curve.Value(t1));
-            addSnap(Snap::Mid, curve.Value((t0 + t1) / 2));
-            if (curve.GetType() == GeomAbs_Circle) {
-                const gp_Circ circle = curve.Circle();
-                addSnap(Snap::Centre, circle.Location());
-                // Ćwiartki: 0°, 90°, 180°, 270° w układzie XY – o ile leżą na łuku.
-                for (int q = 0; q < 4; ++q) {
-                    const gp_Pnt p(circle.Location().X() + circle.Radius() * std::cos(q * kHalfPi),
-                                   circle.Location().Y() + circle.Radius() * std::sin(q * kHalfPi),
-                                   circle.Location().Z());
-                    double t = ElCLib::Parameter(circle, p);
-                    while (t < t0 - 1e-9)
-                        t += 4 * kHalfPi;
-                    if (t <= t1 + 1e-9)
-                        addSnap(Snap::Quadrant, p);
-                }
-            }
-        }
+        addSnapPoints(c.shape, c.height, snaps);
         m_snapPoints.push_back(snaps);
     }
     m_view->Redraw();
@@ -397,6 +376,8 @@ void OccView::updateModel(const camcore::ImportedModel& model)
     if (m_context.IsNull())
         return;
     m_modelData = model;
+    m_modelSnapPoints.clear();
+    addSnapPoints(model.shape, 0.0, m_modelSnapPoints);
     rebuildModel();
 }
 
@@ -662,6 +643,46 @@ void OccView::showCrosshair(const QPoint& pos)
     m_view->Redraw();
 }
 
+void OccView::addSnapPoints(const TopoDS_Shape& shape, double height, std::vector<SnapPoint>& out)
+{
+    // Końce i środki krawędzi, środki i ćwiartki łuków/okręgów. height > 0: te same
+    // punkty także niżej o height (dół ścianki konturu).
+    auto add = [&](Snap kind, const gp_Pnt& p) {
+        out.push_back({kind, p});
+        if (height > 1e-6)
+            out.push_back({kind, gp_Pnt(p.X(), p.Y(), p.Z() - height)});
+    };
+    TopTools_IndexedMapOfShape edges; // każda krawędź raz (w bryle krawędź należy do dwóch ścian)
+    TopExp::MapShapes(shape, TopAbs_EDGE, edges);
+    for (int i = 1; i <= edges.Extent(); ++i) {
+        const TopoDS_Edge& edge = TopoDS::Edge(edges(i));
+        if (BRep_Tool::Degenerated(edge))
+            continue;
+        const BRepAdaptor_Curve curve(edge);
+        const double t0 = curve.FirstParameter(), t1 = curve.LastParameter();
+        add(Snap::End, curve.Value(t0));
+        add(Snap::End, curve.Value(t1));
+        add(Snap::Mid, curve.Value((t0 + t1) / 2));
+        if (curve.GetType() == GeomAbs_Circle) {
+            const gp_Circ circle = curve.Circle();
+            add(Snap::Centre, circle.Location());
+            // Ćwiartki: 0°, 90°, 180°, 270° w układzie XY – o ile leżą na łuku.
+            for (int q = 0; q < 4; ++q) {
+                const gp_Pnt p(circle.Location().X() + circle.Radius() * std::cos(q * kHalfPi),
+                               circle.Location().Y() + circle.Radius() * std::sin(q * kHalfPi),
+                               circle.Location().Z());
+                if (p.Distance(ElCLib::Value(ElCLib::Parameter(circle, p), circle)) > 1e-6)
+                    continue; // okrąg nie leży poziomo – ćwiartki XY nie są na nim
+                double t = ElCLib::Parameter(circle, p);
+                while (t < t0 - 1e-9)
+                    t += 4 * kHalfPi;
+                if (t <= t1 + 1e-9)
+                    add(Snap::Quadrant, p);
+            }
+        }
+    }
+}
+
 void OccView::setSnap(Snap snap, const QCursor& cursor)
 {
     m_snap = snap;
@@ -676,10 +697,15 @@ bool OccView::snapAt(const QPoint& pos, gp_Pnt& out) const
     const double maxDist = 20.0 * devicePixelRatioF();
     double best = maxDist;
     bool found = false;
-    for (size_t i = 0; i < m_snapPoints.size(); ++i) {
-        if (!m_geometryVisible[i])
-            continue;
-        for (const SnapPoint& sp : m_snapPoints[i]) {
+    // Punkty widocznych geometrii i – gdy jest widoczna – bryły.
+    std::vector<const std::vector<SnapPoint>*> sources;
+    for (size_t i = 0; i < m_snapPoints.size(); ++i)
+        if (m_geometryVisible[i])
+            sources.push_back(&m_snapPoints[i]);
+    if (!m_model.IsNull() && m_modelVisible)
+        sources.push_back(&m_modelSnapPoints);
+    for (const std::vector<SnapPoint>* points : sources) {
+        for (const SnapPoint& sp : *points) {
             const bool wanted = m_snap == Snap::Auto
                                     ? (sp.kind == Snap::End || sp.kind == Snap::Mid || sp.kind == Snap::Quadrant)
                                     : sp.kind == m_snap;

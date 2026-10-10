@@ -130,6 +130,8 @@ private:
         gp_Pnt point;
     };
     std::vector<std::vector<SnapPoint>> m_snapPoints; // [geometria] – punkty do przyciągania
+    std::vector<SnapPoint> m_modelSnapPoints;         // punkty krawędzi bryły
+    static void addSnapPoints(const TopoDS_Shape& shape, double height, std::vector<SnapPoint>& out);
     int m_hovered = -1;                // geometria pod kursorem w trybie wyboru (przerywana linia)
     QPoint m_lastPos;
     QPoint m_pressPos; // gdzie wciśnięto przycisk – odróżnia kliknięcie od przeciągania
