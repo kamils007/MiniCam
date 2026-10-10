@@ -1,6 +1,9 @@
 #include "FeatureRecognition.h"
 
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
@@ -12,6 +15,7 @@
 #include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Wire.hxx>
+#include <gp_Circ.hxx>
 #include <gp_Cylinder.hxx>
 #include <gp_Pln.hxx>
 
@@ -87,6 +91,22 @@ double angularSpan(const TopoDS_Face& f)
     return s.LastUParameter() - s.FirstUParameter();
 }
 
+// Kopia konturu przesunięta w pionie na wysokość z (geometria 2D w płaszczyźnie XY).
+TopoDS_Shape atHeight(const TopoDS_Shape& contour, double fromZ, double toZ)
+{
+    if (std::abs(toZ - fromZ) < 1e-9)
+        return contour;
+    gp_Trsf t;
+    t.SetTranslation(gp_Vec(0, 0, toZ - fromZ));
+    return BRepBuilderAPI_Transform(contour, t, Standard_True).Shape();
+}
+
+TopoDS_Shape circle(double x, double y, double z, double radius)
+{
+    const gp_Circ c(gp_Ax2(gp_Pnt(x, y, z), gp::DZ()), radius);
+    return BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(c).Edge()).Wire();
+}
+
 void boxOf(const std::vector<TopoDS_Face>& faces, double& x0, double& y0, double& x1, double& y1)
 {
     Bnd_Box box;
@@ -112,6 +132,7 @@ public:
 
     std::vector<camcore::Feature> run()
     {
+        findOutline();
         findHoles();
         findPockets();
         findCutouts();
@@ -136,6 +157,41 @@ private:
                     out.push_back(TopoDS::Face(g));
         }
         return out;
+    }
+
+    // Obrys detalu: zewnętrzny kontur największej ściany wierzchu płyty.
+    void findOutline()
+    {
+        TopoDS_Face best;
+        double bestArea = 0;
+        for (int i = 1; i <= m_faces.Extent(); ++i) {
+            const TopoDS_Face f = TopoDS::Face(m_faces(i));
+            double z;
+            if (horizontalSide(f, z) != 1 || std::abs(z - m_zTop) > kTol)
+                continue;
+            double x0, y0, x1, y1;
+            boxOf({f}, x0, y0, x1, y1);
+            const double area = (x1 - x0) * (y1 - y0);
+            if (area > bestArea) {
+                bestArea = area;
+                best = f;
+            }
+        }
+        if (best.IsNull())
+            return;
+        camcore::Feature o;
+        o.type = camcore::Feature::Type::Outline;
+        o.side = camcore::Feature::Side::Through;
+        o.depth = m_zTop - m_zBottom;
+        o.faces = {best};
+        o.contour = BRepTools::OuterWire(best);
+        double x0, y0, x1, y1;
+        boxOf({best}, x0, y0, x1, y1);
+        o.sizeX = x1 - x0;
+        o.sizeY = y1 - y0;
+        o.x = (x0 + x1) / 2;
+        o.y = (y0 + y1) / 2;
+        m_result.push_back(o);
     }
 
     // Otwory: wklęsłe walce pionowe o tej samej osi i promieniu, razem pełne 360°
@@ -184,12 +240,15 @@ private:
             h.faces = g.faces;
             const bool fromTop = std::abs(zMax - m_zTop) < kTol;
             const bool fromBottom = std::abs(zMin - m_zBottom) < kTol;
+            // Okrąg rysujemy tam, gdzie wchodzi wiertło (otwór w dnie kieszeni – na dnie).
+            double zEntry = zMax;
             if (fromTop && fromBottom) {
                 h.side = camcore::Feature::Side::Through;
                 h.depth = m_zTop - m_zBottom;
             } else if (fromBottom) {
                 h.side = camcore::Feature::Side::Bottom;
                 h.depth = zMax - m_zBottom;
+                zEntry = zMin;
                 addFloor(h, zMax, -1);
             } else {
                 // Z góry – także otwór w dnie kieszeni (głębokość liczymy od wierzchu płyty).
@@ -197,6 +256,7 @@ private:
                 h.depth = m_zTop - zMin;
                 addFloor(h, zMin, +1);
             }
+            h.contour = circle(h.x, h.y, zEntry, g.cyl.Radius());
             markUsed(h.faces);
             m_result.push_back(h);
         }
@@ -253,6 +313,9 @@ private:
             p.sizeY = y1 - y0;
             p.x = (x0 + x1) / 2;
             p.y = (y0 + y1) / 2;
+            // Obrys kieszeni = obrys dna podniesiony na powierzchnię płyty
+            // (wierzch albo spód), skąd wchodzi frez.
+            p.contour = atHeight(BRepTools::OuterWire(floor), z, side > 0 ? m_zTop : m_zBottom);
             markUsed({floor});
             m_result.push_back(p);
         }
@@ -322,6 +385,7 @@ private:
                 c.sizeY = y1 - y0;
                 c.x = (x0 + x1) / 2;
                 c.y = (y0 + y1) / 2;
+                c.contour = wex.Current(); // wewnętrzny obrys leży już na wierzchu płyty
                 markUsed(walls);
                 m_result.push_back(c);
             }

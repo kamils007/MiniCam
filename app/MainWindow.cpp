@@ -105,7 +105,7 @@ void MainWindow::createRibbon()
 
     QAction* recognizeAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogContentsView),
                                         "Rozpoznaj\ncechy", this);
-    recognizeAct->setToolTip("Znajdź otwory, kieszenie i wycięcia przelotowe");
+    recognizeAct->setToolTip("Narysuj geometrię 2D z bryły: obrys detalu, otwory,\nkieszenie i wycięcia przelotowe");
     connect(recognizeAct, &QAction::triggered, this, &MainWindow::onRecognizeFeatures);
 
     QAction* settingsAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView),
@@ -211,7 +211,7 @@ void MainWindow::clearFeatures()
     m_featureTree->clear();
     auto* hint = new QTreeWidgetItem(m_featureTree, {"Cechy: Ekstrakcja → Rozpoznaj cechy"});
     hint->setFlags(Qt::NoItemFlags);
-    m_view->highlightFaces({});
+    m_view->showGeometry({});
 }
 
 namespace {
@@ -228,9 +228,24 @@ QString sideText(camcore::Feature::Side side)
 
 QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
 
+// Kolory geometrii jak "warstwy" w Alphacam – każdy rodzaj cechy osobno.
+Quantity_Color contourColor(camcore::Feature::Type type)
+{
+    using T = camcore::Feature::Type;
+    switch (type) {
+    case T::Outline: return Quantity_Color(0.10, 0.45, 1.00, Quantity_TOC_sRGB); // niebieski
+    case T::Hole:    return Quantity_Color(0.90, 0.10, 0.10, Quantity_TOC_sRGB); // czerwony
+    case T::Pocket:  return Quantity_Color(0.00, 0.65, 0.20, Quantity_TOC_sRGB); // zielony
+    case T::Cutout:  return Quantity_Color(0.85, 0.10, 0.85, Quantity_TOC_sRGB); // fioletowy
+    }
+    return Quantity_Color(Quantity_NOC_WHITE);
+}
+
 QString featureText(const camcore::Feature& f)
 {
     using T = camcore::Feature::Type;
+    if (f.type == T::Outline)
+        return num(f.sizeX) + " × " + num(f.sizeY) + ", grubość " + num(f.depth);
     if (f.type == T::Hole) {
         QString t = "Ø" + num(f.diameter);
         return f.side == camcore::Feature::Side::Through
@@ -256,9 +271,16 @@ void MainWindow::onRecognizeFeatures()
     m_features = camcore::recognizeFeatures(m_shown.shape);
     QApplication::restoreOverrideCursor();
 
+    // Geometria 2D: jeden kontur na cechę, w tej samej kolejności co m_features.
+    std::vector<OccView::Contour> contours;
+    for (const camcore::Feature& f : m_features)
+        contours.push_back({f.contour, contourColor(f.type)});
+    m_view->showGeometry(contours);
+
     m_featureTree->clear();
     using T = camcore::Feature::Type;
-    const std::pair<T, QString> groups[] = {{T::Hole, "Otwory"},
+    const std::pair<T, QString> groups[] = {{T::Outline, "Obrys detalu"},
+                                            {T::Hole, "Otwory"},
                                             {T::Pocket, "Kieszenie"},
                                             {T::Cutout, "Wycięcia przelotowe"}};
     for (const auto& [type, name] : groups) {
@@ -277,7 +299,7 @@ void MainWindow::onRecognizeFeatures()
         if (count == 0)
             group->setFlags(Qt::ItemIsEnabled);
     }
-    statusBar()->showMessage(QString("Rozpoznano %1 cech – kliknij cechę na liście, żeby ją podświetlić")
+    statusBar()->showMessage(QString("Narysowano geometrię %1 cech – kliknij cechę na liście, żeby ją podświetlić")
                                  .arg(m_features.size()));
 }
 
@@ -286,21 +308,21 @@ void MainWindow::onFeatureClicked(QTreeWidgetItem* item)
     if (!item->data(0, Qt::UserRole).isValid())
         return;
     const int id = item->data(0, Qt::UserRole).toInt();
-    std::vector<TopoDS_Face> faces;
+    std::vector<int> selected;
     if (id >= 0) {
         const camcore::Feature& f = m_features[static_cast<size_t>(id)];
-        faces = f.faces;
+        selected = {id};
         statusBar()->showMessage(QString("%1 – środek X %2  Y %3 mm")
                                      .arg(featureText(f), num(f.x), num(f.y)));
     } else {
-        // Kliknięcie w nazwę grupy podświetla wszystkie cechy tego rodzaju.
+        // Kliknięcie w nazwę grupy podświetla geometrię wszystkich cech tego rodzaju.
         const auto type = static_cast<camcore::Feature::Type>(-1 - id);
-        for (const camcore::Feature& f : m_features)
-            if (f.type == type)
-                faces.insert(faces.end(), f.faces.begin(), f.faces.end());
+        for (size_t i = 0; i < m_features.size(); ++i)
+            if (m_features[i].type == type)
+                selected.push_back(static_cast<int>(i));
         statusBar()->showMessage(item->text(0));
     }
-    m_view->highlightFaces(faces);
+    m_view->highlightGeometry(selected);
 }
 
 void MainWindow::onAutoAlign()

@@ -12,10 +12,12 @@ trafiają w 0,0,0. Przycisk Auto-Wyrównanie Części odwraca bryłę na drugą 
 (kolejne kliknięcie przywraca). Ustawienia zapisują się same i można je
 wyeksportować do pliku .ini.
 
-**Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): program
-szuka w wyrównanej płycie otworów (średnica, głębokość, z góry / od spodu /
-przelotowe), kieszeni (wymiary, głębokość, strona) i wycięć przelotowych. Lista
-pojawia się w oknie Dodatki; kliknięcie cechy podświetla ją na pomarańczowo.
+**Rozpoznawanie cech** (Ekstrakcja modelu bryłowego → Rozpoznaj cechy): jak
+w Alphacam program rysuje z bryły geometrię 2D do obróbki – obrys detalu
+(niebieski), okręgi otworów (czerwone), obrysy kieszeni (zielone) i wycięć
+przelotowych (fioletowe). Każdy kontur leży na wysokości, z której wchodzi
+narzędzie (wierzch, spód albo dno kieszeni). Lista cech z wymiarami i głębokością
+pojawia się w oknie Dodatki; kliknięcie cechy podświetla jej kontur na pomarańczowo.
 
 ```
 minicam/

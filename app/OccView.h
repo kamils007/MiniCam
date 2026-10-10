@@ -6,7 +6,8 @@
 #include <vector>
 
 #include <AIS_InteractiveContext.hxx>
-#include <TopoDS_Face.hxx>
+#include <AIS_Shape.hxx>
+#include <Quantity_Color.hxx>
 #include <TopoDS_Shape.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
@@ -26,8 +27,15 @@ public:
     void showModel(const camcore::ImportedModel& model);
     void fitAll();
 
-    // Podświetla wskazane ściany na pomarańczowo (pusta lista = zgaś podświetlenie).
-    void highlightFaces(const std::vector<TopoDS_Face>& faces);
+    // Geometria 2D (kontury) rysowana grubymi liniami na bryle – wynik rozpoznania cech.
+    struct Contour
+    {
+        TopoDS_Shape shape;
+        Quantity_Color color;
+    };
+    void showGeometry(const std::vector<Contour>& contours); // pusta lista = usuń geometrię
+    // Wskazane kontury (indeksy z showGeometry) rysuje na pomarańczowo i grubiej.
+    void highlightGeometry(const std::vector<int>& indices);
 
     // OCCT rysuje sam, Qt nie może malować po tym widżecie.
     QPaintEngine* paintEngine() const override { return nullptr; }
@@ -48,6 +56,7 @@ private:
     Handle(V3d_View) m_view;
     Handle(AIS_InteractiveContext) m_context;
     Handle(AIS_InteractiveObject) m_model; // wczytany detal
-    Handle(AIS_InteractiveObject) m_highlight; // podświetlone ściany (nakładka)
+    std::vector<Handle(AIS_Shape)> m_geometry; // narysowane kontury
+    std::vector<Quantity_Color> m_geometryColors; // ich kolory bez podświetlenia
     QPoint m_lastPos;
 };
