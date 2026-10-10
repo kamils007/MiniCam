@@ -234,6 +234,8 @@ void InputBar::startPoint(const QString& command, const QString& prompt)
     m_fieldsBox->show();
     m_selectBox->hide();
     m_ok->show();
+    // Pasek staje się aktywny: kursor w polu X z zaznaczoną wartością – można od razu pisać.
+    focusField(0);
     emit activeChanged(true);
 }
 

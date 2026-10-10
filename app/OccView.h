@@ -93,6 +93,8 @@ private:
     void refreshGeometryLook();
     void updateHover(const QPoint& pos); // podświetla to, co jest pod kursorem (tryb wyboru)
     void clearHover();
+    void showCrosshair(const QPoint& pos); // krzyż linii X/Y/Z przy kursorze (wskazywanie punktu)
+    void hideCrosshair();
     QPoint toPixels(const QPointF& p) const;
 
     Handle(V3d_Viewer) m_viewer;
@@ -110,6 +112,7 @@ private:
     std::vector<bool> m_geometryVisible;
     std::vector<int> m_highlighted;    // podświetlone z panelu Warstwy (pomarańczowe)
     std::vector<int> m_selected;       // wybrane w trybie wyboru
+    Handle(AIS_Shape) m_crosshair;     // krzyż linii przy kursorze
     int m_hovered = -1;                // geometria pod kursorem w trybie wyboru (przerywana linia)
     QPoint m_lastPos;
     QPoint m_pressPos; // gdzie wciśnięto przycisk – odróżnia kliknięcie od przeciągania

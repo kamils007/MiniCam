@@ -4,6 +4,10 @@
 #include <SelectMgr_EntityOwner.hxx>
 #include <StdSelect_ViewerSelector3d.hxx>
 #include <AIS_Shape.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRep_Builder.hxx>
+#include <QCursor>
+#include <TopoDS_Compound.hxx>
 #include <AIS_Trihedron.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <TopExp_Explorer.hxx>
@@ -525,6 +529,10 @@ void OccView::setInteraction(Interaction mode)
     } else if (mode == Interaction::Navigate) {
         clearSelection();
     }
+    if (mode == Interaction::PickPoint)
+        showCrosshair(toPixels(mapFromGlobal(QCursor::pos())));
+    else
+        hideCrosshair();
     m_context->ClearDetected(Standard_False);
     m_view->Redraw();
     setCursor(mode == Interaction::Navigate ? Qt::ArrowCursor : Qt::CrossCursor);
@@ -572,8 +580,43 @@ void OccView::mouseMoveEvent(QMouseEvent* e)
     m_lastPos = pos;
     if (m_interaction == Interaction::Select && !(e->buttons() & (Qt::LeftButton | Qt::MiddleButton | Qt::RightButton)))
         updateHover(pos);
+    if (m_interaction == Interaction::PickPoint)
+        showCrosshair(pos);
     const gp_Pnt p = pointOnTable(pos);
     emit cursorMoved(p.X(), p.Y());
+}
+
+void OccView::showCrosshair(const QPoint& pos)
+{
+    // Krzyż linii przy kursorze (wskazywanie punktu): trzy długie białe linie
+    // wzdłuż osi X, Y i Z przez punkt spod kursora na płaszczyźnie Z = 0.
+    if (m_crosshair.IsNull()) {
+        const double len = 1.0e5;
+        BRep_Builder builder;
+        TopoDS_Compound lines;
+        builder.MakeCompound(lines);
+        builder.Add(lines, BRepBuilderAPI_MakeEdge(gp_Pnt(-len, 0, 0), gp_Pnt(len, 0, 0)).Edge());
+        builder.Add(lines, BRepBuilderAPI_MakeEdge(gp_Pnt(0, -len, 0), gp_Pnt(0, len, 0)).Edge());
+        builder.Add(lines, BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, -len), gp_Pnt(0, 0, len)).Edge());
+        m_crosshair = new AIS_Shape(lines);
+        m_crosshair->SetColor(Quantity_NOC_WHITE);
+        m_crosshair->SetWidth(1.0);
+        // Nie liczy się do "dopasuj do okna" ani do zakresu głębi widoku.
+        m_crosshair->SetInfiniteState(Standard_True);
+    }
+    const gp_Pnt p = pointOnTable(pos);
+    gp_Trsf move;
+    move.SetTranslation(gp_Vec(p.X(), p.Y(), 0.0));
+    if (!m_context->IsDisplayed(m_crosshair))
+        m_context->Display(m_crosshair, AIS_WireFrame, -1, Standard_False); // -1: nie do zaznaczania
+    m_context->SetLocation(m_crosshair, TopLoc_Location(move));
+    m_view->Redraw();
+}
+
+void OccView::hideCrosshair()
+{
+    if (!m_crosshair.IsNull() && m_context->IsDisplayed(m_crosshair))
+        m_context->Erase(m_crosshair, Standard_False);
 }
 
 void OccView::updateHover(const QPoint& pos)
