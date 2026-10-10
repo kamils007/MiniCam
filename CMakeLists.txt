@@ -39,6 +39,7 @@ add_library(camcore STATIC
     core/ModelAlign.cpp
     core/ModelAlign.h
     core/Geometry.h
+    core/Layers.h
     core/PartContours.cpp
     core/PartContours.h
     core/FeatureRecognition.cpp

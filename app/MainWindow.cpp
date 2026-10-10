@@ -28,13 +28,6 @@ MainWindow::MainWindow(QWidget* parent)
     m_view = new OccView(this);
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
-    // Definicje warstw geometrii. Warstwy użytkownika pojawiają się w panelu
-    // dopiero wtedy, gdy trafi do nich geometria.
-    m_geometryLayers = {
-        {camcore::kApsLayer, camcore::kApsColor},
-        {camcore::kOuterContourLayer, Quantity_Color(0.10, 0.45, 1.00, Quantity_TOC_sRGB)}, // niebieska
-        {camcore::kInnerContourLayer, Quantity_Color(0.85, 0.10, 0.85, Quantity_TOC_sRGB)}, // fioletowa
-    };
 
     createDock();
     createRibbon();
@@ -223,6 +216,7 @@ void MainWindow::clearFeatures()
 {
     m_contours = {};
     m_geometries.clear();
+    m_layerList.clearUserLayers(); // warstwy z rozpoznawania dotyczyły poprzedniej bryły
     showGeometries();
 }
 
@@ -246,18 +240,14 @@ void MainWindow::showGeometries()
     for (size_t i = 0; i < m_geometries.size(); ++i) {
         const camcore::Geometry& g = m_geometries[i];
         // Kolor z warstwy geometrii.
-        contours.push_back({g.contour.wire, layerOf(g).color, g.contour.zTop - g.contour.zBottom});
+        contours.push_back({g.contour.wire, m_layerList.layerOrAps(g.layer).color, g.contour.zTop - g.contour.zBottom});
         rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
     }
-    // Warstwa użytkownika powstaje dopiero, gdy trafia do niej jakaś geometria
-    // (np. userKonturWew tylko wtedy, gdy wykryto kontur wewnętrzny).
+    // Panel pokazuje wszystkie warstwy użytkownika z listy (także puste –
+    // przydadzą się przy ręcznym dodawaniu warstw).
     std::vector<LayersPanel::LayerRow> userLayers;
-    for (size_t i = 1; i < m_geometryLayers.size(); ++i) {
-        const camcore::Layer& layer = m_geometryLayers[i];
-        const bool used = std::any_of(m_geometries.begin(), m_geometries.end(),
-                                      [&](const camcore::Geometry& g) { return g.layer == layer.name; });
-        if (!used)
-            continue;
+    for (size_t i = 1; i < m_layerList.all().size(); ++i) {
+        const camcore::Layer& layer = m_layerList.all()[i];
         double r, g, b;
         layer.color.Values(r, g, b, Quantity_TOC_sRGB);
         userLayers.push_back({QString::fromStdString(layer.name), QColor::fromRgbF(r, g, b)});
@@ -269,14 +259,6 @@ void MainWindow::showGeometries()
         if (!m_geometries[i].visible)
             m_view->setGeometryVisible(static_cast<int>(i), false);
     m_layers->setGeometries(rows);
-}
-
-const camcore::Layer& MainWindow::layerOf(const camcore::Geometry& g) const
-{
-    for (const camcore::Layer& l : m_geometryLayers)
-        if (l.name == g.layer)
-            return l;
-    return m_geometryLayers.front(); // nieznana warstwa – jak APS
 }
 
 void MainWindow::setGeometryVisible(int index, bool visible)
@@ -301,7 +283,14 @@ void MainWindow::onRecognizeFeatures()
     // kontury wewnętrzne (wycięcia na wylot) do userKonturWew, reszta to na razie
     // geometrie niesklasyfikowane – warstwa APS. Kieszenie zostają w m_contours na później.
     m_geometries.clear();
+    m_layerList.clearUserLayers();
+    // Geometria trafia do warstwy; warstwa użytkownika powstaje przy pierwszej
+    // geometrii, która do niej trafia (createLayer zwraca istniejącą, jeśli już jest).
     auto add = [this](const camcore::Contour& c, const char* layer = camcore::kApsLayer) {
+        if (layer == std::string(camcore::kOuterContourLayer))
+            m_layerList.createLayer(layer, camcore::kOuterContourColor);
+        else if (layer == std::string(camcore::kInnerContourLayer))
+            m_layerList.createLayer(layer, camcore::kInnerContourColor);
         camcore::Geometry g;
         g.contour = c;
         g.layer = layer;

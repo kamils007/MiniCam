@@ -19,8 +19,10 @@ Powierzchnie, Tekst, Bryły, STL, Warstwy Użytkownika. Checkbox włącza/wyłą
 widoczność warstwy albo pojedynczej geometrii. Kontur zewnętrzny (obrys bryły)
 trafia do warstwy użytkownika „userKonturZew” (niebieska), kontury wewnętrzne
 (wycięcia na wylot) do „userKonturWew” (fioletowa), reszta to na razie geometrie
-niesklasyfikowane w „Geometrie APS”. Warstwa użytkownika pojawia się w panelu
-dopiero wtedy, gdy trafi do niej geometria. Geometria ma właściwości
+niesklasyfikowane w „Geometrie APS”. Warstwy trzyma `camcore::LayerList`
+(`core/Layers.h`): zawsze jest w niej APS, a warstwy użytkownika dochodzą przez
+`createLayer` – dziś z rozpoznawania cech (warstwa powstaje przy pierwszej
+geometrii, która do niej trafia), później także ręcznie z panelu. Geometria ma właściwości
 (`core/Geometry.h`): warstwę i widoczność; kolor bierze z warstwy (APS – zawsze
 zielony, jak w Alphacam).
 
