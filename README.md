@@ -50,7 +50,9 @@ Geometria pod kursorem dostaje białą przerywaną linię, bryła pod kursorem s
 LPM dodaje element do wyboru (drugie kliknięcie odejmuje): wybrana geometria ma cienką
 ciągłą niebieską linię, wybrana bryła jest cała niebieska. PPM (albo Enter) kończy wybór.
 Potem przy kursorze jest krzyż linii X/Y/Z, a pasek wprowadzania czeka na punkt bazowy
-i docelowy: klik w widoku (płaszczyzna Z 0) albo wpisanie X/Y. Esc przerywa.
+i docelowy: klik w widoku (płaszczyzna Z 0), uchwyt albo wpisanie X/Y. Po punkcie
+bazowym uchwyt się zwalnia, a kopia elementów jedzie za kursorem (bryła półprzezroczysta,
+geometria same linie w kolorze warstwy). Esc przerywa.
 
 **Uchwyty** (przy wskazywaniu punktu, na belce polecenia): AUTO (końce, środki,
 ćwiartki), KONIEC elementu (F6), ŚRODEK elementu (F7), CENTRUM okręgu (F8), ĆWIARTKI

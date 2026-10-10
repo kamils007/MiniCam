@@ -34,6 +34,11 @@ public:
     // Uchwyty (przyciąganie) przy wskazywaniu punktu: kursor "klei się" do wybranych
     // punktów geometrii (zamiast krzyża pokazuje znacznik), kliknięcie daje ten punkt.
     enum class Snap { None, Auto, End, Mid, Centre, Quadrant };
+
+    // Podgląd przesuwania: półprzezroczysta kopia wybranych elementów jedzie za kursorem
+    // (przesunięta o kursor − punkt bazowy). Znika przy wyjściu z wskazywania punktu.
+    void startMovePreview(const gp_Pnt& base, bool model, const std::vector<int>& geometries);
+    void stopMovePreview();
     void setSnap(Snap snap, const QCursor& cursor = QCursor());
 
     // Zaznaczone elementy (tryb wyboru): numery geometrii i czy bryła.
@@ -123,6 +128,8 @@ private:
     Handle(AIS_Shape) m_crosshair;     // krzyż linii przy kursorze
     Handle(AIS_InteractiveObject) m_snapMarker; // znacznik punktu uchwytu (biała kulka)
     Snap m_snap = Snap::None;
+    std::vector<Handle(AIS_Shape)> m_movePreview; // kopia przesuwanych elementów pod kursorem
+    gp_Pnt m_moveBase;
     QCursor m_snapCursor; // strzałka z ikonką aktywnego uchwytu
     struct SnapPoint
     {

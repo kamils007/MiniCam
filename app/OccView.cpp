@@ -560,6 +560,7 @@ void OccView::setInteraction(Interaction mode)
         updatePickFeedback(toPixels(mapFromGlobal(QCursor::pos())));
     } else {
         hideCrosshair();
+        stopMovePreview();
         if (!m_snapMarker.IsNull())
             m_context->Erase(m_snapMarker, Standard_False);
     }
@@ -683,6 +684,46 @@ void OccView::addSnapPoints(const TopoDS_Shape& shape, double height, std::vecto
     }
 }
 
+void OccView::startMovePreview(const gp_Pnt& base, bool model, const std::vector<int>& geometries)
+{
+    stopMovePreview();
+    m_moveBase = base;
+    if (model && !m_modelData.shape.IsNull()) {
+        // Bryła: półprzezroczysta kopia.
+        Handle(AIS_Shape) solid = new AIS_Shape(m_modelData.shape);
+        solid->SetColor(Quantity_Color(0.72, 0.72, 1.00, Quantity_TOC_sRGB));
+        solid->SetTransparency(0.55);
+        solid->Attributes()->SetFaceBoundaryDraw(Standard_True);
+        solid->Attributes()->SetFaceBoundaryAspect(
+            new Prs3d_LineAspect(Quantity_Color(0.85, 0.85, 1.0, Quantity_TOC_sRGB), Aspect_TOL_SOLID, 1.0));
+        // Kopia leży dokładnie na płaszczyznach oryginału – bez tego ściany migotałyby
+        // (z-fighting). Przesuwamy ją minimalnie w stronę kamery i rysujemy po bryle.
+        solid->Attributes()->ShadingAspect()->Aspect()->SetPolygonOffsets(Aspect_POM_Fill, -2.0f, -2.0f);
+        solid->SetZLayer(Graphic3d_ZLayerId_Top);
+        m_context->Display(solid, AIS_Shaded, -1, Standard_False); // -1: nie do zaznaczania
+        m_movePreview.push_back(solid);
+    }
+    for (int i : geometries) {
+        if (i < 0 || i >= static_cast<int>(m_geometry.size()))
+            continue;
+        // Geometria: same cienkie linie w kolorze warstwy, bez wypełnienia.
+        Handle(AIS_Shape) lines = new AIS_Shape(m_geometry[static_cast<size_t>(i)]->Shape());
+        lines->SetColor(m_geometryColors[static_cast<size_t>(i)]);
+        lines->SetWidth(1.0);
+        lines->SetZLayer(Graphic3d_ZLayerId_Top);
+        m_context->Display(lines, AIS_WireFrame, -1, Standard_False);
+        m_movePreview.push_back(lines);
+    }
+    updatePickFeedback(toPixels(mapFromGlobal(QCursor::pos())));
+}
+
+void OccView::stopMovePreview()
+{
+    for (const Handle(AIS_Shape)& p : m_movePreview)
+        m_context->Remove(p, Standard_False);
+    m_movePreview.clear();
+}
+
 void OccView::setSnap(Snap snap, const QCursor& cursor)
 {
     m_snap = snap;
@@ -726,6 +767,16 @@ bool OccView::snapAt(const QPoint& pos, gp_Pnt& out) const
 
 void OccView::updatePickFeedback(const QPoint& pos)
 {
+    if (!m_movePreview.empty()) {
+        // Kopia jedzie tam, gdzie trafiłby punkt: na uchwyt albo pod kursor (Z bez zmian).
+        gp_Pnt p;
+        if (m_snap == Snap::None || !snapAt(pos, p))
+            p = pointOnTable(pos);
+        gp_Trsf move;
+        move.SetTranslation(gp_Vec(p.X() - m_moveBase.X(), p.Y() - m_moveBase.Y(), 0.0));
+        for (const Handle(AIS_Shape)& copy : m_movePreview)
+            m_context->SetLocation(copy, TopLoc_Location(move));
+    }
     if (m_snap == Snap::None) {
         if (!m_snapMarker.IsNull())
             m_context->Erase(m_snapMarker, Standard_False);

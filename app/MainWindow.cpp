@@ -761,6 +761,11 @@ void MainWindow::onPointEntered(double x, double y, double z)
     if (m_moveStep == MoveStep::PickBase) {
         m_moveBase = gp_Pnt(x, y, z);
         m_moveStep = MoveStep::PickTarget;
+        // Uchwyt służył punktowi bazowemu – zwalniamy go (wraca krzyż), a kopia
+        // przesuwanych elementów jedzie za kursorem aż do kliknięcia celu.
+        for (QToolButton* b : m_snapButtons)
+            b->setChecked(false);
+        m_view->startMovePreview(m_moveBase, m_moveModel, m_moveGeometries);
         m_inputBar->startPoint("Przesuń:", "Punkt docelowy");
         statusBar()->showMessage(QString("Przesuń: punkt bazowy X %1 Y %2 Z %3 – wskaż punkt docelowy")
                                      .arg(x, 0, 'f', 2)
