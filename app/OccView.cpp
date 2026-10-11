@@ -591,6 +591,8 @@ void OccView::onClick(Qt::MouseButton button, const QPoint& pos)
         }
         const gp_Pnt p = pointOnTable(pos);
         emit pointPicked(p.X(), p.Y(), 0.0);
+    } else if (m_interaction == Interaction::PickPoint && button == Qt::RightButton) {
+        emit cancelRequested(); // jak w Alphacam: PPM kończy polecenie
     }
 }
 
@@ -626,6 +628,7 @@ void OccView::setInteraction(Interaction mode)
     } else {
         hideCrosshair();
         stopMovePreview();
+        stopDrawPreview();
         if (!m_snapMarker.IsNull())
             m_context->Erase(m_snapMarker, Standard_False);
     }

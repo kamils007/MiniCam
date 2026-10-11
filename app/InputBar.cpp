@@ -170,6 +170,26 @@ InputBar::InputBar(QWidget* parent)
     }
     layout->addWidget(m_fieldsBox);
 
+    // Jedno pole liczby (średnica, promień, kąt…) – startValue.
+    m_valueBox = new QWidget(this);
+    auto* valueLayout = new QHBoxLayout(m_valueBox);
+    valueLayout->setContentsMargins(8, 0, 0, 0);
+    valueLayout->setSpacing(4);
+    m_valueLabel = new QLabel(m_valueBox);
+    m_valueLabel->setContentsMargins(6, 0, 0, 0);
+    m_valueField = new QLineEdit(m_valueBox);
+    m_valueField->setFixedWidth(92);
+    m_valueField->installEventFilter(this);
+    connect(m_valueField, &QLineEdit::textEdited, this, [this] {
+        m_valueField->setProperty("error", false);
+        m_valueField->style()->unpolish(m_valueField);
+        m_valueField->style()->polish(m_valueField);
+    });
+    connect(m_valueField, &QLineEdit::returnPressed, this, &InputBar::onOk);
+    valueLayout->addWidget(m_valueLabel);
+    valueLayout->addWidget(m_valueField);
+    layout->addWidget(m_valueBox);
+
     // Podpowiedzi przy wyborze elementów (jak w Alphacam) – na razie bez działania.
     m_selectBox = new QWidget(this);
     auto* selectLayout = new QHBoxLayout(m_selectBox);
@@ -198,11 +218,13 @@ void InputBar::showIdle()
     // Jak w Alphacam: bez polecenia miejsce paska jest puste.
     m_picking = false;
     m_selecting = false;
+    m_value = false;
     m_command->clear();
     m_prompt->clear();
     m_command->hide();
     m_prompt->hide();
     m_fieldsBox->hide();
+    m_valueBox->hide();
     m_selectBox->hide();
     m_ok->hide();
     emit activeChanged(false);
@@ -212,10 +234,12 @@ void InputBar::startSelect(const QString& command, const QString& prompt)
 {
     m_picking = false;
     m_selecting = true;
+    m_value = false;
     m_command->setText(command.toUpper());
     m_command->show();
     setPrompt(prompt);
     m_fieldsBox->hide();
+    m_valueBox->hide();
     m_selectBox->show();
     m_ok->hide(); // wybór zatwierdza PPM lub Enter
     emit activeChanged(false);
@@ -225,6 +249,7 @@ void InputBar::startPoint(const QString& command, const QString& prompt)
 {
     m_picking = true;
     m_selecting = false;
+    m_value = false;
     m_command->setText(command.toUpper());
     m_command->show();
     for (int i = 0; i < kFields; ++i) {
@@ -234,11 +259,37 @@ void InputBar::startPoint(const QString& command, const QString& prompt)
     }
     setPrompt(prompt);
     m_fieldsBox->show();
+    m_valueBox->hide();
     m_selectBox->hide();
     m_ok->show();
     // Pasek staje się aktywny: kursor w polu X z zaznaczoną wartością – można od razu pisać.
     focusField(0);
     emit activeChanged(true);
+}
+
+void InputBar::startValue(const QString& command, const QString& prompt, const QString& label, double initial,
+                          bool clicks)
+{
+    m_picking = false;
+    m_selecting = false;
+    m_value = true;
+    for (size_t i = 0; i < m_bypassed.size(); ++i)
+        m_bypassed[i] = false; // kliknięcie w widoku liczy się w całości
+    m_command->setText(command.toUpper());
+    m_command->show();
+    setPrompt(prompt);
+    m_valueLabel->setText(label);
+    m_valueField->setText(QString::number(initial, 'g', 10));
+    m_valueField->setProperty("error", false);
+    m_valueField->style()->unpolish(m_valueField);
+    m_valueField->style()->polish(m_valueField);
+    m_fieldsBox->hide();
+    m_selectBox->hide();
+    m_valueBox->show();
+    m_ok->show();
+    m_valueField->setFocus(Qt::TabFocusReason);
+    m_valueField->selectAll();
+    emit activeChanged(clicks);
 }
 
 void InputBar::setPrompt(const QString& prompt)
@@ -325,6 +376,16 @@ void InputBar::onOk()
         emit selectionDone();
         return;
     }
+    if (m_value) {
+        if (const auto value = evaluateExpression(m_valueField->text())) {
+            emit valueEntered(*value);
+        } else {
+            m_valueField->setProperty("error", true);
+            m_valueField->style()->unpolish(m_valueField);
+            m_valueField->style()->polish(m_valueField);
+        }
+        return;
+    }
     if (!m_picking)
         return;
     if (anyBypassed()) {
@@ -355,6 +416,25 @@ void InputBar::focusField(int field)
 
 bool InputBar::handleViewKey(QKeyEvent* e)
 {
+    if (m_value) {
+        // Czeka na liczbę: Enter = OK, pisanie trafia od razu do pola.
+        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+            onOk();
+            return true;
+        }
+        if (e->key() == Qt::Key_Tab) {
+            m_valueField->setFocus(Qt::TabFocusReason);
+            m_valueField->selectAll();
+            return true;
+        }
+        const QString t = e->text();
+        if (t.size() == 1 && (t[0].isDigit() || QString("-+.,(").contains(t[0]))) {
+            m_valueField->setFocus(Qt::OtherFocusReason);
+            m_valueField->setText(t);
+            return true;
+        }
+        return false;
+    }
     if (!m_picking)
         return false;
     if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
@@ -391,6 +471,11 @@ bool InputBar::handleViewKey(QKeyEvent* e)
 bool InputBar::eventFilter(QObject* watched, QEvent* event)
 {
     // F1 jest w Qt skrótem pomocy – przechwytujemy go, zanim pole go zignoruje.
+    if (watched == m_valueField && event->type() == QEvent::KeyPress
+        && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+        emit cancelled();
+        return true;
+    }
     if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
         for (int i = 0; i < kFields; ++i) {
             if (watched != m_fields[static_cast<size_t>(i)])

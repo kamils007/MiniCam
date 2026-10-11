@@ -140,6 +140,20 @@ void OccView::stopMovePreview()
     m_movePreview.clear();
 }
 
+void OccView::setDrawPreview(std::function<TopoDS_Shape(const gp_Pnt&)> build)
+{
+    m_drawPreviewBuild = std::move(build);
+    if (!m_context.IsNull() && m_interaction == Interaction::PickPoint)
+        updatePickFeedback(toPixels(mapFromGlobal(QCursor::pos())));
+}
+
+void OccView::stopDrawPreview()
+{
+    m_drawPreviewBuild = nullptr;
+    if (!m_drawPreview.IsNull() && m_context->IsDisplayed(m_drawPreview))
+        m_context->Erase(m_drawPreview, Standard_False);
+}
+
 void OccView::setSnap(Snap snap, const QCursor& cursor)
 {
     m_snap = snap;
@@ -183,12 +197,35 @@ bool OccView::snapAt(const QPoint& pos, gp_Pnt& out) const
 
 void OccView::updatePickFeedback(const QPoint& pos)
 {
+    // Punkt, który dałoby kliknięcie: uchwyt (z jego Z) albo kursor na płaszczyźnie Z = 0.
+    gp_Pnt cursorPoint;
+    if (m_snap == Snap::None || !snapAt(pos, cursorPoint))
+        cursorPoint = pointOnTable(pos);
+    if (m_drawPreviewBuild) {
+        // Rysowany element od ostatniego punktu do kursora – cienka biała linia.
+        const TopoDS_Shape shape = m_drawPreviewBuild(cursorPoint);
+        if (shape.IsNull()) {
+            if (!m_drawPreview.IsNull() && m_context->IsDisplayed(m_drawPreview))
+                m_context->Erase(m_drawPreview, Standard_False);
+        } else {
+            if (m_drawPreview.IsNull()) {
+                m_drawPreview = new AIS_Shape(shape);
+                m_drawPreview->SetColor(Quantity_NOC_WHITE);
+                m_drawPreview->SetWidth(1.5);
+                m_drawPreview->SetZLayer(Graphic3d_ZLayerId_Top);
+            } else {
+                m_drawPreview->SetShape(shape);
+            }
+            if (m_context->IsDisplayed(m_drawPreview))
+                m_context->Redisplay(m_drawPreview, Standard_False);
+            else
+                m_context->Display(m_drawPreview, AIS_WireFrame, -1, Standard_False); // -1: nie do zaznaczania
+        }
+    }
     if (!m_movePreview.empty()) {
         // Kopia jedzie tam, gdzie trafiłby punkt: na uchwyt (z jego Z) albo pod kursor
         // na płaszczyźnie Z = 0. Bryła przesuwa się też w Z, geometrie tylko w X i Y.
-        gp_Pnt p;
-        if (m_snap == Snap::None || !snapAt(pos, p))
-            p = pointOnTable(pos);
+        const gp_Pnt& p = cursorPoint;
         const gp_Vec offset(p.X() - m_moveBase.X(), p.Y() - m_moveBase.Y(), p.Z() - m_moveBase.Z());
         gp_Trsf move, flat;
         move.SetTranslation(offset);

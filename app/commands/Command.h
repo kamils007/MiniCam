@@ -43,7 +43,8 @@ public:
 // Polecenie interaktywne (jak w Alphacam): prowadzi użytkownika krok po kroku –
 // wybór elementów, punkty klikane w widoku albo wpisane w pasku wprowadzania.
 // Okno tworzy polecenie, wywołuje start() i przekazuje mu zdarzenia z widoku
-// i paska. Nowe polecenia (Obróć, Lustro, Skaluj…) to kolejne klasy w app/commands.
+// i paska. Nowe polecenia (Obróć, Lustro, Skaluj…) to kolejne klasy w app/commands;
+// rysowanie geometrii (Linia, Łuk, Koło, Prostokąt) – app/commands/DrawCommands.
 class Command : public QObject
 {
     Q_OBJECT
@@ -59,6 +60,7 @@ public:
     virtual void selectionChanged(int /*count*/) {}
     virtual void selectionConfirmed() {}      // PPM, Enter albo OK przy wyborze
     virtual void pointEntered(const gp_Pnt&) {} // punkt kliknięty albo wpisany
+    virtual void valueEntered(double) {}        // liczba wpisana w pasku (np. średnica)
     virtual void cancel();                      // Esc albo "Zakończ"
 
     virtual bool isSelecting() const { return false; } // czy teraz wybiera elementy

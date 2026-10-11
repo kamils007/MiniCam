@@ -7,6 +7,7 @@
 #include "Ribbon.h"
 #include "Icons.h"
 #include "commands/DeleteCommand.h"
+#include "commands/DrawCommands.h"
 #include "commands/MoveCommand.h"
 
 #include <QAction>
@@ -32,6 +33,7 @@
 #include <QUndoStack>
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 #include <cmath>
 #include <exception>
@@ -386,10 +388,64 @@ void MainWindow::createRibbon()
     }
     viewPage->addGroup("Okna")->addAction(dockAct);
 
+    // Zakładka Geometria – rysowanie jak w Alphacam (Geometria → 2D): Linia, Łuk ▾, Koło ▾,
+    // Prostokąt. Punkty z kliknięcia (z uchwytami) albo z paska wprowadzania, PPM/Esc kończy.
+    auto drawAct = [this](const QString& icon, const QString& text, const QString& tip,
+                          std::function<Command*()> make) {
+        auto* a = new QAction(appIcon(icon), text, this);
+        a->setToolTip(tip);
+        connect(a, &QAction::triggered, this, [this, make] { runCommand(make()); });
+        return a;
+    };
+    using Arc = ArcCommand::Method;
+    using Circle = CircleCommand::Method;
+    auto arcAct = [&](const QString& icon, const QString& text, const QString& tip, Arc m) {
+        return drawAct(icon, text, tip, [this, m] { return new ArcCommand(m, *this, this); });
+    };
+    auto circleAct = [&](const QString& icon, const QString& text, const QString& tip, Circle m) {
+        return drawAct(icon, text, tip, [this, m] { return new CircleCommand(m, *this, this); });
+    };
+    QAction* lineAct = drawAct("linia", "Linia",
+                               "Odcinki: punkt 'Od', potem kolejne punkty 'Do' (jedna geometria);\n"
+                               "kliknięcie w początek zamyka kontur, PPM lub Esc kończy",
+                               [this] { return new LineCommand(*this, this); });
+    const QList<QAction*> arcActs = {
+        arcAct("luk-3-punkty", "Początek + Drugi + Koniec", "Łuk przez trzy punkty", Arc::StartSecondEnd),
+        arcAct("luk-2-punkty-promien", "2 punkty + Promień",
+               "Łuk przeciwnie do ruchu wskazówek zegara od początku do końca o podanym promieniu",
+               Arc::TwoPointsRadius),
+        arcAct("luk-2-punkty-srodek", "2 punkty + Środek",
+               "Łuk przeciwnie do ruchu wskazówek zegara: początek, koniec, środek", Arc::TwoPointsCentre),
+        arcAct("luk-srodek-kat", "Początek + Środek + Kąt rozwarcia",
+               "Łuk od początku wokół środka o podany kąt (dodatni – przeciwnie do wskazówek zegara)",
+               Arc::StartCentreAngle),
+    };
+    const QList<QAction*> circleActs = {
+        circleAct("kolo-srodek-srednica", "Środek + Średnica", "Podaj średnicę, potem klikaj środki kół",
+                  Circle::CentreDiameter),
+        circleAct("kolo-srodek-promien", "Środek + Promień", "Podaj promień, potem klikaj środki kół",
+                  Circle::CentreRadius),
+        circleAct("kolo-srodek-punkt", "Środek + Punkt", "Środek koła i punkt na okręgu", Circle::CentrePoint),
+        circleAct("kolo-2-punkty", "2 punkty", "Dwa przeciwległe punkty okręgu (średnica)", Circle::TwoPoints),
+        circleAct("kolo-3-punkty", "3 punkty", "Okrąg przez trzy punkty", Circle::ThreePoints),
+    };
+    QAction* rectangleAct = drawAct("prostokat", "Prostokąt", "Prostokąt z dwóch przeciwległych narożników",
+                                    [this] { return new RectangleCommand(*this, this); });
+    RibbonPage* geometryPage = ribbon->addPage("Geometria");
+    RibbonGroup* draw2d = geometryPage->addGroup("2D");
+    draw2d->addAction(lineAct);
+    draw2d->addMenu(appIcon("luk-3-punkty"), "Łuk", arcActs);
+    draw2d->addMenu(appIcon("kolo-srodek-srednica"), "Koło", circleActs);
+    draw2d->addAction(rectangleAct);
+    QList<QAction*> drawActs = {lineAct, rectangleAct};
+    drawActs << arcActs << circleActs;
+
     // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
     // widok, okna, plik i Cofnij/Ponów się nie liczą.
-    for (QAction* a : {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct}) {
+    QList<QAction*> repeatable = {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct};
+    repeatable << drawActs;
+    for (QAction* a : repeatable) {
         connect(a, &QAction::triggered, this, [this, a] {
             m_lastCommand = a;
             m_repeatAct->setToolTip("Powtórz: " + a->text().replace('\n', ' ') + " (spacja)");
@@ -584,6 +640,11 @@ void MainWindow::createBottomBars()
     m_commandBar = new CommandBar(this, this);
     m_inputBar = m_commandBar->inputBar();
     connect(m_inputBar, &InputBar::pointEntered, this, &MainWindow::onPointEntered);
+    connect(m_inputBar, &InputBar::valueEntered, this, [this](double value) {
+        m_view->setFocus(); // jak po punkcie: pisanie wraca do widoku
+        if (m_command)
+            m_command->valueEntered(value);
+    });
     connect(m_inputBar, &InputBar::selectionDone, this, [this] {
         if (m_command)
             m_command->selectionConfirmed();

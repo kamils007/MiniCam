@@ -39,6 +39,22 @@ void RibbonGroup::addAction(QAction* action)
     m_buttons->addWidget(button);
 }
 
+void RibbonGroup::addMenu(const QIcon& icon, const QString& text, const QList<QAction*>& actions)
+{
+    auto* button = new QToolButton(this);
+    button->setIcon(icon);
+    button->setText(text);
+    button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    button->setIconSize(QSize(32, 32));
+    button->setAutoRaise(true);
+    button->setMinimumWidth(64);
+    button->setPopupMode(QToolButton::InstantPopup);
+    auto* menu = new QMenu(button);
+    menu->addActions(actions);
+    button->setMenu(menu);
+    m_buttons->addWidget(button);
+}
+
 RibbonPage::RibbonPage(QWidget* parent)
     : QWidget(parent)
 {
@@ -96,6 +112,9 @@ Ribbon::Ribbon(QWidget* parent)
         RibbonGroup QToolButton:disabled { color: #9a9a9a; }
         QLabel#ribbonGroupTitle { color: #404040; background: transparent; }
         QFrame[frameShape="5"] { color: #b4b4b4; }
+        QMenu { background: white; color: black; border: 1px solid #a0a0a0; }
+        QMenu::item { padding: 4px 24px 4px 8px; }
+        QMenu::item:selected { background: #cfe3f7; color: black; }
     )");
 }
 

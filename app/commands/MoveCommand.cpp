@@ -10,8 +10,9 @@
 
 bool MoveCommand::start()
 {
-    if (host().editState().shown.shape.IsNull()) {
-        host().showMessage("Najpierw otwórz model (Ctrl+O)");
+    const EditState state = host().editState();
+    if (state.shown.shape.IsNull() && state.geometries.empty()) {
+        host().showMessage("Przesuń: nie ma nic do przesunięcia – otwórz model (Ctrl+O) albo narysuj geometrię");
         return false;
     }
     host().inputBar()->startSelect("Przesuń:", "Wskaż");

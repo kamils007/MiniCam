@@ -66,6 +66,28 @@ I['ustawienia-rozpoznawania']=(
   '<g transform="translate(13 13)">' + ''.join(f'<rect x="-2.6" y="-12" width="5.2" height="6" rx="1" fill="{G}" stroke="{GD}" stroke-width="1" transform="rotate({a})"/>' for a in range(0,360,45))
   + f'<circle r="8" fill="{G}" stroke="{GD}" stroke-width="1.2"/><circle r="3.2" fill="#FFF" stroke="{GD}" stroke-width="1.2"/></g>'
   + f'<rect x="17" y="17" width="13" height="13" rx="1.5" fill="#FFF" stroke="{SD}" stroke-width="1"/>' + geo('M20 27 V20 H27 V27 Z',2.2))
+# Rysowanie 2D (zakładka Geometria): czerwona geometria, złote kwadraciki = punkty, które się wskazuje.
+K='#212121'  # czarne linie pomocnicze (promień, średnica)
+def pt(x,y):
+    return f'<rect x="{x-2.6}" y="{y-2.6}" width="5.2" height="5.2" fill="{G}" stroke="{GD}" stroke-width="1"/>'
+def aux(d,dash=None):
+    da=f' stroke-dasharray="{dash}"' if dash else ''
+    return f'<path d="{d}" fill="none" stroke="{K}" stroke-width="1.6" stroke-linecap="round"{da}/>'
+def tip(x,y,ang):
+    return f'<g transform="translate({x} {y}) rotate({ang})"><path d="M0 0 L-5 -3 L-5 3 Z" fill="{K}"/></g>'
+ARC='M5 8 A20 20 0 0 1 25 27'
+I['linia']=geo('M4 22 L11 6 L19 26 L28 9')+pt(4,22)+pt(11,6)+pt(19,26)+pt(28,9)
+I['prostokat']=geo('M5 9 H27 V24 H5 Z')+pt(5,9)+pt(27,9)+pt(27,24)+pt(5,24)
+I['luk-3-punkty']=geo(ARC)+pt(5,8)+pt(18.8,13.5)+pt(25,27)
+I['luk-2-punkty-promien']=geo(ARC)+aux('M8 25 L17.5 15.5')+tip(19,14,-45)+tip(6.5,26.5,135)+pt(5,8)+pt(25,27)
+I['luk-2-punkty-srodek']=geo(ARC)+aux('M5 28 L25 27')+pt(5,8)+pt(5,28)+pt(25,27)
+I['luk-srodek-kat']=geo(ARC)+aux('M5 28 L5 8','1.6 2.4')+aux('M5 28 L18.8 13.5')+pt(5,8)+pt(5,28)
+CIRC='<circle cx="16" cy="16" r="11" fill="none" stroke="'+R+'" stroke-width="2.6"/>'
+I['kolo-srodek-srednica']=CIRC+aux('M10.5 21.5 L21.5 10.5')+tip(23,9,-45)+tip(9,23,135)+pt(16,16)
+I['kolo-srodek-promien']=CIRC+aux('M16 16 L22.5 9.5')+tip(24,8,-45)+pt(16,16)
+I['kolo-srodek-punkt']=CIRC+pt(16,16)+pt(23.8,8.2)
+I['kolo-2-punkty']=CIRC+pt(8.2,23.8)+pt(23.8,8.2)
+I['kolo-3-punkty']=CIRC+pt(5,16)+pt(23.8,8.2)+pt(19.4,26.5)
 os.makedirs(out,exist_ok=True)
 for k,v in I.items():
     open(f'{out}/{k}.svg','w').write(f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{v}</svg>\n')

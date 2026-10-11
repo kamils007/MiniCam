@@ -5,6 +5,7 @@
 #include <QPoint>
 #include <QWidget>
 
+#include <functional>
 #include <vector>
 
 #include <AIS_InteractiveContext.hxx>
@@ -23,7 +24,8 @@
 // Sterowanie: LPM – obrót, ŚPM/PPM – przesuwanie, kółko – zoom.
 // Bez polecenia kliknięcie PPM otwiera menu radialne (contextMenuRequested).
 // W trybie wyboru kliknięcie LPM zaznacza element, kliknięcie PPM zatwierdza wybór;
-// w trybie wskazywania punktu kliknięcie LPM podaje punkt na płaszczyźnie Z = 0.
+// w trybie wskazywania punktu kliknięcie LPM podaje punkt na płaszczyźnie Z = 0,
+// a kliknięcie PPM przerywa polecenie (jak Esc).
 class OccView : public QWidget
 {
     Q_OBJECT
@@ -43,6 +45,11 @@ public:
     // (przesunięta o kursor − punkt bazowy). Znika przy wyjściu z wskazywania punktu.
     void startMovePreview(const gp_Pnt& base, bool model, const std::vector<int>& geometries);
     void stopMovePreview();
+    // Podgląd rysowania (zakładka Geometria): build dostaje punkt spod kursora (uchwyt
+    // albo płaszczyzna Z = 0) i zwraca element, który rysujemy na biało, np. odcinek od
+    // ostatniego punktu do kursora. Pusty kształt = nic. Znika przy wyjściu z wskazywania punktu.
+    void setDrawPreview(std::function<TopoDS_Shape(const gp_Pnt&)> build);
+    void stopDrawPreview();
     void setSnap(Snap snap, const QCursor& cursor = QCursor());
 
     // Zaznaczone elementy (tryb wyboru): numery geometrii i czy bryła.
@@ -142,6 +149,8 @@ private:
     std::vector<Handle(AIS_Shape)> m_movePreview; // kopia przesuwanych elementów pod kursorem
     bool m_movePreviewHasModel = false; // pierwsza kopia to bryła (jedzie też w Z)
     gp_Pnt m_moveBase;
+    std::function<TopoDS_Shape(const gp_Pnt&)> m_drawPreviewBuild; // podgląd rysowania
+    Handle(AIS_Shape) m_drawPreview;
     QCursor m_snapCursor; // strzałka z ikonką aktywnego uchwytu
     struct SnapPoint
     {

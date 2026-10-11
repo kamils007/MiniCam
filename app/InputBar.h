@@ -38,9 +38,15 @@ public:
     void startSelect(const QString& command, const QString& prompt);
     // Polecenie czeka na punkt: podpowiedź, pola X, Y, Z, OK.
     void startPoint(const QString& command, const QString& prompt);
+    // Polecenie czeka na liczbę (np. "KOŁO Średnica"): jedno pole z wartością początkową
+    // i OK. clicks = czy kliknięcie w widoku też daje wartość (np. kąt łuku) – wtedy
+    // widać uchwyty, a polecenie dostaje kliknięty punkt.
+    void startValue(const QString& command, const QString& prompt, const QString& label, double initial,
+                    bool clicks = false);
     void setPrompt(const QString& prompt);
 
     bool isPicking() const { return m_picking; }
+    bool isValueInput() const { return m_value; }
 
     // Punkt kliknięty w widoku. Gdy jakieś pole pominięto (F1), wpisane pola
     // zastępują współrzędne kliknięcia. Brak wartości = błąd w polu.
@@ -51,6 +57,7 @@ public:
 
 signals:
     void pointEntered(double x, double y, double z); // punkt wpisany i zatwierdzony OK
+    void valueEntered(double value);                 // liczba wpisana i zatwierdzona OK
     void selectionDone();                            // OK przy wyborze elementów
     void cancelled();                                // Esc w polu
     void activeChanged(bool pointInput);             // pasek pokazuje pola punktu albo nie
@@ -69,6 +76,9 @@ private:
     QLabel* m_command = nullptr;
     QLabel* m_prompt = nullptr;
     QWidget* m_fieldsBox = nullptr;
+    QWidget* m_valueBox = nullptr;  // jedno pole liczby (startValue)
+    QLabel* m_valueLabel = nullptr;
+    QLineEdit* m_valueField = nullptr;
     QWidget* m_selectBox = nullptr; // podpowiedzi przy wyborze: Poprzednie, Zakończ, Wszystko, Warstwy
     std::vector<QLineEdit*> m_fields;
     std::vector<bool> m_bypassed;
@@ -77,6 +87,7 @@ private:
     QString m_basePrompt;
     bool m_picking = false;
     bool m_selecting = false;
+    bool m_value = false; // czeka na liczbę (startValue)
 };
 
 // Liczy wyrażenie z pola (+ - * / i nawiasy, przecinek jak kropka).

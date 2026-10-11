@@ -3,6 +3,7 @@
 #include <QTabWidget>
 
 class QAction;
+class QIcon;
 class QHBoxLayout;
 class QMenu;
 
@@ -15,6 +16,9 @@ class RibbonGroup : public QWidget
 public:
     RibbonGroup(const QString& title, QWidget* parent = nullptr);
     void addAction(QAction* action);
+    // Przycisk z rozwijaną listą wariantów (jak "Łuk ▾" w Alphacam): kliknięcie
+    // pokazuje menu z akcjami.
+    void addMenu(const QIcon& icon, const QString& text, const QList<QAction*>& actions);
 
 private:
     QHBoxLayout* m_buttons = nullptr;

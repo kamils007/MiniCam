@@ -63,6 +63,20 @@ uchwyt. Przecięcie, styczna, prostopadła, równoległa i Filtry – na razie b
 **Cofnij / Ponów** (Edycja, Ctrl+Z / Ctrl+Y): cofa i ponawia przesunięcia bryły
 i geometrii. Otwarcie pliku, wyrównanie i ponowne rozpoznanie cech czyszczą historię.
 
+**Geometria → 2D** (rysowanie jak w Alphacam, `app/commands/DrawCommands`, `core/Sketch`):
+wszystko leży na płaszczyźnie XY (Z 0) i ma zerową wysokość – także punkty złapane uchwytem
+na bryle trafiają na Z 0. Punkty klika się w widoku (z uchwytami) albo wpisuje w pasek
+wprowadzania; za kursorem jedzie biały podgląd elementu. Polecenie działa, dopóki się go
+nie przerwie (PPM albo Esc), nowa geometria trafia do warstwy APS, Ctrl+Z cofa.
+- **Linia** – punkt „Od”, potem kolejne „Do”; odcinki tworzą jedną geometrię (Ctrl+Z cofa
+  ostatni odcinek). Kliknięcie w punkt początkowy (uchwyt KONIEC) zamyka kontur.
+- **Łuk ▾** – Początek + Drugi + Koniec, 2 punkty + Promień (przeciwnie do wskazówek zegara;
+  promień ujemny = dłuższy łuk), 2 punkty + Środek, Początek + Środek + Kąt rozwarcia
+  (wpisany albo z kliknięcia; ujemny = zgodnie ze wskazówkami).
+- **Koło ▾** – Środek + Średnica / Promień (wartość raz, potem klikane kolejne środki),
+  Środek + Punkt, 2 punkty, 3 punkty.
+- **Prostokąt** – dwa przeciwległe narożniki.
+
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
 pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X, Y i Z z przyciskami „F1=?”,
@@ -83,6 +97,7 @@ minicam/
 ├── core/            rdzeń (C++ + OCCT, bez Qt)
 │   ├── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
 │   ├── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
+│   ├── Sketch.h/.cpp        rysowanie 2D: odcinki, łuki, okręgi, prostokąty
 │   └── FeatureRecognition.h/.cpp  rozpoznawanie otworów, kieszeni, wycięć
 └── app/             GUI (Qt)
     ├── main.cpp
@@ -95,6 +110,7 @@ minicam/
     ├── OccViewPick.cpp            widok 3D: wskazywanie punktu, uchwyty, podgląd przesuwania
     └── commands/                  polecenia krok po kroku (jak w Alphacam)
         ├── Command.h/.cpp         klasa bazowa + CommandHost (co polecenie dostaje od okna)
+        ├── DrawCommands.h/.cpp    Linia, Łuk, Koło, Prostokąt (zakładka Geometria)
         └── MoveCommand.h/.cpp     Przesuń
 ```
 
