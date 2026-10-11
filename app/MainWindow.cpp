@@ -297,12 +297,7 @@ void MainWindow::createRibbon()
     addActions({openAct, quitAct, fitAct});
 
     auto* ribbon = new Ribbon(this);
-    QAction* openMenuAct = ribbon->fileMenu()->addAction("Otwórz model…");
-    openMenuAct->setShortcut(QKeySequence::Open);
-    openMenuAct->setShortcutContext(Qt::WidgetShortcut); // skrót już obsługuje openAct
-    connect(openMenuAct, &QAction::triggered, this, &MainWindow::onOpen);
-    ribbon->fileMenu()->addSeparator();
-    ribbon->fileMenu()->addAction(quitAct);
+    createFileMenu(ribbon->fileMenu(), quitAct);
 
     // Akcja "pokaż/ukryj okno" gotowa od Qt – zaznaczona, gdy okno jest widoczne.
     QAction* dockAct = m_dock->toggleViewAction();
@@ -480,6 +475,7 @@ void MainWindow::openFile(const QString& path)
         // Rdzeń dostaje ścieżkę w UTF-8 – działa też z polskimi znakami.
         m_original = camcore::importModel(path.toUtf8().toStdString());
         m_fileName = QFileInfo(path).fileName();
+        addRecentFile(path);
 
         m_flipped = false;
         m_aligned = m_alignSettings.alignAfterImport;

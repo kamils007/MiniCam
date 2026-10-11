@@ -20,6 +20,7 @@ class InputBar;
 class QWidget;
 class QAction;
 class QLabel;
+class QMenu;
 class QToolBar;
 class QToolButton;
 class QUndoStack;
@@ -47,6 +48,9 @@ private slots:
 
 private:
     void createRibbon();
+    void createFileMenu(QMenu* menu, QAction* quitAct); // FileMenu.cpp
+    void addRecentFile(const QString& path);
+    void updateRecentMenu();
     void createDock();
     void createBottomBars();
 
@@ -94,6 +98,7 @@ private:
     InputBar* m_inputBar = nullptr;         // pasek wprowadzania (lewa strona belki)
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
+    QMenu* m_recentMenu = nullptr; // Plik → Ostatnie
     bool m_aligned = false; // czy pokazany model jest wyrównany
     bool m_flipped = false; // czy leży na przeciwnej stronie niż wybrał algorytm
     camcore::AlignSettings m_alignSettings;

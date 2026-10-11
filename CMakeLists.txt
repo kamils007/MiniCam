@@ -62,6 +62,7 @@ target_link_libraries(camcore PUBLIC
 qt_add_executable(minicam
     app/main.cpp
     app/MainWindow.cpp
+    app/FileMenu.cpp
     app/MainWindow.h
     app/OccView.cpp
     app/OccView.h
