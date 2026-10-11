@@ -87,8 +87,8 @@ wykonuje, Esc anuluje, Ctrl+Z cofa.
   z tą samą warstwą i wysokością ścian.
 
 **3D → Poziomy Z** (grupa „Ustaw poziomy Z/Materiał”, jak Z levels w Alphacam,
-`app/commands/ZLevelsCommand`, `core/GeometryEdit`): okno z dolnym (może być poniżej 0)
-i górnym poziomem Z, potem wybór geometrii (LPM), PPM, Enter albo OK zatwierdza – płaska
+`app/commands/ZLevelsCommand`, `core/GeometryEdit`): okno z górnym i dolnym poziomem Z
+(dolny może być poniżej 0), potem wybór geometrii (LPM), PPM, Enter albo OK zatwierdza – płaska
 geometria dostaje wysokość: leży na górnym poziomie, a ściany schodzą do dolnego. Okno
 pamięta ostatnie wartości, Esc anuluje, Ctrl+Z cofa. Przesuń zmienia położenie geometrii tylko w X i Y –
 poziomy Z zostają, także gdy punkt bazowy albo docelowy złapano uchwytem na innej wysokości. Pozostałe grupy zakładki 3D – później.

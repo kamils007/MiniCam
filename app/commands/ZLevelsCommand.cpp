@@ -36,8 +36,8 @@ bool askLevels(QWidget* parent, double& bottom, double& top)
     auto* form = new QFormLayout(&dialog);
     QDoubleSpinBox* topBox = levelBox(settings.value("ZLevels/top", 0.0).toDouble(), &dialog);
     QDoubleSpinBox* bottomBox = levelBox(settings.value("ZLevels/bottom", -18.0).toDouble(), &dialog);
-    form->addRow("Dolny poziom Z:", bottomBox);
     form->addRow("Górny poziom Z:", topBox);
+    form->addRow("Dolny poziom Z:", bottomBox);
     auto* error = new QLabel(&dialog);
     error->setStyleSheet("color: #c62828;");
     form->addRow(error);
@@ -52,8 +52,8 @@ bool askLevels(QWidget* parent, double& bottom, double& top)
         }
         dialog.accept();
     });
-    bottomBox->setFocus();
-    bottomBox->selectAll();
+    topBox->setFocus();
+    topBox->selectAll();
     if (dialog.exec() != QDialog::Accepted)
         return false;
     top = topBox->value();
