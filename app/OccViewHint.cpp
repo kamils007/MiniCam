@@ -12,7 +12,9 @@
 #include <SelectMgr_Selection.hxx>
 #include <QTimer>
 
+#include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace {
 

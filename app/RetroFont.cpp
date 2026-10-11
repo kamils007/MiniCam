@@ -113,14 +113,15 @@ struct Accented
     char base;
     const char* accent; // jak w kGlyphs, ale bez krawędzi
 };
-// Ogonek, kreska (ó, ś…), kropka (ż) i przekreślenie (ł).
+// Ogonek, kreska (ó, ś…), kropka (ż) i przekreślenie (ł). Kody liczbowo – plik źródłowy
+// nie musi być czytany jako UTF-8.
 const Accented kPolish[] = {
-    {u'Ą', 'A', "Z[X]X_Z`[`"}, {u'Ć', 'C', "QDUA"}, {u'Ę', 'E', "Y[W]W_Y`Z`"},
-    {u'Ł', 'L', "HSPM"},       {u'Ń', 'N', "QDUA"}, {u'Ó', 'O', "QDUA"},
-    {u'Ś', 'S', "QDUA"},       {u'Ź', 'Z', "QDUA"}, {u'Ż', 'Z', "RBQCRDSCRB"},
-    {u'ą', 'a', "X[V]V_X`Y`"}, {u'ć', 'c', "QJUG"}, {u'ę', 'e', "T[R]R_T`U`"},
-    {u'ł', 'l', "ORUN"},       {u'ń', 'n', "QJUG"}, {u'ó', 'o', "QJUG"},
-    {u'ś', 's', "QJUG"},       {u'ź', 'z', "QJUG"}, {u'ż', 'z', "RHQIRJSIRH"},
+    {0x0104, 'A', "Z[X]X_Z`[`"} /* Ą */, {0x0106, 'C', "QDUA"} /* Ć */, {0x0118, 'E', "Y[W]W_Y`Z`"} /* Ę */,
+    {0x0141, 'L', "HSPM"} /* Ł */,       {0x0143, 'N', "QDUA"} /* Ń */, {0x00D3, 'O', "QDUA"} /* Ó */,
+    {0x015A, 'S', "QDUA"} /* Ś */,       {0x0179, 'Z', "QDUA"} /* Ź */, {0x017B, 'Z', "RBQCRDSCRB"} /* Ż */,
+    {0x0105, 'a', "X[V]V_X`Y`"} /* ą */, {0x0107, 'c', "QJUG"} /* ć */, {0x0119, 'e', "T[R]R_T`U`"} /* ę */,
+    {0x0142, 'l', "ORUN"} /* ł */,       {0x0144, 'n', "QJUG"} /* ń */, {0x00F3, 'o', "QJUG"} /* ó */,
+    {0x015B, 's', "QJUG"} /* ś */,       {0x017A, 'z', "QJUG"} /* ź */, {0x017C, 'z', "RHQIRJSIRH"} /* ż */,
 };
 
 // Rysuje ciąg punktów z zapisu Hershey przesunięty o (dx, 0).
