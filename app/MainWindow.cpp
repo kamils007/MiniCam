@@ -270,7 +270,7 @@ void MainWindow::createRibbon()
 
     // Zielone strzałki kierunku i strony narzędzia przy geometriach – włącz/wyłącz.
     // Stan zapamiętuje się między uruchomieniami programu.
-    QAction* directionsAct = new QAction(appIcon("kierunki"), "Kierunki\ngeometrii", this);
+    QAction* directionsAct = new QAction(appIcon("kierunki"), "Kierunki\nnarzędzia", this);
     directionsAct->setCheckable(true);
     directionsAct->setChecked(QSettings("MiniCAM", "MiniCAM").value(kDirectionsKey, true).toBool());
     shortcuts::bind(directionsAct, shortcuts::kToggleDirections);
@@ -280,7 +280,7 @@ void MainWindow::createRibbon()
     connect(directionsAct, &QAction::toggled, this, [this](bool on) {
         m_view->setDirectionsVisible(on);
         QSettings("MiniCAM", "MiniCAM").setValue(kDirectionsKey, on);
-        statusBar()->showMessage(QString("Kierunki geometrii: %1 (%2)")
+        statusBar()->showMessage(QString("Kierunki narzędzia: %1 (%2)")
                                      .arg(on ? "widoczne" : "ukryte", shortcuts::text(shortcuts::kToggleDirections)));
     });
 
@@ -312,7 +312,6 @@ void MainWindow::createRibbon()
     RibbonGroup* viewGroup = home->addGroup("Widok");
     viewGroup->addAction(fitAct);
     viewGroup->addAction(dockAct);
-    viewGroup->addAction(directionsAct);
 
     // Zakładka Edycja – układ grup jak w Alphacam. Na razie działa "Przesuń",
     // pozostałe polecenia są widoczne, ale wyłączone (przyjdą później).
@@ -435,7 +434,6 @@ void MainWindow::createRibbon()
         connect(a, &QAction::triggered, this, [this, v] { m_view->setStandardView(v); });
         views3d->addAction(a);
     }
-    viewPage->addGroup("Pokaż")->addAction(directionsAct);
     viewPage->addGroup("Okna")->addAction(dockAct);
 
     // Zakładka Geometria – rysowanie jak w Alphacam (Geometria → 2D): Linia, Łuk ▾, Koło ▾,
@@ -498,6 +496,12 @@ void MainWindow::createRibbon()
     connect(zLevelsAct, &QAction::triggered, this, [this] { runCommand(new ZLevelsCommand(*this, this)); });
     RibbonPage* page3d = ribbon->addPage("3D");
     page3d->addGroup("Ustaw poziomy Z/Materiał")->addAction(zLevelsAct);
+
+    // Zakładka Technologia (jak Machine w Alphacam). Grupa "Narzędzia i kierunki":
+    // na razie przełącznik strzałek kierunku (w Alphacam Tool Directions otwiera okno
+    // z kierunkiem i stroną – przyjdzie później).
+    RibbonPage* machinePage = ribbon->addPage("Technologia");
+    machinePage->addGroup("Narzędzia i kierunki")->addAction(directionsAct);
 
     // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;

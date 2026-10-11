@@ -113,7 +113,7 @@ patrząc z góry) i stronę narzędzia względem kierunku ruchu (lewa, prawa, ś
 Domyślnie wszystkie są na zewnątrz, CW (CW + narzędzie po lewej). Pokazuje to mała zielona
 strzałka 3D na górnym poziomie geometrii: wychodzi z punktu początkowego, wskazuje kierunek
 ruchu frezu i stoi po stronie narzędzia (środkiem – na linii). Ma stały rozmiar na ekranie.
-Widok → Pokaż → Kierunki geometrii albo Ctrl+G włącza i wyłącza strzałki (stan się zapamiętuje).
+Technologia → Narzędzia i kierunki → Kierunki narzędzia albo Ctrl+G włącza i wyłącza strzałki (stan się zapamiętuje).
 Domyślną stronę wybiera program (`core/ToolSides`, frezowanie współbieżne: na zewnątrz CW,
 do środka CCW, narzędzie zawsze po lewej):
 - po rozpoznaniu cech obrys bryły jest zawsze na zewnątrz, otwory o średnicy wiertła – środkiem,
