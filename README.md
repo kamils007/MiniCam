@@ -86,6 +86,12 @@ wykonuje, Esc anuluje, Ctrl+Z cofa.
 - **Rozdziel** – geometria rozpada się na osobne elementy (każdy odcinek i łuk osobno),
   z tą samą warstwą i wysokością ścian.
 
+**3D → Poziomy Z** (grupa „Ustaw poziomy Z/Materiał”, jak Z levels w Alphacam,
+`app/commands/ZLevelsCommand`, `core/GeometryEdit`): okno z dolnym (może być poniżej 0)
+i górnym poziomem Z, potem wybór geometrii (LPM), PPM, Enter albo OK zatwierdza – płaska
+geometria dostaje wysokość: leży na górnym poziomie, a ściany schodzą do dolnego. Okno
+pamięta ostatnie wartości, Esc anuluje, Ctrl+Z cofa. Pozostałe grupy zakładki 3D – później.
+
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
 pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X, Y i Z z przyciskami „F1=?”,

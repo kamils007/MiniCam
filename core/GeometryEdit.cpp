@@ -86,4 +86,12 @@ std::vector<Contour> joinContours(const std::vector<Contour>& contours, double t
     return joined;
 }
 
+Contour withZLevels(const Contour& contour, double bottom, double top)
+{
+    Contour c = translated(contour, gp_Vec(0, 0, top - contour.zTop));
+    c.zTop = top;
+    c.zBottom = bottom;
+    return c;
+}
+
 } // namespace camcore

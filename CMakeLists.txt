@@ -91,6 +91,8 @@ qt_add_executable(minicam
     app/commands/JoinCommands.h
     app/commands/MoveCommand.cpp
     app/commands/MoveCommand.h
+    app/commands/ZLevelsCommand.cpp
+    app/commands/ZLevelsCommand.h
     app/AlignSettingsDialog.cpp
     app/LayersPanel.cpp
     app/LayersPanel.h

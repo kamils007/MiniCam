@@ -92,6 +92,13 @@ def cross(x,y):
     return (f'<path d="M{x-3} {y-3} L{x+3} {y+3} M{x+3} {y-3} L{x-3} {y+3}" stroke="{GD}" stroke-width="3.2" stroke-linecap="round"/>'
             f'<path d="M{x-3} {y-3} L{x+3} {y+3} M{x+3} {y-3} L{x-3} {y+3}" stroke="{G}" stroke-width="1.8" stroke-linecap="round"/>')
 I['rozdziel']=geo('M9 7 H23 M25 9 V23 M23 25 H9 M7 23 V9')+cross(7,7)+cross(25,7)+cross(25,25)+cross(7,25)
+# 3D: płaska czerwona geometria wyciągnięta w ścianki, złote znaczniki poziomów Z.
+I['poziomy-z']=(f'<path d="M3 24 L12 20 L22 24 L13 28 Z" fill="none" stroke="{S3}" stroke-width="1.4" stroke-dasharray="2 2" stroke-linejoin="round"/>'
+  f'<path d="M3 13 L3 24 L13 28 L13 17 Z" fill="#EF9A9A" stroke="{RD}" stroke-width="1" stroke-linejoin="round"/>'
+  f'<path d="M13 17 L13 28 L22 24 L22 13 Z" fill="#E57373" stroke="{RD}" stroke-width="1" stroke-linejoin="round"/>'
+  + geo('M3 13 L12 9 L22 13 L13 17 Z',2.4)
+  + arrow('M27 13 V24',w=1.8)+head(27,8,-90,s=0.7)+head(27,29,90,s=0.7)
+  + f'<path d="M24 8 H30 M24 29 H30" stroke="{GD}" stroke-width="1.6" stroke-linecap="round"/>')
 os.makedirs(out,exist_ok=True)
 for k,v in I.items():
     open(f'{out}/{k}.svg','w').write(f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{v}</svg>\n')

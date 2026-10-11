@@ -17,4 +17,9 @@ std::vector<Contour> explodeContour(const Contour& contour);
 // zwykle wychodzi jedna, a gdy elementy się nie stykają, kilka.
 std::vector<Contour> joinContours(const std::vector<Contour>& contours, double tol = 0.01);
 
+// Poziomy Z (3D → Ustaw poziomy Z, jak Z levels w Alphacam): geometria staje na górnym
+// poziomie (top), a jej ściany schodzą do dolnego (bottom) – płaska geometria dostaje
+// wysokość top − bottom. Poziomy mogą być poniżej 0.
+Contour withZLevels(const Contour& contour, double bottom, double top);
+
 } // namespace camcore

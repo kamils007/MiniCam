@@ -9,6 +9,7 @@
 #include "commands/DeleteCommand.h"
 #include "commands/DrawCommands.h"
 #include "commands/JoinCommands.h"
+#include "commands/ZLevelsCommand.h"
 #include "commands/MoveCommand.h"
 
 #include <QAction>
@@ -450,11 +451,20 @@ void MainWindow::createRibbon()
     QList<QAction*> drawActs = {lineAct, rectangleAct};
     drawActs << arcActs << circleActs;
 
+    // Zakładka 3D (jak w Alphacam). Na razie tylko Poziomy Z w grupie
+    // "Ustaw poziomy Z/Materiał"; Panele, Edycja powierzchni, Edycja geometrii,
+    // Narzędzia STL i Obrót części 3D – później.
+    QAction* zLevelsAct = new QAction(appIcon("poziomy-z"), "Poziomy Z", this);
+    zLevelsAct->setToolTip("Poziomy Z: dolny i górny poziom dla wybranych geometrii – płaska geometria dostaje wysokość");
+    connect(zLevelsAct, &QAction::triggered, this, [this] { runCommand(new ZLevelsCommand(*this, this)); });
+    RibbonPage* page3d = ribbon->addPage("3D");
+    page3d->addGroup("Ustaw poziomy Z/Materiał")->addAction(zLevelsAct);
+
     // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
     // widok, okna, plik i Cofnij/Ponów się nie liczą.
     QList<QAction*> repeatable = {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct};
-    repeatable << drawActs << joinAct << explodeAct;
+    repeatable << drawActs << joinAct << explodeAct << zLevelsAct;
     for (QAction* a : repeatable) {
         connect(a, &QAction::triggered, this, [this, a] {
             m_lastCommand = a;
