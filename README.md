@@ -4,6 +4,12 @@ Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z koloram
 zapisanymi w pliku. Na górze okna jest wstążka w stylu Alphacam (Plik, Narzędzia
 główne, Ekstrakcja modelu bryłowego, Bryły - Użytkowe).
 
+**Narzędzia główne → CAD** (jak Input CAD / Output CAD w Alphacam): „Wczytaj CAD…” na razie
+wyłączone. „Zapisz CAD…” zapisuje widoczne geometrie do DXF (R12, mm, `core/DxfExport`):
+odcinki → LINE, łuki → ARC, okręgi → CIRCLE, inne krzywe → krótkie odcinki; każdy element
+na swojej wysokości Z. Warstwy użytkownika stają się warstwami DXF (kolor najbliższy
+z palety DXF, nazwa bez polskich znaków i spacji), geometrie APS idą na warstwę „0”.
+
 **Auto-wyrównanie** (Bryły - Użytkowe): ustawienia w „Rozpoznawanie cech modelu…”.
 Przy „Wyrównanie panelu” na stole kładzie się płaszczyzna o największej sumie pól
 leżących w niej ścian (kieszenie mogą być z obu stron – spodem zostaje strona mniej

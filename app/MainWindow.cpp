@@ -277,6 +277,17 @@ void MainWindow::createRibbon()
 
     RibbonPage* home = ribbon->addPage("Narzędzia główne");
     home->addGroup("Plik")->addAction(openAct);
+    // Grupa CAD jak w Alphacam: Wczytaj CAD (na razie wyłączone) i Zapisz CAD (DXF).
+    QAction* inputCadAct = new QAction(appIcon("wczytaj-cad"), "Wczytaj\nCAD…", this);
+    inputCadAct->setEnabled(false);
+    inputCadAct->setToolTip("Wczytaj CAD – rysunek z innego programu (wkrótce)");
+    QAction* outputCadAct = new QAction(appIcon("zapisz-cad"), "Zapisz\nCAD…", this);
+    outputCadAct->setToolTip("Zapisz CAD – geometrie 2D do pliku DXF\n"
+                             "(na swoich wysokościach Z, warstwy jako warstwy DXF)");
+    connect(outputCadAct, &QAction::triggered, this, &MainWindow::onOutputCad);
+    RibbonGroup* cadGroup = home->addGroup("CAD");
+    cadGroup->addAction(inputCadAct);
+    cadGroup->addAction(outputCadAct);
     RibbonGroup* viewGroup = home->addGroup("Widok");
     viewGroup->addAction(fitAct);
     viewGroup->addAction(dockAct);

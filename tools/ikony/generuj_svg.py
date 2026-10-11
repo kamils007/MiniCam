@@ -99,6 +99,11 @@ I['poziomy-z']=(f'<path d="M3 24 L12 20 L22 24 L13 28 Z" fill="none" stroke="{S3
   + geo('M3 13 L12 9 L22 13 L13 17 Z',2.4)
   + arrow('M27 13 V24',w=1.8)+head(27,8,-90,s=0.7)+head(27,29,90,s=0.7)
   + f'<path d="M24 8 H30 M24 29 H30" stroke="{GD}" stroke-width="1.6" stroke-linecap="round"/>')
+# Plik CAD (Narzędzia główne → CAD): kartka z czerwonym rysunkiem, niebieska strzałka do środka / na zewnątrz.
+def cadpage():
+    return page(3,3,18,24)+geo('M7 12 H14 V22 H7 Z',1.8)+'<circle cx="14" cy="12" r="3.2" fill="none" stroke="'+R+'" stroke-width="1.8"/>'
+I['wczytaj-cad']=cadpage()+arrow('M30 20 H21',w=2.4)+head(18,20,180,s=0.85)
+I['zapisz-cad']=cadpage()+arrow('M18 20 H26',w=2.4)+head(30,20,0,s=0.85)
 os.makedirs(out,exist_ok=True)
 for k,v in I.items():
     open(f'{out}/{k}.svg','w').write(f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{v}</svg>\n')

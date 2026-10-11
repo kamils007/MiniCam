@@ -4,6 +4,7 @@
 #include "MainWindow.h"
 #include "Icons.h"
 #include "LayersPanel.h"
+#include "DxfExport.h"
 #include "ModelExport.h"
 #include "OccView.h"
 
@@ -13,6 +14,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
@@ -187,6 +189,32 @@ bool MainWindow::saveTo(const QString& path)
     setWindowTitle("MiniCAM – " + m_fileName);
     statusBar()->showMessage("Zapisano " + QDir::toNativeSeparators(path));
     return true;
+}
+
+void MainWindow::onOutputCad()
+{
+    if (m_geometries.empty()) {
+        QMessageBox::information(this, "Zapisz CAD", "Brak geometrii do zapisania.");
+        return;
+    }
+    QString start = m_savePath.isEmpty() ? QString() : QFileInfo(m_savePath).path();
+    if (!m_fileName.isEmpty())
+        start = QDir(start).filePath(QFileInfo(m_fileName).completeBaseName() + ".dxf");
+    QString path = QFileDialog::getSaveFileName(this, "Zapisz CAD", start, "DXF (*.dxf)");
+    if (path.isEmpty())
+        return;
+    if (QFileInfo(path).suffix().isEmpty())
+        path += ".dxf";
+
+    const std::string dxf = camcore::writeDxf(m_geometries, m_layerList);
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)
+        || file.write(dxf.data(), static_cast<qint64>(dxf.size())) != static_cast<qint64>(dxf.size())
+        || !file.commit()) {
+        QMessageBox::critical(this, "Błąd zapisu", "Nie udało się zapisać pliku " + QDir::toNativeSeparators(path));
+        return;
+    }
+    statusBar()->showMessage("Zapisano DXF: " + QDir::toNativeSeparators(path));
 }
 
 bool MainWindow::maybeSave()
