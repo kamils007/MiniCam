@@ -26,8 +26,9 @@ QDoubleSpinBox* levelBox(double value, QWidget* parent)
     return box;
 }
 
-// Okno "Poziomy Z": dolny poziom (może być poniżej 0) i górny. Ostatnie wartości
-// zapamiętuje. false = Anuluj.
+// Okno "Poziomy Z": górny i dolny poziom (dolny może być poniżej 0), pod nimi różnica
+// (wysokość ścian) liczona na bieżąco. Za pierwszym razem 0 i 0, potem ostatnie wartości.
+// Górny = dolny daje płaską geometrię (zerowa wysokość). false = Anuluj.
 bool askLevels(QWidget* parent, double& bottom, double& top)
 {
     QSettings settings;
@@ -35,23 +36,26 @@ bool askLevels(QWidget* parent, double& bottom, double& top)
     dialog.setWindowTitle("Poziomy Z");
     auto* form = new QFormLayout(&dialog);
     QDoubleSpinBox* topBox = levelBox(settings.value("ZLevels/top", 0.0).toDouble(), &dialog);
-    QDoubleSpinBox* bottomBox = levelBox(settings.value("ZLevels/bottom", -18.0).toDouble(), &dialog);
+    QDoubleSpinBox* bottomBox = levelBox(settings.value("ZLevels/bottom", 0.0).toDouble(), &dialog);
     form->addRow("Górny poziom Z:", topBox);
     form->addRow("Dolny poziom Z:", bottomBox);
-    auto* error = new QLabel(&dialog);
-    error->setStyleSheet("color: #c62828;");
-    form->addRow(error);
+    auto* difference = new QLabel(&dialog);
+    form->addRow("Różnica:", difference);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     buttons->button(QDialogButtonBox::Cancel)->setText("Anuluj");
     form->addRow(buttons);
+    const auto update = [&] {
+        const double d = topBox->value() - bottomBox->value();
+        const bool ok = d >= 0;
+        difference->setText(ok ? num(d) + " mm" : "górny poziom musi być nad dolnym");
+        difference->setStyleSheet(ok ? "font-weight: bold;" : "color: #c62828;");
+        buttons->button(QDialogButtonBox::Ok)->setEnabled(ok);
+    };
+    update();
+    QObject::connect(topBox, &QDoubleSpinBox::valueChanged, &dialog, update);
+    QObject::connect(bottomBox, &QDoubleSpinBox::valueChanged, &dialog, update);
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
-        if (topBox->value() <= bottomBox->value()) {
-            error->setText("Górny poziom musi być wyżej niż dolny");
-            return;
-        }
-        dialog.accept();
-    });
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     topBox->setFocus();
     topBox->selectAll();
     if (dialog.exec() != QDialog::Accepted)
