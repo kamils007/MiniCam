@@ -113,7 +113,13 @@ patrząc z góry) i stronę narzędzia względem kierunku ruchu (lewa, prawa, ś
 Domyślnie wszystkie są na zewnątrz, CW (CW + narzędzie po lewej). Pokazuje to mała zielona
 strzałka 3D na górnym poziomie geometrii: wychodzi z punktu początkowego, wskazuje kierunek
 ruchu frezu i stoi po stronie narzędzia (środkiem – na linii). Ma stały rozmiar na ekranie.
-Technologia → Narzędzia i kierunki → Kierunki narzędzia albo Ctrl+G włącza i wyłącza strzałki (stan się zapamiętuje).
+Technologia → Narzędzia i kierunki → Pokaż kierunki albo Ctrl+G włącza i wyłącza strzałki (stan się zapamiętuje).
+**Kierunki narzędzia…** (obok, jak Tool Directions w Alphacam, `app/ToolDirectionsDialog`): okno z kierunkiem
+i stroną osobno dla geometrii otwartych (Odwróć / Bez zmian; Lewa, Prawa, Zamień L/P, Środkiem, Bez zmian)
+i zamkniętych (CW, CCW, Odwróć, Bez zmian, Narzędzie po lewej / po prawej; Na zewnątrz, Do środka, Lewa,
+Prawa, Zamień zewnątrz/środek, Środkiem, Bez zmian, Automatycznie). Zmiana kierunku zostawia narzędzie
+po tej samej stronie geometrii. „Wszystkie geometrie” zmienia od razu wszystkie, „Wybierz geometrie…” –
+wybór w widoku (LPM), PPM zmienia; Ctrl+Z cofa. Punkt startowy – na razie tylko układ (wyłączony).
 Domyślną stronę wybiera program (`core/ToolSides`, frezowanie współbieżne: na zewnątrz CW,
 do środka CCW, narzędzie zawsze po lewej):
 - po rozpoznaniu cech obrys bryły jest zawsze na zewnątrz, otwory o średnicy wiertła – środkiem,
@@ -155,6 +161,7 @@ minicam/
     ├── BottomBars.h/.cpp          dolne belki: belka polecenia (CommandBar) i stopka
     ├── InputBar.h/.cpp            pasek wprowadzania (lewa część belki polecenia)
     ├── Shortcuts.h/.cpp           skróty klawiszowe – wszystkie w jednym miejscu
+    ├── ToolDirectionsDialog.h/.cpp okno Kierunki narzędzia (Technologia)
     ├── OccView.h/.cpp             widok 3D: rysowanie, wybór, mysz
     ├── OccViewPick.cpp            widok 3D: wskazywanie punktu, uchwyty, podgląd przesuwania
     └── commands/                  polecenia krok po kroku (jak w Alphacam)

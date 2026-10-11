@@ -26,4 +26,27 @@ void assignToolSides(std::vector<Geometry>& geometries, const TopoDS_Shape& soli
 // otwarta – środkiem.
 void assignToolSide(std::vector<Geometry>& geometries, size_t index);
 
+// Zmiana kierunku i strony wybranych geometrii (okno Technologia → Kierunki narzędzia,
+// jak Tool Directions w Alphacam). Najpierw zmienia się strona, potem kierunek –
+// zmiana kierunku zostawia narzędzie po tej samej stronie geometrii (np. na zewnątrz).
+struct DirectionChange
+{
+    // Geometrie otwarte.
+    enum class OpenDirection { Reverse, NoChange };
+    enum class OpenSide { Left, Right, Swap, Centre, NoChange };
+    // Geometrie zamknięte. OnLeft/OnRight: kierunek tak, żeby narzędzie było po lewej
+    // (frezowanie współbieżne) albo po prawej (przeciwbieżne).
+    enum class ClosedDirection { CW, CCW, Reverse, NoChange, OnLeft, OnRight };
+    enum class ClosedSide { Outside, Inside, Left, Right, Swap, Centre, NoChange, Automatic };
+
+    OpenDirection openDirection = OpenDirection::NoChange;
+    OpenSide openSide = OpenSide::NoChange;
+    ClosedDirection closedDirection = ClosedDirection::OnLeft;
+    ClosedSide closedSide = ClosedSide::Automatic;
+};
+// indices – które geometrie zmienić (puste = wszystkie). solid – bryła dla "Automatycznie"
+// (może być pusta – wtedy reguła zagnieżdżenia).
+void applyDirectionChange(std::vector<Geometry>& geometries, const std::vector<int>& indices,
+                          const DirectionChange& change, const TopoDS_Shape& solid);
+
 } // namespace camcore

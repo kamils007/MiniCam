@@ -14,6 +14,8 @@
 #include "commands/TrimCommand.h"
 #include "commands/ZLevelsCommand.h"
 #include "commands/MoveCommand.h"
+#include "commands/ToolDirectionsCommand.h"
+#include "ToolDirectionsDialog.h"
 
 #include <QAction>
 #include <QHBoxLayout>
@@ -270,7 +272,7 @@ void MainWindow::createRibbon()
 
     // Zielone strzałki kierunku i strony narzędzia przy geometriach – włącz/wyłącz.
     // Stan zapamiętuje się między uruchomieniami programu.
-    QAction* directionsAct = new QAction(appIcon("kierunki"), "Kierunki\nnarzędzia", this);
+    QAction* directionsAct = new QAction(appIcon("pokaz-kierunki"), "Pokaż\nkierunki", this);
     directionsAct->setCheckable(true);
     directionsAct->setChecked(QSettings("MiniCAM", "MiniCAM").value(kDirectionsKey, true).toBool());
     shortcuts::bind(directionsAct, shortcuts::kToggleDirections);
@@ -498,16 +500,29 @@ void MainWindow::createRibbon()
     page3d->addGroup("Ustaw poziomy Z/Materiał")->addAction(zLevelsAct);
 
     // Zakładka Technologia (jak Machine w Alphacam). Grupa "Narzędzia i kierunki":
-    // na razie przełącznik strzałek kierunku (w Alphacam Tool Directions otwiera okno
-    // z kierunkiem i stroną – przyjdzie później).
+    // okno Kierunki narzędzia (jak Tool Directions) i przełącznik strzałek kierunku (Ctrl+G).
     RibbonPage* machinePage = ribbon->addPage("Technologia");
-    machinePage->addGroup("Narzędzia i kierunki")->addAction(directionsAct);
+    QAction* toolDirectionsAct = new QAction(appIcon("kierunki"), "Kierunki\nnarzędzia…", this);
+    toolDirectionsAct->setToolTip("Kierunek i strona narzędzia geometrii otwartych i zamkniętych:\n"
+                                  "wszystkie geometrie albo wybrane (LPM, PPM zmienia; Ctrl+Z cofa)");
+    connect(toolDirectionsAct, &QAction::triggered, this, [this] {
+        cancelCommand();
+        ToolDirectionsDialog dialog(this);
+        const int result = dialog.exec();
+        if (result == ToolDirectionsDialog::AllGeometries)
+            statusBar()->showMessage(ToolDirectionsCommand::applyTo(*this, {}, dialog.change()));
+        else if (result == ToolDirectionsDialog::SelectGeometries)
+            runCommand(new ToolDirectionsCommand(dialog.change(), *this, this));
+    });
+    RibbonGroup* directionsGroup = machinePage->addGroup("Narzędzia i kierunki");
+    directionsGroup->addAction(toolDirectionsAct);
+    directionsGroup->addAction(directionsAct);
 
     // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
     // widok, okna, plik i Cofnij/Ponów się nie liczą.
     QList<QAction*> repeatable = {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct};
-    repeatable << drawActs << trimAct << joinAct << explodeAct << zLevelsAct;
+    repeatable << drawActs << trimAct << joinAct << explodeAct << zLevelsAct << toolDirectionsAct;
     for (QAction* a : repeatable) {
         connect(a, &QAction::triggered, this, [this, a] {
             m_lastCommand = a;

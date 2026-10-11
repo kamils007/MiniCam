@@ -107,6 +107,10 @@ I['zapisz-cad']=cadpage()+arrow('M18 20 H26',w=2.4)+head(30,20,0,s=0.85)
 # Kierunki geometrii (Widok → Pokaż): czerwony kontur i zielona strzałka kierunku CW na zewnątrz.
 I['kierunki']=(geo('M5 12 H27 V27 H5 Z',2.4)
   + arrow('M7 6 H21',c=OK,cd='#145A20',w=2.4)+head(27,6,0,c=OK,cd='#145A20',s=0.9))
+# Pokaż kierunki (Technologia): zielona strzałka i oko.
+I['pokaz-kierunki']=(arrow('M4 9 H19',c=OK,cd='#145A20',w=2.4)+head(25,9,0,c=OK,cd='#145A20',s=0.9)
+  + f'<path d="M3 23 Q16 12 29 23 Q16 34 3 23 Z" fill="#FFF" stroke="{SD}" stroke-width="1.6" stroke-linejoin="round"/>'
+  + f'<circle cx="16" cy="23" r="4" fill="{B}" stroke="{BD}" stroke-width="1"/><circle cx="16" cy="23" r="1.6" fill="#000"/>')
 os.makedirs(out,exist_ok=True)
 for k,v in I.items():
     open(f'{out}/{k}.svg','w').write(f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{v}</svg>\n')

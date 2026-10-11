@@ -89,23 +89,114 @@ void assignToolSide(std::vector<Geometry>& geometries, size_t index)
     setPlacement(g, depth % 2 == 0 ? ToolPlacement::Outside : ToolPlacement::Inside);
 }
 
+namespace {
+
+// Domyślna strona jednej geometrii (reguły jak w assignToolSides).
+void assignAutomatic(std::vector<Geometry>& geometries, size_t i, const TopoDS_Shape& solid)
+{
+    Geometry& g = geometries[i];
+    if (g.layer == kOuterContourLayer) {
+        setPlacement(g, ToolPlacement::Outside);
+        return;
+    }
+    if (g.layer == kHoleLayer) {
+        setPlacement(g, ToolPlacement::Centre);
+        return;
+    }
+    const ToolPlacement fromSolid = placementFromSolid(g, solid);
+    if (fromSolid != ToolPlacement::Centre)
+        setPlacement(g, fromSolid);
+    else
+        assignToolSide(geometries, i);
+}
+
+ToolSide swapped(ToolSide side)
+{
+    return side == ToolSide::Left ? ToolSide::Right : side == ToolSide::Right ? ToolSide::Left : side;
+}
+
+CutDirection opposite(CutDirection d) { return d == CutDirection::CW ? CutDirection::CCW : CutDirection::CW; }
+
+// Nowy kierunek, narzędzie zostaje po tej samej stronie geometrii.
+void setDirectionKeepingSide(Geometry& g, CutDirection direction)
+{
+    if (direction == g.direction)
+        return;
+    g.direction = direction;
+    g.toolSide = swapped(g.toolSide);
+}
+
+void changeOpen(Geometry& g, const DirectionChange& c)
+{
+    using Side = DirectionChange::OpenSide;
+    switch (c.openSide) {
+    case Side::Left: g.toolSide = ToolSide::Left; break;
+    case Side::Right: g.toolSide = ToolSide::Right; break;
+    case Side::Swap: g.toolSide = swapped(g.toolSide); break;
+    case Side::Centre: g.toolSide = ToolSide::Centre; break;
+    case Side::NoChange: break;
+    }
+    if (c.openDirection == DirectionChange::OpenDirection::Reverse)
+        setDirectionKeepingSide(g, opposite(g.direction));
+}
+
+void changeClosed(std::vector<Geometry>& geometries, size_t i, const DirectionChange& c, const TopoDS_Shape& solid)
+{
+    Geometry& g = geometries[i];
+    using Side = DirectionChange::ClosedSide;
+    // Przy CW lewa strona to zewnątrz, przy CCW – wnętrze.
+    const ToolSide outside = g.direction == CutDirection::CW ? ToolSide::Left : ToolSide::Right;
+    switch (c.closedSide) {
+    case Side::Outside: g.toolSide = outside; break;
+    case Side::Inside: g.toolSide = swapped(outside); break;
+    case Side::Left: g.toolSide = ToolSide::Left; break;
+    case Side::Right: g.toolSide = ToolSide::Right; break;
+    case Side::Swap: g.toolSide = swapped(g.toolSide); break;
+    case Side::Centre: g.toolSide = ToolSide::Centre; break;
+    case Side::NoChange: break;
+    case Side::Automatic: assignAutomatic(geometries, i, solid); break;
+    }
+    using Dir = DirectionChange::ClosedDirection;
+    switch (c.closedDirection) {
+    case Dir::CW: setDirectionKeepingSide(g, CutDirection::CW); break;
+    case Dir::CCW: setDirectionKeepingSide(g, CutDirection::CCW); break;
+    case Dir::Reverse: setDirectionKeepingSide(g, opposite(g.direction)); break;
+    case Dir::NoChange: break;
+    case Dir::OnLeft:
+        if (g.toolSide == ToolSide::Right)
+            setDirectionKeepingSide(g, opposite(g.direction));
+        break;
+    case Dir::OnRight:
+        if (g.toolSide == ToolSide::Left)
+            setDirectionKeepingSide(g, opposite(g.direction));
+        break;
+    }
+}
+
+} // namespace
+
 void assignToolSides(std::vector<Geometry>& geometries, const TopoDS_Shape& solid)
 {
-    for (size_t i = 0; i < geometries.size(); ++i) {
-        Geometry& g = geometries[i];
-        if (g.layer == kOuterContourLayer) {
-            setPlacement(g, ToolPlacement::Outside);
-            continue;
-        }
-        if (g.layer == kHoleLayer) {
-            setPlacement(g, ToolPlacement::Centre);
-            continue;
-        }
-        const ToolPlacement fromSolid = placementFromSolid(g, solid);
-        if (fromSolid != ToolPlacement::Centre)
-            setPlacement(g, fromSolid);
+    for (size_t i = 0; i < geometries.size(); ++i)
+        assignAutomatic(geometries, i, solid);
+}
+
+void applyDirectionChange(std::vector<Geometry>& geometries, const std::vector<int>& indices,
+                          const DirectionChange& change, const TopoDS_Shape& solid)
+{
+    std::vector<size_t> which;
+    if (indices.empty())
+        for (size_t i = 0; i < geometries.size(); ++i)
+            which.push_back(i);
+    else
+        for (int i : indices)
+            if (i >= 0 && i < static_cast<int>(geometries.size()))
+                which.push_back(static_cast<size_t>(i));
+    for (size_t i : which) {
+        if (isClosed(geometries[i].contour.wire))
+            changeClosed(geometries, i, change, solid);
         else
-            assignToolSide(geometries, i);
+            changeOpen(geometries[i], change);
     }
 }
 

@@ -102,6 +102,10 @@ qt_add_executable(minicam
     app/commands/TrimCommand.h
     app/commands/ZLevelsCommand.cpp
     app/commands/ZLevelsCommand.h
+    app/commands/ToolDirectionsCommand.cpp
+    app/commands/ToolDirectionsCommand.h
+    app/ToolDirectionsDialog.cpp
+    app/ToolDirectionsDialog.h
     app/AlignSettingsDialog.cpp
     app/LayersPanel.cpp
     app/LayersPanel.h
