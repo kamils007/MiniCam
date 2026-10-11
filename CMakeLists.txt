@@ -87,7 +87,14 @@ qt_add_executable(minicam
     app/LayersPanel.cpp
     app/LayersPanel.h
     app/AlignSettingsDialog.h
+    app/Icons.cpp
+    app/Icons.h
 )
+# Ikony wstążki: PNG wyrenderowane z SVG (resources/ikony, skrypty w tools/ikony),
+# wkompilowane w exe jako zasoby Qt pod ścieżką :/ikony/png/<nazwa>_<rozmiar>.png.
+file(GLOB MINICAM_ICONS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/ikony/png/*.png")
+qt_add_resources(minicam "ikony" PREFIX "/" BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+    FILES ${MINICAM_ICONS})
 target_include_directories(minicam PRIVATE app) # polecenia w app/commands widzą InputBar.h, OccView.h
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
