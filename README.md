@@ -77,12 +77,18 @@ nie przerwie (PPM albo Esc), nowa geometria trafia do warstwy APS, Ctrl+Z cofa.
   Środek + Punkt, 2 punkty, 3 punkty.
 - **Prostokąt** – dwa przeciwległe narożniki.
 
-**Połącz / Rozdziel** (Edycja → Przerwij, połącz itd., jak Join / Explode w Alphacam,
+**Utnij / Połącz / Rozdziel** (Edycja → Przerwij, połącz itd., jak Join / Explode w Alphacam,
 `app/commands/JoinCommands`, `core/GeometryEdit`): wybór geometrii (LPM), PPM, Enter albo OK
 wykonuje, Esc anuluje, Ctrl+Z cofa.
 - **Połącz** – elementy wybranych geometrii łączą się koniec do końca (tolerancja 0,01 mm)
   w jedną geometrię; gdy się nie stykają, powstaje kilka. Wspólna warstwa zostaje,
   z różnych warstw geometria trafia do APS.
+- **Utnij** (`app/commands/TrimCommand`, jak Trim w Alphacam) – najpierw geometrie tnące (LPM,
+  PPM zatwierdza; zostają pomarańczowe), potem geometrie do ucięcia: klika się je w kawałku,
+  który ma zniknąć, PPM ucina. Kawałek znika między najbliższymi przecięciami z geometriami
+  tnącymi (w rzucie na XY), a na otwartej geometrii bez przecięcia po jednej stronie – aż do
+  jej końca. Zamknięta geometria potrzebuje dwóch przecięć i staje się otwarta. Warstwa
+  i wysokość ścian zostają.
 - **Rozdziel** – geometria rozpada się na osobne elementy (każdy odcinek i łuk osobno),
   z tą samą warstwą i wysokością ścian.
 
@@ -115,7 +121,7 @@ minicam/
 │   ├── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
 │   ├── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
 │   ├── Sketch.h/.cpp        rysowanie 2D: odcinki, łuki, okręgi, prostokąty
-│   ├── GeometryEdit.h/.cpp  edycja geometrii: Połącz, Rozdziel
+│   ├── GeometryEdit.h/.cpp  edycja geometrii: Utnij, Połącz, Rozdziel, poziomy Z
 │   └── FeatureRecognition.h/.cpp  rozpoznawanie otworów, kieszeni, wycięć
 └── app/             GUI (Qt)
     ├── main.cpp
@@ -130,6 +136,7 @@ minicam/
         ├── Command.h/.cpp         klasa bazowa + CommandHost (co polecenie dostaje od okna)
         ├── DrawCommands.h/.cpp    Linia, Łuk, Koło, Prostokąt (zakładka Geometria)
         ├── JoinCommands.h/.cpp    Połącz, Rozdziel (Edycja)
+        ├── TrimCommand.h/.cpp     Utnij (Edycja)
         ├── MoveCommand.h/.cpp     Przesuń
         └── ZLevelsCommand.h/.cpp  Poziomy Z (zakładka 3D)
 ```

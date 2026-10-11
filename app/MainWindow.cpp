@@ -9,6 +9,7 @@
 #include "commands/DeleteCommand.h"
 #include "commands/DrawCommands.h"
 #include "commands/JoinCommands.h"
+#include "commands/TrimCommand.h"
 #include "commands/ZLevelsCommand.h"
 #include "commands/MoveCommand.h"
 
@@ -345,7 +346,11 @@ void MainWindow::createRibbon()
     moveGroup->addAction(soon("skaluj", "Skaluj"));
     RibbonGroup* breakGroup = edit->addGroup("Przerwij, połącz itd.");
     breakGroup->addAction(soon("przerwij", "Przerwij"));
-    breakGroup->addAction(soon("przytnij", "Przytnij"));
+    QAction* trimAct = new QAction(appIcon("przytnij"), "Utnij", this);
+    trimAct->setToolTip("Utnij geometrie: wybierz geometrie tnące (LPM), PPM,\n"
+                        "potem kliknij kawałki do usunięcia, PPM ucina (Ctrl+Z cofa)");
+    connect(trimAct, &QAction::triggered, this, [this] { runCommand(new TrimCommand(*this, this)); });
+    breakGroup->addAction(trimAct);
     QAction* joinAct = new QAction(appIcon("polacz"), "Połącz", this);
     joinAct->setToolTip("Połącz geometrie stykające się końcami w jedną:\n"
                         "wybierz geometrie (LPM), PPM łączy (Ctrl+Z cofa)");
@@ -464,7 +469,7 @@ void MainWindow::createRibbon()
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
     // widok, okna, plik i Cofnij/Ponów się nie liczą.
     QList<QAction*> repeatable = {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct};
-    repeatable << drawActs << joinAct << explodeAct << zLevelsAct;
+    repeatable << drawActs << trimAct << joinAct << explodeAct << zLevelsAct;
     for (QAction* a : repeatable) {
         connect(a, &QAction::triggered, this, [this, a] {
             m_lastCommand = a;

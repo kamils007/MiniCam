@@ -58,6 +58,7 @@ target_link_libraries(camcore PUBLIC
     TKHLR       # HLRBRep – rzut bryły z góry (obrys)
     TKBO        # BOPAlgo_Tools – obszary z krawędzi rzutu (obrys)
     TKShHealing # ShapeAnalysis – łączenie krawędzi w kontury
+    TKGeomAlgo  # GeomAPI, Geom2dAPI – przecięcia przy Utnij
     TKTopAlgo   # BRepBndLib – prostopadłościan otaczający
     TKBRep      # TopoDS, BRepTools
     TKG3d TKGeomBase TKMath TKernel
@@ -91,6 +92,8 @@ qt_add_executable(minicam
     app/commands/JoinCommands.h
     app/commands/MoveCommand.cpp
     app/commands/MoveCommand.h
+    app/commands/TrimCommand.cpp
+    app/commands/TrimCommand.h
     app/commands/ZLevelsCommand.cpp
     app/commands/ZLevelsCommand.h
     app/AlignSettingsDialog.cpp

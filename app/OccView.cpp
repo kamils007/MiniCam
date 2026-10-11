@@ -223,6 +223,7 @@ void OccView::showGeometry(const std::vector<Contour>& contours)
     m_geometryVisible.clear();
     m_highlighted.clear();
     m_selected.clear();
+    m_selectionPoints.clear();
     m_hovered = -1;
 
     for (const Contour& c : contours) {
@@ -326,7 +327,7 @@ void OccView::refreshGeometryLook()
     m_view->Redraw();
 }
 
-int OccView::geometryAt(const QPoint& pos) const
+int OccView::geometryAt(const QPoint& pos, gp_Pnt* hit) const
 {
     // Geometrię wskazujemy po jej liniach: najbliższa w promieniu kilku pikseli.
     const double maxDist = 6.0 * devicePixelRatioF();
@@ -349,6 +350,8 @@ int OccView::geometryAt(const QPoint& pos) const
                 if (d < bestDist) {
                     bestDist = d;
                     best = static_cast<int>(i);
+                    if (hit)
+                        hit->SetXYZ(line[k].XYZ() + t * (line[k + 1].XYZ() - line[k].XYZ()));
                 }
             }
         }
@@ -557,13 +560,17 @@ void OccView::onClick(Qt::MouseButton button, const QPoint& pos)
         if (button == Qt::LeftButton) {
             // Kliknięty element dokładamy do wyboru albo – gdy już był – odejmujemy.
             // Najpierw geometrie (wskazywane po liniach), potem bryła.
-            const int g = geometryAt(pos);
+            gp_Pnt hit;
+            const int g = geometryAt(pos, &hit);
             if (g >= 0) {
                 auto it = std::find(m_selected.begin(), m_selected.end(), g);
-                if (it == m_selected.end())
+                if (it == m_selected.end()) {
                     m_selected.push_back(g); // dokładamy do wyboru
-                else
+                    m_selectionPoints[g] = hit;
+                } else {
                     m_selected.erase(it);    // drugie kliknięcie odejmuje
+                    m_selectionPoints.erase(g);
+                }
                 refreshGeometryLook();
                 emit selectionChanged(selectionCount());
             } else {
@@ -642,6 +649,12 @@ std::vector<int> OccView::selectedGeometries() const
     return m_selected;
 }
 
+gp_Pnt OccView::selectionPoint(int geometry) const
+{
+    const auto it = m_selectionPoints.find(geometry);
+    return it == m_selectionPoints.end() ? gp_Pnt() : it->second;
+}
+
 bool OccView::isModelSelected() const
 {
     return !m_model.IsNull() && m_modelSelected;
@@ -661,6 +674,7 @@ void OccView::clearSelection()
         rebuildModel();
     }
     m_selected.clear();
+    m_selectionPoints.clear();
     m_hovered = -1;
     refreshGeometryLook();
 }

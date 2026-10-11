@@ -6,6 +6,7 @@
 #include <QWidget>
 
 #include <functional>
+#include <map>
 #include <vector>
 
 #include <AIS_InteractiveContext.hxx>
@@ -55,6 +56,9 @@ public:
     // Zaznaczone elementy (tryb wyboru): numery geometrii i czy bryła.
     std::vector<int> selectedGeometries() const;
     bool isModelSelected() const;
+    // Miejsce, w którym kliknięto wybraną geometrię (punkt na jej linii) – np. Utnij
+    // usuwa kawałek przy tym punkcie. Brak kliknięcia = środek układu.
+    gp_Pnt selectionPoint(int geometry) const;
     int selectionCount() const;
     void clearSelection();
 
@@ -116,7 +120,7 @@ private:
     void rebuildModel(); // przerysowuje bryłę (np. po zmianie zaznaczenia)
     bool isSelectable(const Handle(AIS_InteractiveObject)& obj) const;
     void onClick(Qt::MouseButton button, const QPoint& pos);
-    int geometryAt(const QPoint& pos) const; // -1 = żadna
+    int geometryAt(const QPoint& pos, gp_Pnt* hit = nullptr) const; // -1 = żadna; hit = punkt na linii
     bool modelAt(const QPoint& pos) const;   // czy pod kursorem jest bryła
     gp_Pnt pointOnTable(const QPoint& pos) const; // punkt spod kursora na płaszczyźnie Z = 0
     void refreshGeometryLook();
@@ -143,6 +147,7 @@ private:
     std::vector<bool> m_geometryVisible;
     std::vector<int> m_highlighted;    // podświetlone z panelu Warstwy (pomarańczowe)
     std::vector<int> m_selected;       // wybrane w trybie wyboru
+    std::map<int, gp_Pnt> m_selectionPoints; // gdzie kliknięto wybrane geometrie
     Handle(AIS_Shape) m_crosshair;     // krzyż linii przy kursorze
     Handle(AIS_InteractiveObject) m_snapMarker; // znacznik punktu uchwytu (biała kulka)
     Snap m_snap = Snap::None;
