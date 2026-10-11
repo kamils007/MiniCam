@@ -59,6 +59,34 @@ double signedArea(const std::vector<gp_Pnt>& points)
 
 } // namespace
 
+std::vector<gp_Pnt> contourPoints(const TopoDS_Wire& wire)
+{
+    return samplePoints(orderedEdges(wire));
+}
+
+bool isClosed(const TopoDS_Wire& wire)
+{
+    const std::vector<gp_Pnt> points = contourPoints(wire);
+    return points.size() > 2 && points.front().Distance(points.back()) < 1e-6;
+}
+
+bool contourMidPoint(const TopoDS_Wire& wire, gp_Pnt& point, gp_Dir& tangent)
+{
+    const std::vector<OrientedEdge> edges = orderedEdges(wire);
+    if (edges.empty())
+        return false;
+    const BRepAdaptor_Curve curve(edges.front().edge);
+    gp_Vec d;
+    curve.D1((curve.FirstParameter() + curve.LastParameter()) / 2, point, d);
+    if (edges.front().reversed)
+        d.Reverse();
+    d.SetZ(0);
+    if (d.Magnitude() < 1e-9)
+        return false;
+    tangent = gp_Dir(d);
+    return true;
+}
+
 bool isClockwise(const TopoDS_Wire& wire)
 {
     return signedArea(samplePoints(orderedEdges(wire))) < 0;

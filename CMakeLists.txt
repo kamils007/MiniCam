@@ -52,6 +52,8 @@ add_library(camcore STATIC
     core/Sketch.h
     core/ToolDirection.cpp
     core/ToolDirection.h
+    core/ToolSides.cpp
+    core/ToolSides.h
     core/FeatureRecognition.cpp
     core/FeatureRecognition.h
 )

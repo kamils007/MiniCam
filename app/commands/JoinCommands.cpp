@@ -1,4 +1,5 @@
 #include "JoinCommands.h"
+#include "ToolSides.h"
 
 #include "GeometryEdit.h"
 #include "InputBar.h"
@@ -90,6 +91,7 @@ QString JoinCommand::apply(const std::vector<int>& geometries)
     // wspólna warstwa zostaje, z różnych warstw – geometria trafia do APS.
     EditState after = before;
     after.geometries.clear();
+    std::vector<size_t> joinedIndices;
     for (size_t i = 0; i < before.geometries.size(); ++i) {
         if (static_cast<int>(i) == geometries.front()) {
             for (const camcore::Contour& c : joined) {
@@ -97,11 +99,14 @@ QString JoinCommand::apply(const std::vector<int>& geometries)
                 g.contour = c;
                 g.layer = sameLayer ? layer : camcore::kApsLayer;
                 after.geometries.push_back(g);
+                joinedIndices.push_back(after.geometries.size() - 1);
             }
         } else if (!std::binary_search(geometries.begin(), geometries.end(), static_cast<int>(i))) {
             after.geometries.push_back(before.geometries[i]);
         }
     }
+    for (size_t i : joinedIndices)
+        camcore::assignToolSide(after.geometries, i); // domyślna strona frezowania
     host().commitEdit("Połącz", before, after);
     if (joined.size() == 1)
         return QString("Połączono %1 geometrii w jedną (Ctrl+Z cofa)").arg(geometries.size());

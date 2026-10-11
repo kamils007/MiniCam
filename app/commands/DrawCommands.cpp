@@ -3,6 +3,7 @@
 #include "InputBar.h"
 #include "OccView.h"
 #include "Sketch.h"
+#include "ToolSides.h"
 
 #include <BRep_Builder.hxx>
 #include <QRegularExpression>
@@ -93,6 +94,7 @@ int DrawCommand::addGeometry(const std::vector<TopoDS_Edge>& edges, int replace)
         after.geometries.push_back(g);
         index = static_cast<int>(after.geometries.size()) - 1;
     }
+    camcore::assignToolSide(after.geometries, static_cast<size_t>(index)); // domyślna strona frezowania
     host().commitEdit(name(), before, after);
     return index;
 }

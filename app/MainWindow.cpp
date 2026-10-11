@@ -7,6 +7,7 @@
 #include "Ribbon.h"
 #include "Icons.h"
 #include "Shortcuts.h"
+#include "ToolSides.h"
 #include "commands/DeleteCommand.h"
 #include "commands/DrawCommands.h"
 #include "commands/JoinCommands.h"
@@ -690,6 +691,8 @@ void MainWindow::onRecognizeFeatures()
     for (const camcore::Pocket& p : m_contours.pockets)
         for (const camcore::Contour& c : p.contours)
             add(c, camcore::layerForContour(c, false));
+    // Domyślna strona frezowania i kierunek (obrys na zewnątrz, reszta z bryły).
+    camcore::assignToolSides(m_geometries, m_shown.shape);
     showGeometries();
     statusBar()->showMessage(QString("Wyciągnięto %1 geometrii").arg(m_geometries.size()));
 }

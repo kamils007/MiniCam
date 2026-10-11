@@ -114,6 +114,13 @@ Domyślnie wszystkie są na zewnątrz, CW (CW + narzędzie po lewej). Pokazuje t
 strzałka 3D na górnym poziomie geometrii: wychodzi z punktu początkowego, wskazuje kierunek
 ruchu frezu i stoi po stronie narzędzia (środkiem – na linii). Ma stały rozmiar na ekranie.
 Widok → Pokaż → Kierunki geometrii albo Ctrl+G włącza i wyłącza strzałki (stan się zapamiętuje).
+Domyślną stronę wybiera program (`core/ToolSides`, frezowanie współbieżne: na zewnątrz CW,
+do środka CCW, narzędzie zawsze po lewej):
+- po rozpoznaniu cech obrys bryły jest zawsze na zewnątrz, otwory o średnicy wiertła – środkiem,
+  a reszta idzie po stronie, po której przy ściance nie ma materiału (sprawdzenie bryły tuż obok
+  geometrii, w połowie wysokości ścianki),
+- geometria narysowana albo połączona: leżąca w parzystej liczbie zamkniętych geometrii
+  (0, 2 – wyspa…) – na zewnątrz, w nieparzystej – do środka; otwarta – środkiem.
 
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
@@ -138,6 +145,7 @@ minicam/
 │   ├── Sketch.h/.cpp        rysowanie 2D: odcinki, łuki, okręgi, prostokąty
 │   ├── GeometryEdit.h/.cpp  edycja geometrii: Utnij, Połącz, Rozdziel, poziomy Z
 │   ├── ToolDirection.h/.cpp kierunek i strona narzędzia, strzałka kierunku
+│   ├── ToolSides.h/.cpp     domyślna strona frezowania (bryła, zagnieżdżenie)
 │   └── FeatureRecognition.h/.cpp  rozpoznawanie otworów, kieszeni, wycięć
 └── app/             GUI (Qt)
     ├── main.cpp
