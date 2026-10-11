@@ -5,6 +5,7 @@
 #include "LayersPanel.h"
 #include "OccView.h"
 #include "Ribbon.h"
+#include "Icons.h"
 #include "commands/DeleteCommand.h"
 #include "commands/MoveCommand.h"
 
@@ -96,41 +97,6 @@ QIcon zoomIcon(bool in)
     p.drawLine(QPointF(9, 13), QPointF(17, 13));
     if (in)
         p.drawLine(QPointF(13, 9), QPointF(13, 17));
-    return QIcon(pix);
-}
-
-// Ikona "Przesuń": strzałki w cztery strony.
-QIcon moveIcon()
-{
-    QPixmap pix(32, 32);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.setPen(QPen(QColor(200, 40, 30), 2.5));
-    p.drawLine(16, 4, 16, 28);
-    p.drawLine(4, 16, 28, 16);
-    p.setBrush(QColor(200, 40, 30));
-    const QPointF up[] = {{16, 1}, {11, 8}, {21, 8}};
-    const QPointF down[] = {{16, 31}, {11, 24}, {21, 24}};
-    const QPointF left[] = {{1, 16}, {8, 11}, {8, 21}};
-    const QPointF right[] = {{31, 16}, {24, 11}, {24, 21}};
-    p.drawPolygon(up, 3);
-    p.drawPolygon(down, 3);
-    p.drawPolygon(left, 3);
-    p.drawPolygon(right, 3);
-    return QIcon(pix);
-}
-
-// Ikona "Usuń": czerwony X, jak w Alphacam.
-QIcon deleteIcon()
-{
-    QPixmap pix(32, 32);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.setPen(QPen(QColor(200, 30, 30), 5, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(7, 7, 25, 25);
-    p.drawLine(25, 7, 7, 25);
     return QIcon(pix);
 }
 
@@ -263,7 +229,7 @@ void MainWindow::createRibbon()
 {
     // Akcje (QAction) to "polecenia" programu. Ten sam obiekt może siedzieć
     // w menu Plik i na wstążce, a skrót klawiszowy działa w całym oknie.
-    QAction* openAct = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
+    QAction* openAct = new QAction(appIcon("otworz-model"),
                                    "Otwórz\nmodel", this);
     openAct->setShortcut(QKeySequence::Open);
     connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
@@ -272,23 +238,23 @@ void MainWindow::createRibbon()
     quitAct->setShortcut(QKeySequence::Quit);
     connect(quitAct, &QAction::triggered, this, &QWidget::close);
 
-    QAction* fitAct = new QAction(style()->standardIcon(QStyle::SP_TitleBarMaxButton),
+    QAction* fitAct = new QAction(appIcon("dopasuj-do-okna"),
                                   "Dopasuj\ndo okna", this);
     fitAct->setShortcut(Qt::Key_F);
     connect(fitAct, &QAction::triggered, m_view, &OccView::fitAll);
 
-    QAction* autoAlignAct = new QAction(style()->standardIcon(QStyle::SP_ArrowDown),
+    QAction* autoAlignAct = new QAction(appIcon("auto-wyrownanie"),
                                         "Auto-Wyrównanie\nCzęści", this);
     autoAlignAct->setToolTip("Wyrównaj bryłę według ustawień z okna Konfiguracja;\n"
                              "każde kolejne kliknięcie odwraca ją na drugą stronę");
     connect(autoAlignAct, &QAction::triggered, this, &MainWindow::onAutoAlign);
 
-    QAction* recognizeAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogContentsView),
+    QAction* recognizeAct = new QAction(appIcon("rozpoznaj-cechy"),
                                         "Rozpoznaj\ncechy", this);
     recognizeAct->setToolTip("Narysuj kontury 2D z bryły: od dołu, na każdej\npoziomej powierzchni");
     connect(recognizeAct, &QAction::triggered, this, &MainWindow::onRecognizeFeatures);
 
-    QAction* settingsAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView),
+    QAction* settingsAct = new QAction(appIcon("ustawienia-rozpoznawania"),
                                        "Rozpoznawanie\ncech modelu…", this);
     connect(settingsAct, &QAction::triggered, this, &MainWindow::onAlignSettings);
 
@@ -302,7 +268,7 @@ void MainWindow::createRibbon()
     // Akcja "pokaż/ukryj okno" gotowa od Qt – zaznaczona, gdy okno jest widoczne.
     QAction* dockAct = m_dock->toggleViewAction();
     dockAct->setText("Okno\nWarstwy");
-    dockAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogListView));
+    dockAct->setIcon(appIcon("okno-warstwy"));
 
     RibbonPage* home = ribbon->addPage("Narzędzia główne");
     home->addGroup("Plik")->addAction(openAct);
@@ -312,13 +278,13 @@ void MainWindow::createRibbon()
 
     // Zakładka Edycja – układ grup jak w Alphacam. Na razie działa "Przesuń",
     // pozostałe polecenia są widoczne, ale wyłączone (przyjdą później).
-    auto soon = [this](QStyle::StandardPixmap icon, const QString& text) {
-        auto* a = new QAction(style()->standardIcon(icon), text, this);
+    auto soon = [this](const QString& icon, const QString& text) {
+        auto* a = new QAction(appIcon(icon), text, this);
         a->setEnabled(false);
         a->setToolTip(QString(text).replace('\n', ' ') + " (wkrótce)");
         return a;
     };
-    QAction* moveAct = new QAction(moveIcon(), "Przesuń", this);
+    QAction* moveAct = new QAction(appIcon("przesun"), "Przesuń", this);
     moveAct->setToolTip("Przesuń bryłę lub geometrie: wybierz elementy (LPM),\n"
                         "zatwierdź PPM, potem kliknij punkt bazowy i docelowy\n"
                         "albo wpisz przesunięcie dX/dY/dZ");
@@ -326,7 +292,7 @@ void MainWindow::createRibbon()
 
     RibbonPage* edit = ribbon->addPage("Edycja");
     RibbonGroup* editGroup = edit->addGroup("Edycja");
-    QAction* undoAct = new QAction(style()->standardIcon(QStyle::SP_ArrowBack), "Cofnij", this);
+    QAction* undoAct = new QAction(appIcon("cofnij"), "Cofnij", this);
     undoAct->setShortcut(QKeySequence::Undo);
     undoAct->setToolTip("Cofnij ostatnią zmianę (Ctrl+Z)");
     undoAct->setEnabled(false);
@@ -337,7 +303,7 @@ void MainWindow::createRibbon()
         statusBar()->showMessage("Cofnięto: " + what);
     });
     connect(m_undo, &QUndoStack::canUndoChanged, undoAct, &QAction::setEnabled);
-    QAction* redoAct = new QAction(style()->standardIcon(QStyle::SP_ArrowForward), "Ponów", this);
+    QAction* redoAct = new QAction(appIcon("ponow"), "Ponów", this);
     redoAct->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
     redoAct->setToolTip("Ponów cofniętą zmianę (Ctrl+Y)");
     redoAct->setEnabled(false);
@@ -351,7 +317,7 @@ void MainWindow::createRibbon()
     addActions({undoAct, redoAct}); // skróty działają w całym oknie
     editGroup->addAction(undoAct);
     editGroup->addAction(redoAct);
-    QAction* deleteAct = new QAction(deleteIcon(), "Usuń", this);
+    QAction* deleteAct = new QAction(appIcon("usun"), "Usuń", this);
     deleteAct->setShortcut(QKeySequence::Delete);
     deleteAct->setToolTip("Usuń bryłę lub geometrie: wybierz elementy (LPM),\n"
                           "PPM usuwa (Del, Ctrl+Z cofa)");
@@ -365,18 +331,18 @@ void MainWindow::createRibbon()
     m_radialSlots[11].action = undoAct;
     m_radialSlots[12].action = redoAct;
     RibbonGroup* clipboard = edit->addGroup("Schowek");
-    clipboard->addAction(soon(QStyle::SP_FileIcon, "Kopiuj"));
-    clipboard->addAction(soon(QStyle::SP_DialogResetButton, "Wytnij"));
-    clipboard->addAction(soon(QStyle::SP_DialogSaveButton, "Wklej"));
+    clipboard->addAction(soon("kopiuj", "Kopiuj"));
+    clipboard->addAction(soon("wytnij", "Wytnij"));
+    clipboard->addAction(soon("wklej", "Wklej"));
     RibbonGroup* moveGroup = edit->addGroup("Przesuń, kopiuj itd.");
     moveGroup->addAction(moveAct);
-    moveGroup->addAction(soon(QStyle::SP_BrowserReload, "Obróć"));
-    moveGroup->addAction(soon(QStyle::SP_MediaSeekBackward, "Lustro"));
-    moveGroup->addAction(soon(QStyle::SP_TitleBarMaxButton, "Skaluj"));
+    moveGroup->addAction(soon("obroc", "Obróć"));
+    moveGroup->addAction(soon("lustro", "Lustro"));
+    moveGroup->addAction(soon("skaluj", "Skaluj"));
     RibbonGroup* breakGroup = edit->addGroup("Przerwij, połącz itd.");
-    breakGroup->addAction(soon(QStyle::SP_MediaPause, "Przerwij"));
-    breakGroup->addAction(soon(QStyle::SP_DialogCancelButton, "Przytnij"));
-    breakGroup->addAction(soon(QStyle::SP_DialogApplyButton, "Połącz"));
+    breakGroup->addAction(soon("przerwij", "Przerwij"));
+    breakGroup->addAction(soon("przytnij", "Przytnij"));
+    breakGroup->addAction(soon("polacz", "Połącz"));
 
     RibbonPage* extraction = ribbon->addPage("Ekstrakcja modelu bryłowego");
     extraction->addGroup("Cechy")->addAction(recognizeAct);

@@ -2,6 +2,7 @@
 // Nowy, Otwórz, Zapisz, Zapisz jako, Drukarka/Ploter, Podgląd wydruku,
 // Ostatnie, Pomoc, Dostosuj (na razie wyłączone), Zakończ.
 #include "MainWindow.h"
+#include "Icons.h"
 #include "LayersPanel.h"
 #include "ModelExport.h"
 #include "OccView.h"
@@ -46,7 +47,7 @@ void MainWindow::createFileMenu(QMenu* menu, QAction* quitAct)
     connect(add(QStyle::SP_FileIcon, "Nowy", QKeySequence::New), &QAction::triggered,
             this, &MainWindow::onNew);
 
-    QAction* openAct = menu->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton), "Otwórz…");
+    QAction* openAct = menu->addAction(appIcon("otworz-model"), "Otwórz…");
     openAct->setShortcut(QKeySequence::Open);
     openAct->setShortcutContext(Qt::WidgetShortcut); // skrót Ctrl+O obsługuje już okno
     connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
