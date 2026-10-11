@@ -77,6 +77,15 @@ nie przerwie (PPM albo Esc), nowa geometria trafia do warstwy APS, Ctrl+Z cofa.
   Środek + Punkt, 2 punkty, 3 punkty.
 - **Prostokąt** – dwa przeciwległe narożniki.
 
+**Połącz / Rozdziel** (Edycja → Przerwij, połącz itd., jak Join / Explode w Alphacam,
+`app/commands/JoinCommands`, `core/GeometryEdit`): wybór geometrii (LPM), PPM, Enter albo OK
+wykonuje, Esc anuluje, Ctrl+Z cofa.
+- **Połącz** – elementy wybranych geometrii łączą się koniec do końca (tolerancja 0,01 mm)
+  w jedną geometrię; gdy się nie stykają, powstaje kilka. Wspólna warstwa zostaje,
+  z różnych warstw geometria trafia do APS.
+- **Rozdziel** – geometria rozpada się na osobne elementy (każdy odcinek i łuk osobno),
+  z tą samą warstwą i wysokością ścian.
+
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
 pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X, Y i Z z przyciskami „F1=?”,
@@ -98,6 +107,7 @@ minicam/
 │   ├── ModelImport.h/.cpp   wczytywanie plików (geometria + kolory)
 │   ├── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
 │   ├── Sketch.h/.cpp        rysowanie 2D: odcinki, łuki, okręgi, prostokąty
+│   ├── GeometryEdit.h/.cpp  edycja geometrii: Połącz, Rozdziel
 │   └── FeatureRecognition.h/.cpp  rozpoznawanie otworów, kieszeni, wycięć
 └── app/             GUI (Qt)
     ├── main.cpp
@@ -111,6 +121,7 @@ minicam/
     └── commands/                  polecenia krok po kroku (jak w Alphacam)
         ├── Command.h/.cpp         klasa bazowa + CommandHost (co polecenie dostaje od okna)
         ├── DrawCommands.h/.cpp    Linia, Łuk, Koło, Prostokąt (zakładka Geometria)
+        ├── JoinCommands.h/.cpp    Połącz, Rozdziel (Edycja)
         └── MoveCommand.h/.cpp     Przesuń
 ```
 

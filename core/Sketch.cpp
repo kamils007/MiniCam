@@ -4,6 +4,7 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <Bnd_Box.hxx>
 #include <gp_Ax2.hxx>
 #include <TopExp_Explorer.hxx>
@@ -148,20 +149,22 @@ std::vector<TopoDS_Edge> rectangleEdges(const gp_Pnt& a, const gp_Pnt& b)
     return edges;
 }
 
-Contour sketchContour(const std::vector<TopoDS_Edge>& edges)
+Contour contourFromWire(const TopoDS_Wire& wire, double zTop, double zBottom)
 {
     Contour c;
-    if (edges.empty())
+    if (wire.IsNull())
         return c;
-    BRepBuilderAPI_MakeWire wire;
-    for (const TopoDS_Edge& e : edges)
-        wire.Add(e);
-    c.wire = wire.Wire();
-    // Krawędzie z wire (połączone wspólnymi wierzchołkami), po kolei.
-    for (TopExp_Explorer ex(c.wire, TopAbs_EDGE); ex.More(); ex.Next())
-        c.geometry.push_back(TopoDS::Edge(ex.Current()));
+    c.wire = wire;
+    c.zTop = zTop;
+    c.zBottom = zBottom;
+    // Geometrie po kolei wzdłuż konturu (WireExplorer); gdy się nie da – w kolejności z wire.
+    for (BRepTools_WireExplorer ex(wire); ex.More(); ex.Next())
+        c.geometry.push_back(ex.Current());
+    if (c.geometry.empty())
+        for (TopExp_Explorer ex(wire, TopAbs_EDGE); ex.More(); ex.Next())
+            c.geometry.push_back(TopoDS::Edge(ex.Current()));
     Bnd_Box box;
-    BRepBndLib::Add(c.wire, box);
+    BRepBndLib::Add(wire, box);
     box.SetGap(0.0);
     double x0, y0, z0, x1, y1, z1;
     box.Get(x0, y0, z0, x1, y1, z1);
@@ -169,12 +172,22 @@ Contour sketchContour(const std::vector<TopoDS_Edge>& edges)
     c.y = (y0 + y1) / 2;
     c.sizeX = x1 - x0;
     c.sizeY = y1 - y0;
-    if (edges.size() == 1) {
-        const BRepAdaptor_Curve curve(edges.front());
+    if (c.geometry.size() == 1) {
+        const BRepAdaptor_Curve curve(c.geometry.front());
         if (curve.GetType() == GeomAbs_Circle && curve.IsClosed())
             c.diameter = 2 * curve.Circle().Radius();
     }
     return c;
+}
+
+Contour sketchContour(const std::vector<TopoDS_Edge>& edges)
+{
+    if (edges.empty())
+        return {};
+    BRepBuilderAPI_MakeWire wire;
+    for (const TopoDS_Edge& e : edges)
+        wire.Add(e);
+    return contourFromWire(wire.Wire(), 0.0, 0.0);
 }
 
 } // namespace camcore

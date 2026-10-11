@@ -44,6 +44,8 @@ add_library(camcore STATIC
     core/Layers.h
     core/PartContours.cpp
     core/PartContours.h
+    core/GeometryEdit.cpp
+    core/GeometryEdit.h
     core/Sketch.cpp
     core/Sketch.h
     core/FeatureRecognition.cpp
@@ -85,6 +87,8 @@ qt_add_executable(minicam
     app/commands/DeleteCommand.h
     app/commands/DrawCommands.cpp
     app/commands/DrawCommands.h
+    app/commands/JoinCommands.cpp
+    app/commands/JoinCommands.h
     app/commands/MoveCommand.cpp
     app/commands/MoveCommand.h
     app/AlignSettingsDialog.cpp

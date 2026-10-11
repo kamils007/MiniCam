@@ -8,6 +8,7 @@
 #include "Icons.h"
 #include "commands/DeleteCommand.h"
 #include "commands/DrawCommands.h"
+#include "commands/JoinCommands.h"
 #include "commands/MoveCommand.h"
 
 #include <QAction>
@@ -344,7 +345,16 @@ void MainWindow::createRibbon()
     RibbonGroup* breakGroup = edit->addGroup("Przerwij, połącz itd.");
     breakGroup->addAction(soon("przerwij", "Przerwij"));
     breakGroup->addAction(soon("przytnij", "Przytnij"));
-    breakGroup->addAction(soon("polacz", "Połącz"));
+    QAction* joinAct = new QAction(appIcon("polacz"), "Połącz", this);
+    joinAct->setToolTip("Połącz geometrie stykające się końcami w jedną:\n"
+                        "wybierz geometrie (LPM), PPM łączy (Ctrl+Z cofa)");
+    connect(joinAct, &QAction::triggered, this, [this] { runCommand(new JoinCommand(*this, this)); });
+    breakGroup->addAction(joinAct);
+    QAction* explodeAct = new QAction(appIcon("rozdziel"), "Rozdziel", this);
+    explodeAct->setToolTip("Rozdziel geometrię na osobne elementy (odcinki, łuki):\n"
+                           "wybierz geometrie (LPM), PPM rozdziela (Ctrl+Z cofa)");
+    connect(explodeAct, &QAction::triggered, this, [this] { runCommand(new ExplodeCommand(*this, this)); });
+    breakGroup->addAction(explodeAct);
 
     RibbonPage* extraction = ribbon->addPage("Ekstrakcja modelu bryłowego");
     extraction->addGroup("Cechy")->addAction(recognizeAct);
@@ -444,7 +454,7 @@ void MainWindow::createRibbon()
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
     // widok, okna, plik i Cofnij/Ponów się nie liczą.
     QList<QAction*> repeatable = {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct};
-    repeatable << drawActs;
+    repeatable << drawActs << joinAct << explodeAct;
     for (QAction* a : repeatable) {
         connect(a, &QAction::triggered, this, [this, a] {
             m_lastCommand = a;

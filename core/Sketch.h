@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <TopoDS_Edge.hxx>
+#include <TopoDS_Wire.hxx>
 #include <gp_Pnt.hxx>
 
 #include "PartContours.h"
@@ -44,5 +45,7 @@ std::vector<TopoDS_Edge> rectangleEdges(const gp_Pnt& a, const gp_Pnt& b);
 // Geometria z kolejnych elementów (odcinki, łuki) – kontur bez wysokości ścian
 // na Z = 0, z wymiarami obrysu i średnicą, gdy to pełny okrąg.
 Contour sketchContour(const std::vector<TopoDS_Edge>& edges);
+// Geometria z gotowego wire: geometrie po kolei, obrys, średnica okręgu i wysokości ścian.
+Contour contourFromWire(const TopoDS_Wire& wire, double zTop, double zBottom);
 
 } // namespace camcore

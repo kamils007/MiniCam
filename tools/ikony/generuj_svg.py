@@ -88,6 +88,10 @@ I['kolo-srodek-promien']=CIRC+aux('M16 16 L22.5 9.5')+tip(24,8,-45)+pt(16,16)
 I['kolo-srodek-punkt']=CIRC+pt(16,16)+pt(23.8,8.2)
 I['kolo-2-punkty']=CIRC+pt(8.2,23.8)+pt(23.8,8.2)
 I['kolo-3-punkty']=CIRC+pt(5,16)+pt(23.8,8.2)+pt(19.4,26.5)
+def cross(x,y):
+    return (f'<path d="M{x-3} {y-3} L{x+3} {y+3} M{x+3} {y-3} L{x-3} {y+3}" stroke="{GD}" stroke-width="3.2" stroke-linecap="round"/>'
+            f'<path d="M{x-3} {y-3} L{x+3} {y+3} M{x+3} {y-3} L{x-3} {y+3}" stroke="{G}" stroke-width="1.8" stroke-linecap="round"/>')
+I['rozdziel']=geo('M9 7 H23 M25 9 V23 M23 25 H9 M7 23 V9')+cross(7,7)+cross(25,7)+cross(25,25)+cross(7,25)
 os.makedirs(out,exist_ok=True)
 for k,v in I.items():
     open(f'{out}/{k}.svg','w').write(f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{v}</svg>\n')
