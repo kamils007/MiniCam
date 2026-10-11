@@ -112,6 +112,7 @@ qt_add_executable(minicam
     app/AlignSettingsDialog.h
     app/Icons.cpp
     app/Icons.h
+    app/AppName.h
     app/Shortcuts.cpp
     app/Shortcuts.h
 )

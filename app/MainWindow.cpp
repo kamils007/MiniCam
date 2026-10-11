@@ -6,6 +6,7 @@
 #include "OccView.h"
 #include "Ribbon.h"
 #include "Icons.h"
+#include "AppName.h"
 #include "Shortcuts.h"
 #include "ToolSides.h"
 #include "commands/DeleteCommand.h"
@@ -142,7 +143,7 @@ private:
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
-    setWindowTitle("MiniCAM");
+    setWindowTitle(kAppName);
 
     m_undo = new QUndoStack(this);
     m_view = new OccView(this);
@@ -591,7 +592,7 @@ void MainWindow::openFile(const QString& path)
         }
         QApplication::restoreOverrideCursor();
 
-        setWindowTitle("MiniCAM – " + m_fileName);
+        setWindowTitle(kAppName + " – " + m_fileName);
         statusBar()->showMessage(QString("Wczytano %1 w %2 ms (%3)")
                                      .arg(m_fileName)
                                      .arg(timer.elapsed())

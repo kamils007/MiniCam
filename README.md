@@ -1,4 +1,6 @@
-# MiniCAM
+# cam&L
+
+(dawniej MiniCAM; plik programu nadal nazywa się `minicam.exe`)
 
 Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z kolorami
 zapisanymi w pliku. Na górze okna jest wstążka w stylu Alphacam (Plik, Narzędzia

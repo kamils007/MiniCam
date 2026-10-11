@@ -3,6 +3,7 @@
 // Ostatnie, Pomoc, Dostosuj (na razie wyłączone), Zakończ.
 #include "MainWindow.h"
 #include "Icons.h"
+#include "AppName.h"
 #include "Shortcuts.h"
 #include "LayersPanel.h"
 #include "DxfExport.h"
@@ -71,8 +72,8 @@ void MainWindow::createFileMenu(QMenu* menu, QAction* quitAct)
     updateRecentMenu();
 
     connect(add(QStyle::SP_DialogHelpButton, "Pomoc"), &QAction::triggered, this, [this] {
-        QMessageBox::about(this, "Pomoc – MiniCAM",
-                           "<b>MiniCAM</b><br>Prosty CAM do detali 3D (STEP/IGES/BREP), "
+        QMessageBox::about(this, "Pomoc – " + kAppName,
+                           "<b>" + kAppName.toHtmlEscaped() + "</b><br>Prosty CAM do detali 3D (STEP/IGES/BREP), "
                            "wzorowany na Alphacam.<br><br>"
                            "Widok: LPM – obrót, ŚPM/PPM – przesuwanie, kółko – zoom, F – dopasuj.<br>"
                            "PPM w widoku – menu radialne.");
@@ -139,7 +140,7 @@ void MainWindow::onNew()
     m_layers->setModelName(QString());
     clearFeatures();
     m_undo->clear();
-    setWindowTitle("MiniCAM");
+    setWindowTitle(kAppName);
     statusBar()->showMessage("Nowy rysunek");
 }
 
@@ -188,7 +189,7 @@ bool MainWindow::saveTo(const QString& path)
     m_layers->setModelName(m_fileName);
     m_undo->setClean();
     addRecentFile(path);
-    setWindowTitle("MiniCAM – " + m_fileName);
+    setWindowTitle(kAppName + " – " + m_fileName);
     statusBar()->showMessage("Zapisano " + QDir::toNativeSeparators(path));
     return true;
 }
@@ -224,7 +225,7 @@ bool MainWindow::maybeSave()
     if (m_shown.shape.IsNull() || m_undo->isClean())
         return true;
     const auto answer = QMessageBox::question(
-        this, "MiniCAM",
+        this, kAppName,
         QString("Rysunek %1 został zmieniony. Zapisać zmiany?").arg(m_fileName),
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::Yes);
     if (answer == QMessageBox::Yes)
@@ -244,7 +245,7 @@ void MainWindow::onPrint(bool preview)
 {
     QPrinter printer(QPrinter::HighResolution);
     printer.setPageOrientation(QPageLayout::Landscape);
-    printer.setDocName(m_fileName.isEmpty() ? "MiniCAM" : m_fileName);
+    printer.setDocName(m_fileName.isEmpty() ? kAppName : m_fileName);
     if (preview) {
         QPrintPreviewDialog dialog(&printer, this);
         dialog.setWindowTitle("Podgląd wydruku");
@@ -285,5 +286,5 @@ void MainWindow::printTo(QPrinter* printer)
                           area.y() + (area.height() - target.height()) / 2, target.width(), target.height());
     painter.drawImage(imageRect, image);
     painter.drawText(page.adjusted(0, page.height() - footer, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
-                     "MiniCAM – " + (m_fileName.isEmpty() ? QString("bez nazwy") : m_fileName));
+                     kAppName + " – " + (m_fileName.isEmpty() ? QString("bez nazwy") : m_fileName));
 }
