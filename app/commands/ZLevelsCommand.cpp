@@ -9,7 +9,6 @@
 #include <QFormLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QSettings>
 
 namespace {
 
@@ -27,16 +26,15 @@ QDoubleSpinBox* levelBox(double value, QWidget* parent)
 }
 
 // Okno "Poziomy Z": górny i dolny poziom (dolny może być poniżej 0), pod nimi różnica
-// (wysokość ścian) liczona na bieżąco. Za pierwszym razem 0 i 0, potem ostatnie wartości.
+// (wysokość ścian) liczona na bieżąco. Na start bottom i top – aktualne poziomy geometrii.
 // Górny = dolny daje płaską geometrię (zerowa wysokość). false = Anuluj.
 bool askLevels(QWidget* parent, double& bottom, double& top)
 {
-    QSettings settings;
     QDialog dialog(parent);
     dialog.setWindowTitle("Poziomy Z");
     auto* form = new QFormLayout(&dialog);
-    QDoubleSpinBox* topBox = levelBox(settings.value("ZLevels/top", 0.0).toDouble(), &dialog);
-    QDoubleSpinBox* bottomBox = levelBox(settings.value("ZLevels/bottom", 0.0).toDouble(), &dialog);
+    QDoubleSpinBox* topBox = levelBox(top, &dialog);
+    QDoubleSpinBox* bottomBox = levelBox(bottom, &dialog);
     form->addRow("Górny poziom Z:", topBox);
     form->addRow("Dolny poziom Z:", bottomBox);
     auto* difference = new QLabel(&dialog);
@@ -62,8 +60,6 @@ bool askLevels(QWidget* parent, double& bottom, double& top)
         return false;
     top = topBox->value();
     bottom = bottomBox->value();
-    settings.setValue("ZLevels/top", top);
-    settings.setValue("ZLevels/bottom", bottom);
     return true;
 }
 
@@ -77,10 +73,12 @@ QString ZLevelsCommand::hint() const
 QString ZLevelsCommand::apply(const std::vector<int>& geometries)
 {
     // Jak w Alphacam: najpierw wybór geometrii, po PPM okno z poziomami, OK kończy polecenie.
-    double bottom = 0, top = 0;
+    // W oknie na start aktualne poziomy (pierwszej wybranej) geometrii.
+    const EditState before = host().editState();
+    const camcore::Contour& first = before.geometries[static_cast<size_t>(geometries.front())].contour;
+    double bottom = first.zBottom, top = first.zTop;
     if (!askLevels(host().view(), bottom, top))
         return name() + ": anulowane";
-    const EditState before = host().editState();
     EditState after = before;
     for (int i : geometries) {
         camcore::Contour& c = after.geometries[static_cast<size_t>(i)].contour;
