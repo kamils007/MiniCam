@@ -90,7 +90,8 @@ wykonuje, Esc anuluje, Ctrl+Z cofa.
 `app/commands/ZLevelsCommand`, `core/GeometryEdit`): okno z dolnym (może być poniżej 0)
 i górnym poziomem Z, potem wybór geometrii (LPM), PPM, Enter albo OK zatwierdza – płaska
 geometria dostaje wysokość: leży na górnym poziomie, a ściany schodzą do dolnego. Okno
-pamięta ostatnie wartości, Esc anuluje, Ctrl+Z cofa. Pozostałe grupy zakładki 3D – później.
+pamięta ostatnie wartości, Esc anuluje, Ctrl+Z cofa. Przesuń zmienia położenie geometrii tylko w X i Y –
+poziomy Z zostają, także gdy punkt bazowy albo docelowy złapano uchwytem na innej wysokości. Pozostałe grupy zakładki 3D – później.
 
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,

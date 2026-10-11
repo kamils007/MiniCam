@@ -84,10 +84,12 @@ void MoveCommand::apply(const gp_Vec& offset)
         g.contour = camcore::translated(g.contour, flat);
     }
     host().commitEdit("Przesuń", before, after);
+    // Same geometrie: poziomy Z zostają (nawet gdy punkt złapano na innej wysokości).
+    const double dz = m_model ? offset.Z() : 0.0;
     finish(QString("Przesunięto o dX %1  dY %2  dZ %3 mm")
                .arg(offset.X(), 0, 'f', 2)
                .arg(offset.Y(), 0, 'f', 2)
-               .arg(offset.Z(), 0, 'f', 2));
+               .arg(dz, 0, 'f', 2));
 }
 
 void MoveCommand::cancel()
