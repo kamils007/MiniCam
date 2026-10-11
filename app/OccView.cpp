@@ -219,7 +219,7 @@ namespace {
 // Ma stały rozmiar na ekranie, niezależnie od powiększenia (wymiary w pikselach).
 Handle(AIS_Shape) makeDirectionArrow(const camcore::DirectionMarker& m)
 {
-    constexpr double kShaft = 18, kShaftRadius = 1.6, kHead = 9, kHeadRadius = 4.5, kSideOffset = 8;
+    constexpr double kShaft = 34, kShaftRadius = 3, kHead = 16, kHeadRadius = 8, kSideOffset = 14;
     BRep_Builder builder;
     TopoDS_Compound arrow;
     builder.MakeCompound(arrow);
