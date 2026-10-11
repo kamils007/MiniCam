@@ -76,6 +76,8 @@ qt_add_executable(minicam
     app/RadialMenu.h
     app/commands/Command.cpp
     app/commands/Command.h
+    app/commands/DeleteCommand.cpp
+    app/commands/DeleteCommand.h
     app/commands/MoveCommand.cpp
     app/commands/MoveCommand.h
     app/AlignSettingsDialog.cpp

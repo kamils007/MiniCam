@@ -5,6 +5,7 @@
 #include "LayersPanel.h"
 #include "OccView.h"
 #include "Ribbon.h"
+#include "commands/DeleteCommand.h"
 #include "commands/MoveCommand.h"
 
 #include <QAction>
@@ -55,6 +56,19 @@ QIcon moveIcon()
     p.drawPolygon(down, 3);
     p.drawPolygon(left, 3);
     p.drawPolygon(right, 3);
+    return QIcon(pix);
+}
+
+// Ikona "Usuń": czerwony X, jak w Alphacam.
+QIcon deleteIcon()
+{
+    QPixmap pix(32, 32);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(QPen(QColor(200, 30, 30), 5, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(7, 7, 25, 25);
+    p.drawLine(25, 7, 7, 25);
     return QIcon(pix);
 }
 
@@ -278,12 +292,21 @@ void MainWindow::createRibbon()
     });
     connect(m_undo, &QUndoStack::canRedoChanged, redoAct, &QAction::setEnabled);
     addActions({undoAct, redoAct}); // skróty działają w całym oknie
-    // W menu radialnym (PPM) Cofnij i Ponów stoją tam, gdzie w Alphacam: pola 12 i 13.
-    m_radialSlots[11].action = undoAct;
-    m_radialSlots[12].action = redoAct;
     editGroup->addAction(undoAct);
     editGroup->addAction(redoAct);
-    editGroup->addAction(soon(QStyle::SP_DialogDiscardButton, "Usuń"));
+    QAction* deleteAct = new QAction(deleteIcon(), "Usuń", this);
+    deleteAct->setShortcut(QKeySequence::Delete);
+    deleteAct->setToolTip("Usuń bryłę lub geometrie: wybierz elementy (LPM),\n"
+                          "PPM usuwa (Del, Ctrl+Z cofa)");
+    connect(deleteAct, &QAction::triggered, this, [this] { runCommand(new DeleteCommand(*this, this)); });
+    addAction(deleteAct); // skrót Del działa w całym oknie
+    editGroup->addAction(deleteAct);
+    // W menu radialnym (PPM) polecenia stoją tam, gdzie w Alphacam: Usuń (pole 11, godz. 12),
+    // Cofnij i Ponów (pola 12 i 13), Przesuń w łuku pola 8.
+    m_radialSlots[10].action = deleteAct; // X na godz. 12
+    m_radialSlots[7].more[4] = moveAct; // środek łuku "Przesuń, kopiuj itd." (godz. 9)
+    m_radialSlots[11].action = undoAct;
+    m_radialSlots[12].action = redoAct;
     RibbonGroup* clipboard = edit->addGroup("Schowek");
     clipboard->addAction(soon(QStyle::SP_FileIcon, "Kopiuj"));
     clipboard->addAction(soon(QStyle::SP_DialogResetButton, "Wytnij"));
@@ -308,7 +331,7 @@ void MainWindow::createRibbon()
     // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
     // widok, okna, plik i Cofnij/Ponów się nie liczą.
-    for (QAction* a : {moveAct, recognizeAct, autoAlignAct, settingsAct}) {
+    for (QAction* a : {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct}) {
         connect(a, &QAction::triggered, this, [this, a] {
             m_lastCommand = a;
             m_repeatAct->setToolTip("Powtórz: " + a->text().replace('\n', ' ') + " (spacja)");
@@ -592,10 +615,15 @@ void MainWindow::commitEdit(const QString& text, const EditState& before, const 
 void MainWindow::restoreEditState(const EditState& state)
 {
     const bool modelChanged = !state.shown.shape.IsSame(m_shown.shape);
+    const bool hadModel = !m_shown.shape.IsNull();
     m_shown = state.shown;
     m_geometries = state.geometries;
-    if (modelChanged)
+    if (modelChanged) {
         m_view->updateModel(m_shown);
+        // Bryła usunięta albo przywrócona (Usuń / Cofnij) – panel Warstwy pokazuje, czy jest.
+        if (hadModel != !m_shown.shape.IsNull())
+            m_layers->setModelName(hadModel ? QString() : m_fileName);
+    }
     showGeometries();
 }
 

@@ -384,6 +384,14 @@ void OccView::rebuildModel()
 {
     if (!m_model.IsNull())
         m_context->Remove(m_model, Standard_False);
+    if (m_modelData.shape.IsNull()) {
+        // Bryła usunięta (polecenie Usuń) – nic nie rysujemy.
+        m_model.Nullify();
+        m_modelSelected = false;
+        m_modelHovered = false;
+        m_view->Redraw();
+        return;
+    }
     m_model = makeModelPresentation(m_modelData, m_modelSelected, m_modelHovered);
     if (m_modelVisible)
         m_context->Display(m_model, AIS_Shaded, 0, Standard_False);
