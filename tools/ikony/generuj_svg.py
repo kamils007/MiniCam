@@ -104,6 +104,9 @@ def cadpage():
     return page(3,3,18,24)+geo('M7 12 H14 V22 H7 Z',1.8)+'<circle cx="14" cy="12" r="3.2" fill="none" stroke="'+R+'" stroke-width="1.8"/>'
 I['wczytaj-cad']=cadpage()+arrow('M30 20 H21',w=2.4)+head(18,20,180,s=0.85)
 I['zapisz-cad']=cadpage()+arrow('M18 20 H26',w=2.4)+head(30,20,0,s=0.85)
+# Kierunki geometrii (Widok → Pokaż): czerwony kontur i zielona strzałka kierunku CW na zewnątrz.
+I['kierunki']=(geo('M5 12 H27 V27 H5 Z',2.4)
+  + arrow('M7 6 H21',c=OK,cd='#145A20',w=2.4)+head(27,6,0,c=OK,cd='#145A20',s=0.9))
 os.makedirs(out,exist_ok=True)
 for k,v in I.items():
     open(f'{out}/{k}.svg','w').write(f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{v}</svg>\n')

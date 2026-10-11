@@ -6,6 +6,7 @@
 #include "OccView.h"
 #include "Ribbon.h"
 #include "Icons.h"
+#include "Shortcuts.h"
 #include "commands/DeleteCommand.h"
 #include "commands/DrawCommands.h"
 #include "commands/JoinCommands.h"
@@ -19,6 +20,7 @@
 #include <QLabel>
 #include <QPainter>
 #include <QPixmap>
+#include <QSettings>
 #include <QKeyEvent>
 #include <QApplication>
 #include <QDockWidget>
@@ -42,6 +44,8 @@
 #include <exception>
 
 namespace {
+
+const char* const kDirectionsKey = "widok/kierunki"; // czy pokazywać strzałki kierunku
 
 // Ikona widoku: sześcian w izometrii z zaznaczoną na niebiesko ścianą, od której patrzymy.
 // Ściany niewidoczne w izometrii (spód, tył, lewa) rysujemy przerywaną linią.
@@ -236,16 +240,16 @@ void MainWindow::createRibbon()
     // w menu Plik i na wstążce, a skrót klawiszowy działa w całym oknie.
     QAction* openAct = new QAction(appIcon("otworz-model"),
                                    "Otwórz\nmodel", this);
-    openAct->setShortcut(QKeySequence::Open);
+    shortcuts::bind(openAct, shortcuts::kOpen);
     connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
 
     QAction* quitAct = new QAction("Zakończ", this);
-    quitAct->setShortcut(QKeySequence::Quit);
+    shortcuts::bind(quitAct, shortcuts::kQuit);
     connect(quitAct, &QAction::triggered, this, &QWidget::close);
 
     QAction* fitAct = new QAction(appIcon("dopasuj-do-okna"),
                                   "Dopasuj\ndo okna", this);
-    fitAct->setShortcut(Qt::Key_F);
+    shortcuts::bind(fitAct, shortcuts::kFitAll);
     connect(fitAct, &QAction::triggered, m_view, &OccView::fitAll);
 
     QAction* autoAlignAct = new QAction(appIcon("auto-wyrownanie"),
@@ -263,9 +267,25 @@ void MainWindow::createRibbon()
                                        "Rozpoznawanie\ncech modelu…", this);
     connect(settingsAct, &QAction::triggered, this, &MainWindow::onAlignSettings);
 
+    // Zielone strzałki kierunku i strony narzędzia przy geometriach – włącz/wyłącz.
+    // Stan zapamiętuje się między uruchomieniami programu.
+    QAction* directionsAct = new QAction(appIcon("kierunki"), "Kierunki\ngeometrii", this);
+    directionsAct->setCheckable(true);
+    directionsAct->setChecked(QSettings("MiniCAM", "MiniCAM").value(kDirectionsKey, true).toBool());
+    shortcuts::bind(directionsAct, shortcuts::kToggleDirections);
+    directionsAct->setToolTip("Pokaż/ukryj zielone strzałki kierunku i strony narzędzia (" +
+                              shortcuts::text(shortcuts::kToggleDirections) + ")");
+    m_view->setDirectionsVisible(directionsAct->isChecked());
+    connect(directionsAct, &QAction::toggled, this, [this](bool on) {
+        m_view->setDirectionsVisible(on);
+        QSettings("MiniCAM", "MiniCAM").setValue(kDirectionsKey, on);
+        statusBar()->showMessage(QString("Kierunki geometrii: %1 (%2)")
+                                     .arg(on ? "widoczne" : "ukryte", shortcuts::text(shortcuts::kToggleDirections)));
+    });
+
     // Skróty muszą być zarejestrowane w oknie, inaczej działałyby tylko
     // przy otwartym menu.
-    addActions({openAct, quitAct, fitAct});
+    addActions({openAct, quitAct, fitAct, directionsAct});
 
     auto* ribbon = new Ribbon(this);
     createFileMenu(ribbon->fileMenu(), quitAct);
@@ -291,6 +311,7 @@ void MainWindow::createRibbon()
     RibbonGroup* viewGroup = home->addGroup("Widok");
     viewGroup->addAction(fitAct);
     viewGroup->addAction(dockAct);
+    viewGroup->addAction(directionsAct);
 
     // Zakładka Edycja – układ grup jak w Alphacam. Na razie działa "Przesuń",
     // pozostałe polecenia są widoczne, ale wyłączone (przyjdą później).
@@ -309,7 +330,7 @@ void MainWindow::createRibbon()
     RibbonPage* edit = ribbon->addPage("Edycja");
     RibbonGroup* editGroup = edit->addGroup("Edycja");
     QAction* undoAct = new QAction(appIcon("cofnij"), "Cofnij", this);
-    undoAct->setShortcut(QKeySequence::Undo);
+    shortcuts::bind(undoAct, shortcuts::kUndo);
     undoAct->setToolTip("Cofnij ostatnią zmianę (Ctrl+Z)");
     undoAct->setEnabled(false);
     connect(undoAct, &QAction::triggered, this, [this] {
@@ -320,7 +341,7 @@ void MainWindow::createRibbon()
     });
     connect(m_undo, &QUndoStack::canUndoChanged, undoAct, &QAction::setEnabled);
     QAction* redoAct = new QAction(appIcon("ponow"), "Ponów", this);
-    redoAct->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
+    shortcuts::bind(redoAct, shortcuts::kRedo);
     redoAct->setToolTip("Ponów cofniętą zmianę (Ctrl+Y)");
     redoAct->setEnabled(false);
     connect(redoAct, &QAction::triggered, this, [this] {
@@ -334,7 +355,7 @@ void MainWindow::createRibbon()
     editGroup->addAction(undoAct);
     editGroup->addAction(redoAct);
     QAction* deleteAct = new QAction(appIcon("usun"), "Usuń", this);
-    deleteAct->setShortcut(QKeySequence::Delete);
+    shortcuts::bind(deleteAct, shortcuts::kDelete);
     deleteAct->setToolTip("Usuń bryłę lub geometrie: wybierz elementy (LPM),\n"
                           "PPM usuwa (Del, Ctrl+Z cofa)");
     connect(deleteAct, &QAction::triggered, this, [this] { runCommand(new DeleteCommand(*this, this)); });
@@ -413,6 +434,7 @@ void MainWindow::createRibbon()
         connect(a, &QAction::triggered, this, [this, v] { m_view->setStandardView(v); });
         views3d->addAction(a);
     }
+    viewPage->addGroup("Pokaż")->addAction(directionsAct);
     viewPage->addGroup("Okna")->addAction(dockAct);
 
     // Zakładka Geometria – rysowanie jak w Alphacam (Geometria → 2D): Linia, Łuk ▾, Koło ▾,
@@ -490,7 +512,7 @@ void MainWindow::createRibbon()
     // Skrót okna: pole tekstowe z fokusem zabiera spację dla siebie, więc pisanie
     // w polach paska wprowadzania nie powtarza polecenia.
     m_repeatAct = new QAction("Powtórz ostatnie polecenie", this);
-    m_repeatAct->setShortcut(Qt::Key_Space);
+    shortcuts::bind(m_repeatAct, shortcuts::kRepeatCommand);
     connect(m_repeatAct, &QAction::triggered, this, [this] {
         if (!m_lastCommand) {
             statusBar()->showMessage("Spacja powtarza ostatnie polecenie – na razie żadnego nie było");
@@ -605,7 +627,8 @@ void MainWindow::showGeometries()
     for (size_t i = 0; i < m_geometries.size(); ++i) {
         const camcore::Geometry& g = m_geometries[i];
         // Kolor z warstwy geometrii.
-        contours.push_back({g.contour.wire, m_layerList.layerOrAps(g.layer).color, g.contour.zTop - g.contour.zBottom});
+        contours.push_back({g.contour.wire, m_layerList.layerOrAps(g.layer).color, g.contour.zTop - g.contour.zBottom,
+                            camcore::directionMarker(g.contour.wire, g.direction, g.toolSide)});
         rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
     }
     // Panel pokazuje wszystkie warstwy użytkownika z listy (także puste –
@@ -703,7 +726,7 @@ void MainWindow::createBottomBars()
 
     // Esc przerywa polecenie także wtedy, gdy widok 3D nie ma fokusu.
     auto* escAct = new QAction(this);
-    escAct->setShortcut(Qt::Key_Escape);
+    shortcuts::bind(escAct, shortcuts::kCancelCommand);
     connect(escAct, &QAction::triggered, this, &MainWindow::cancelCommand);
     addAction(escAct);
 }

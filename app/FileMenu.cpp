@@ -3,6 +3,7 @@
 // Ostatnie, Pomoc, Dostosuj (na razie wyłączone), Zakończ.
 #include "MainWindow.h"
 #include "Icons.h"
+#include "Shortcuts.h"
 #include "LayersPanel.h"
 #include "DxfExport.h"
 #include "ModelExport.h"
@@ -39,27 +40,28 @@ const char* const kRecentKey = "ostatniePliki";
 void MainWindow::createFileMenu(QMenu* menu, QAction* quitAct)
 {
     auto add = [this, menu](QStyle::StandardPixmap icon, const QString& text,
-                            const QKeySequence& shortcut = {}) {
+                            const QString& shortcut = {}) {
         QAction* a = menu->addAction(style()->standardIcon(icon), text);
-        a->setShortcut(shortcut);
+        if (!shortcut.isEmpty())
+            shortcuts::bind(a, shortcut);
         addAction(a); // skrót działa w całym oknie, nie tylko przy otwartym menu
         return a;
     };
 
-    connect(add(QStyle::SP_FileIcon, "Nowy", QKeySequence::New), &QAction::triggered,
+    connect(add(QStyle::SP_FileIcon, "Nowy", shortcuts::kNew), &QAction::triggered,
             this, &MainWindow::onNew);
 
     QAction* openAct = menu->addAction(appIcon("otworz-model"), "Otwórz…");
-    openAct->setShortcut(QKeySequence::Open);
+    shortcuts::bind(openAct, shortcuts::kOpen);
     openAct->setShortcutContext(Qt::WidgetShortcut); // skrót Ctrl+O obsługuje już okno
     connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
 
-    connect(add(QStyle::SP_DialogSaveButton, "Zapisz", QKeySequence::Save), &QAction::triggered,
+    connect(add(QStyle::SP_DialogSaveButton, "Zapisz", shortcuts::kSave), &QAction::triggered,
             this, &MainWindow::onSave);
-    connect(add(QStyle::SP_DialogSaveButton, "Zapisz jako…", QKeySequence::SaveAs),
+    connect(add(QStyle::SP_DialogSaveButton, "Zapisz jako…", shortcuts::kSaveAs),
             &QAction::triggered, this, &MainWindow::onSaveAs);
     menu->addSeparator();
-    connect(add(QStyle::SP_ComputerIcon, "Drukarka/Ploter…", QKeySequence::Print),
+    connect(add(QStyle::SP_ComputerIcon, "Drukarka/Ploter…", shortcuts::kPrint),
             &QAction::triggered, this, [this] { onPrint(false); });
     connect(add(QStyle::SP_FileDialogContentsView, "Podgląd wydruku…"), &QAction::triggered,
             this, [this] { onPrint(true); });

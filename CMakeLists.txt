@@ -50,6 +50,8 @@ add_library(camcore STATIC
     core/GeometryEdit.h
     core/Sketch.cpp
     core/Sketch.h
+    core/ToolDirection.cpp
+    core/ToolDirection.h
     core/FeatureRecognition.cpp
     core/FeatureRecognition.h
 )
@@ -104,6 +106,8 @@ qt_add_executable(minicam
     app/AlignSettingsDialog.h
     app/Icons.cpp
     app/Icons.h
+    app/Shortcuts.cpp
+    app/Shortcuts.h
 )
 # Ikony wstążki: PNG wyrenderowane z SVG (resources/ikony, skrypty w tools/ikony),
 # wkompilowane w exe jako zasoby Qt pod ścieżką :/ikony/png/<nazwa>_<rozmiar>.png.

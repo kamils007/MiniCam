@@ -18,6 +18,7 @@
 #include <gp_Pnt.hxx>
 
 #include "ModelImport.h"
+#include "ToolDirection.h"
 
 // Widżet Qt, w którym Open CASCADE rysuje scenę 3D.
 // Kod: OccView.cpp (rysowanie, wybór, mysz) i OccViewPick.cpp (wskazywanie punktu:
@@ -82,10 +83,15 @@ public:
         TopoDS_Shape shape;   // kontur na górze ścian
         Quantity_Color color;
         double height = 0;    // wysokość ścian pod konturem [mm]
+        camcore::DirectionMarker direction; // gdzie stoi zielona strzałka kierunku
     };
     void showGeometry(const std::vector<Contour>& contours); // pusta lista = usuń geometrię
     // Wskazane kontury (indeksy z showGeometry) rysuje na pomarańczowo i grubiej.
     void highlightGeometry(const std::vector<int>& indices);
+
+    // Zielone strzałki kierunku i strony narzędzia przy geometriach (Ctrl+G).
+    void setDirectionsVisible(bool visible);
+    bool directionsVisible() const { return m_directionsVisible; }
 
     // Widoczność (checkboxy w panelu Warstwy).
     void setGeometryVisible(int index, bool visible);
@@ -145,6 +151,8 @@ private:
     // Punkty konturów (góra i dół ścianki) do wskazywania geometrii myszką.
     std::vector<std::vector<std::vector<gp_Pnt>>> m_geometryLines; // [geometria][łamana][punkt]
     std::vector<bool> m_geometryVisible;
+    std::vector<Handle(AIS_Shape)> m_directionArrows; // [geometria] – strzałka kierunku (pusta = brak)
+    bool m_directionsVisible = true;
     std::vector<int> m_highlighted;    // podświetlone z panelu Warstwy (pomarańczowe)
     std::vector<int> m_selected;       // wybrane w trybie wyboru
     std::map<int, gp_Pnt> m_selectionPoints; // gdzie kliknięto wybrane geometrie

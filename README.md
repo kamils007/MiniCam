@@ -107,6 +107,14 @@ leży na górnym poziomie, a ściany schodzą do dolnego. Esc
 anuluje, Ctrl+Z cofa. Przesuń zmienia położenie geometrii tylko w X i Y –
 poziomy Z zostają, także gdy punkt bazowy albo docelowy złapano uchwytem na innej wysokości. Pozostałe grupy zakładki 3D – później.
 
+**Kierunek i strona narzędzia** (jak Direction / Tool side w Alphacam, `core/ToolDirection`):
+każda geometria ma kierunek (CW / CCW – zgodnie lub przeciwnie do ruchu wskazówek zegara,
+patrząc z góry) i stronę narzędzia względem kierunku ruchu (lewa, prawa, środkiem).
+Domyślnie wszystkie są na zewnątrz, CW (CW + narzędzie po lewej). Pokazuje to mała zielona
+strzałka 3D na górnym poziomie geometrii: wychodzi z punktu początkowego, wskazuje kierunek
+ruchu frezu i stoi po stronie narzędzia (środkiem – na linii). Ma stały rozmiar na ekranie.
+Widok → Pokaż → Kierunki geometrii albo Ctrl+G włącza i wyłącza strzałki (stan się zapamiętuje).
+
 **Pasek wprowadzania** (lewa część belki polecenia, jak Input Bar w Alphacam,
 `app/InputBar`): bez polecenia belka jest pusta. Polecenie, które potrzebuje punktu,
 pokazuje podpowiedź (np. „PRZESUŃ Punkt bazowy”), pola X, Y i Z z przyciskami „F1=?”,
@@ -129,6 +137,7 @@ minicam/
 │   ├── ModelAlign.h/.cpp    auto-wyrównanie (obrót + przesunięcie do 0,0,0)
 │   ├── Sketch.h/.cpp        rysowanie 2D: odcinki, łuki, okręgi, prostokąty
 │   ├── GeometryEdit.h/.cpp  edycja geometrii: Utnij, Połącz, Rozdziel, poziomy Z
+│   ├── ToolDirection.h/.cpp kierunek i strona narzędzia, strzałka kierunku
 │   └── FeatureRecognition.h/.cpp  rozpoznawanie otworów, kieszeni, wycięć
 └── app/             GUI (Qt)
     ├── main.cpp
@@ -137,6 +146,7 @@ minicam/
     ├── AlignSettingsDialog.h/.cpp okno Konfiguracja → Auto-wyrównanie
     ├── BottomBars.h/.cpp          dolne belki: belka polecenia (CommandBar) i stopka
     ├── InputBar.h/.cpp            pasek wprowadzania (lewa część belki polecenia)
+    ├── Shortcuts.h/.cpp           skróty klawiszowe – wszystkie w jednym miejscu
     ├── OccView.h/.cpp             widok 3D: rysowanie, wybór, mysz
     ├── OccViewPick.cpp            widok 3D: wskazywanie punktu, uchwyty, podgląd przesuwania
     └── commands/                  polecenia krok po kroku (jak w Alphacam)
@@ -160,6 +170,12 @@ Rozpoznawanie cech modelu…) – tak, jakby kliknąć jego przycisk na wstążc
 | Zoom (do kursora) | kółko |
 | Dopasuj do okna | F |
 | Otwórz | Ctrl+O |
+| Pokaż/ukryj kierunki geometrii | Ctrl+G |
+
+Wszystkie skróty są w jednym miejscu – `app/Shortcuts.h/.cpp` (identyfikator, nazwa,
+klawisze domyślne), pod przyszłe okno Plik → Dostosuj → Klawiatura. Zmienione klawisze
+zapisują się w ustawieniach (grupa „skroty”) i od razu działają w akcjach podpiętych
+przez `shortcuts::bind`.
 
 ## Budowanie
 

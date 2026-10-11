@@ -4,6 +4,7 @@
 
 #include "Layers.h"
 #include "PartContours.h"
+#include "ToolDirection.h"
 
 namespace camcore {
 
@@ -55,11 +56,15 @@ inline std::string layerForContour(const Contour& c, bool through)
 
 // Geometria w projekcie: kontur plus jego właściwości. Kolor nie jest
 // właściwością geometrii – bierze się z warstwy, do której geometria należy.
+// Kierunek i strona narzędzia: domyślnie na zewnątrz, zgodnie z ruchem wskazówek
+// zegara (CW + narzędzie po lewej). Pokazuje je zielona strzałka na górze geometrii.
 struct Geometry
 {
     Contour contour;
     std::string layer = kApsLayer; // warstwa, do której należy
     bool visible = true;
+    CutDirection direction = CutDirection::CW;
+    ToolSide toolSide = ToolSide::Left;
 };
 
 } // namespace camcore

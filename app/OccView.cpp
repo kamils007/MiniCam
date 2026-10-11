@@ -21,6 +21,8 @@
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <Aspect_DisplayConnection.hxx>
+#include <BRepPrimAPI_MakeCone.hxx>
+#include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <Geom_Axis2Placement.hxx>
@@ -210,12 +212,60 @@ constexpr double kHighlightWidth = 4.0;
 constexpr double kSelectedWidth = 1.5;
 }
 
+namespace {
+
+// Zielona strzałka 3D kierunku obróbki (jak w Alphacam): wychodzi z początku ruchu
+// frezu, wzdłuż kierunku ruchu, odsunięta na stronę narzędzia (środkiem – na linii).
+// Ma stały rozmiar na ekranie, niezależnie od powiększenia (wymiary w pikselach).
+Handle(AIS_Shape) makeDirectionArrow(const camcore::DirectionMarker& m)
+{
+    constexpr double kShaft = 18, kShaftRadius = 1.6, kHead = 9, kHeadRadius = 4.5, kSideOffset = 8;
+    BRep_Builder builder;
+    TopoDS_Compound arrow;
+    builder.MakeCompound(arrow);
+    builder.Add(arrow, BRepPrimAPI_MakeCylinder(gp_Ax2(gp::Origin(), gp::DX()), kShaftRadius, kShaft).Shape());
+    builder.Add(arrow, BRepPrimAPI_MakeCone(gp_Ax2(gp_Pnt(kShaft, 0, 0), gp::DX()), kHeadRadius, 0, kHead).Shape());
+    // Strzałka zbudowana wzdłuż X – obracamy ją w kierunek ruchu i odsuwamy na stronę narzędzia.
+    gp_Trsf rotate;
+    rotate.SetRotation(gp::OZ(), std::atan2(m.travel.Y(), m.travel.X()));
+    gp_Trsf shift;
+    shift.SetTranslation(m.side * kSideOffset);
+    Handle(AIS_Shape) ais = new AIS_Shape(arrow.Moved(TopLoc_Location(shift * rotate)));
+    ais->SetColor(Quantity_Color(0.10, 0.85, 0.10, Quantity_TOC_sRGB));
+    ais->SetTransformPersistence(new Graphic3d_TransformPers(Graphic3d_TMF_ZoomPers, m.point));
+    ais->SetZLayer(Graphic3d_ZLayerId_Top);
+    return ais;
+}
+
+} // namespace
+
+void OccView::setDirectionsVisible(bool visible)
+{
+    m_directionsVisible = visible;
+    if (m_context.IsNull())
+        return;
+    for (size_t i = 0; i < m_directionArrows.size(); ++i) {
+        const Handle(AIS_Shape)& a = m_directionArrows[i];
+        if (a.IsNull())
+            continue;
+        if (visible && m_geometryVisible[i])
+            m_context->Display(a, AIS_Shaded, -1, Standard_False);
+        else
+            m_context->Erase(a, Standard_False);
+    }
+    m_view->Redraw();
+}
+
 void OccView::showGeometry(const std::vector<Contour>& contours)
 {
     if (m_context.IsNull())
         return;
     for (const Handle(AIS_Shape)& g : m_geometry)
         m_context->Remove(g, Standard_False);
+    for (const Handle(AIS_Shape)& a : m_directionArrows)
+        if (!a.IsNull())
+            m_context->Remove(a, Standard_False);
+    m_directionArrows.clear();
     m_geometry.clear();
     m_geometryColors.clear();
     m_geometryLines.clear();
@@ -256,6 +306,14 @@ void OccView::showGeometry(const std::vector<Contour>& contours)
         m_geometry.push_back(item);
         m_geometryColors.push_back(c.color);
         m_geometryVisible.push_back(true);
+
+        Handle(AIS_Shape) arrow;
+        if (c.direction.valid) {
+            arrow = makeDirectionArrow(c.direction);
+            if (m_directionsVisible)
+                m_context->Display(arrow, AIS_Shaded, -1, Standard_False);
+        }
+        m_directionArrows.push_back(arrow);
 
         // Punkty wzdłuż konturu (u góry i u dołu ścianki) – po nich trafiamy myszką.
         std::vector<std::vector<gp_Pnt>> lines;
@@ -438,6 +496,13 @@ void OccView::setGeometryVisible(int index, bool visible)
         m_context->Display(g, Standard_False); // wraca z tym samym trybem i warstwą
     else
         m_context->Erase(g, Standard_False);
+    const Handle(AIS_Shape)& arrow = m_directionArrows[static_cast<size_t>(index)];
+    if (!arrow.IsNull()) {
+        if (visible && m_directionsVisible)
+            m_context->Display(arrow, AIS_Shaded, -1, Standard_False);
+        else
+            m_context->Erase(arrow, Standard_False);
+    }
     m_view->Redraw();
 }
 

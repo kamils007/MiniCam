@@ -1,6 +1,7 @@
 #include "BottomBars.h"
 
 #include "InputBar.h"
+#include "Shortcuts.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -118,18 +119,18 @@ CommandBar::CommandBar(QWidget* shortcutWindow, QWidget* parent)
     {
         const char* name;
         OccView::Snap snap; // None = jeszcze bez działania
-        int key;            // skrót klawiszowy (0 = brak)
+        const char* shortcut; // identyfikator skrótu z Shortcuts.h (nullptr = brak)
     };
     const SnapDef snapDefs[] = {
-        {"AUTO uchwyt (końce, środki, ćwiartki)", OccView::Snap::Auto, 0},
-        {"KONIEC elementu", OccView::Snap::End, Qt::Key_F6},
-        {"ŚRODEK elementu", OccView::Snap::Mid, Qt::Key_F7},
-        {"CENTRUM okręgu", OccView::Snap::Centre, Qt::Key_F8},
-        {"PRZECIĘCIE elementów", OccView::Snap::None, 0},
-        {"STYCZNA do łuku lub okręgu", OccView::Snap::None, 0},
-        {"PROSTOPADŁA do elementu", OccView::Snap::None, 0},
-        {"RÓWNOLEGŁA do elementu", OccView::Snap::None, 0},
-        {"ĆWIARTKI koła", OccView::Snap::Quadrant, 0},
+        {"AUTO uchwyt (końce, środki, ćwiartki)", OccView::Snap::Auto, nullptr},
+        {"KONIEC elementu", OccView::Snap::End, shortcuts::kSnapEnd},
+        {"ŚRODEK elementu", OccView::Snap::Mid, shortcuts::kSnapMid},
+        {"CENTRUM okręgu", OccView::Snap::Centre, shortcuts::kSnapCentre},
+        {"PRZECIĘCIE elementów", OccView::Snap::None, nullptr},
+        {"STYCZNA do łuku lub okręgu", OccView::Snap::None, nullptr},
+        {"PROSTOPADŁA do elementu", OccView::Snap::None, nullptr},
+        {"RÓWNOLEGŁA do elementu", OccView::Snap::None, nullptr},
+        {"ĆWIARTKI koła", OccView::Snap::Quadrant, nullptr},
     };
     for (int i = 0; i < 9; ++i) {
         const SnapDef& d = snapDefs[i];
@@ -145,7 +146,7 @@ CommandBar::CommandBar(QWidget* shortcutWindow, QWidget* parent)
         b->setFixedSize(26, 24);
         b->setCheckable(true);
         b->setFocusPolicy(Qt::NoFocus);
-        b->setToolTip(d.key ? name + "  " + QKeySequence(d.key).toString() : name);
+        b->setToolTip(d.shortcut ? name + "  " + shortcuts::text(d.shortcut) : name);
         const OccView::Snap snap = d.snap;
         const QCursor cursor = snapCursor(i);
         connect(b, &QToolButton::toggled, this, [this, b, snap, cursor](bool on) {
@@ -159,10 +160,11 @@ CommandBar::CommandBar(QWidget* shortcutWindow, QWidget* parent)
                 emit snapChanged(OccView::Snap::None, QCursor());
             }
         });
-        if (d.key) {
+        if (d.shortcut) {
             // Skrót działa w całym oknie (także gdy kursor stoi w polu X/Y), ale tylko
             // wtedy, gdy przycisk jest widoczny – czyli polecenie czeka na punkt.
-            auto* shortcut = new QShortcut(QKeySequence(d.key), shortcutWindow);
+            auto* shortcut = new QShortcut(shortcutWindow);
+            shortcuts::bind(shortcut, d.shortcut);
             connect(shortcut, &QShortcut::activated, b, [b] {
                 if (b->isVisible())
                     b->toggle();
