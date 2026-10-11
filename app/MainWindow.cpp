@@ -37,6 +37,68 @@
 
 namespace {
 
+// Ikona widoku: sześcian w izometrii z zaznaczoną na niebiesko ścianą, od której patrzymy.
+// Ściany niewidoczne w izometrii (spód, tył, lewa) rysujemy przerywaną linią.
+enum class CubeFace { Top, Bottom, Front, Back, Left, Right, None };
+
+QIcon viewIcon(CubeFace face)
+{
+    QPixmap pix(32, 32);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    // Narożniki: T = góra, B = dół; tył, prawo, przód, lewo jak w widoku izometrycznym.
+    const QPointF tBack(16, 3), tRight(28, 9), tFront(16, 15), tLeft(4, 9);
+    const QPointF bBack(16, 17), bRight(28, 23), bFront(16, 29), bLeft(4, 23);
+    auto quad = [&](QPointF a, QPointF b, QPointF c, QPointF d) {
+        const QPointF pts[] = {a, b, c, d};
+        p.drawPolygon(pts, 4);
+    };
+    auto drawFace = [&](CubeFace f) {
+        switch (f) {
+        case CubeFace::Top: quad(tBack, tRight, tFront, tLeft); break;
+        case CubeFace::Bottom: quad(bBack, bRight, bFront, bLeft); break;
+        case CubeFace::Front: quad(tLeft, tFront, bFront, bLeft); break;
+        case CubeFace::Right: quad(tFront, tRight, bRight, bFront); break;
+        case CubeFace::Back: quad(tBack, tRight, bRight, bBack); break;
+        case CubeFace::Left: quad(tBack, tLeft, bLeft, bBack); break;
+        case CubeFace::None: break;
+        }
+    };
+    const QColor blue(60, 130, 220);
+    const bool hidden = face == CubeFace::Bottom || face == CubeFace::Back || face == CubeFace::Left;
+    if (hidden) { // ściana z tyłu – najpierw, przezroczysta
+        p.setPen(QPen(blue.darker(130), 1.2, Qt::DashLine));
+        p.setBrush(QColor(60, 130, 220, 110));
+        drawFace(face);
+    }
+    p.setPen(QPen(QColor(50, 50, 50), 1.2));
+    for (CubeFace f : {CubeFace::Top, CubeFace::Front, CubeFace::Right}) {
+        p.setBrush(f == face ? blue : QColor(235, 235, 235, hidden ? 150 : 255));
+        drawFace(f);
+    }
+    return QIcon(pix);
+}
+
+// Ikona lupy z plusem albo minusem (powiększ / pomniejsz).
+QIcon zoomIcon(bool in)
+{
+    QPixmap pix(32, 32);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(QPen(QColor(60, 60, 60), 3, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(20, 20), QPointF(29, 29));
+    p.setPen(QPen(QColor(60, 60, 60), 2));
+    p.setBrush(QColor(225, 238, 252));
+    p.drawEllipse(QPointF(13, 13), 9, 9);
+    p.setPen(QPen(QColor(30, 100, 200), 2.5));
+    p.drawLine(QPointF(9, 13), QPointF(17, 13));
+    if (in)
+        p.drawLine(QPointF(13, 9), QPointF(13, 17));
+    return QIcon(pix);
+}
+
 // Ikona "Przesuń": strzałki w cztery strony.
 QIcon moveIcon()
 {
@@ -327,6 +389,41 @@ void MainWindow::createRibbon()
     RibbonPage* solids = ribbon->addPage("Bryły - Użytkowe");
     solids->addGroup("Wyrównanie")->addAction(autoAlignAct);
     solids->addGroup("Ustawienia")->addAction(settingsAct);
+
+    // Zakładka Widok: widoki okna (kierunek patrzenia), powiększenie i okna.
+    RibbonPage* viewPage = ribbon->addPage("Widok");
+    RibbonGroup* zoomGroup = viewPage->addGroup("Powiększenie");
+    zoomGroup->addAction(fitAct);
+    QAction* zoomInAct = new QAction(zoomIcon(true), "Powiększ", this);
+    connect(zoomInAct, &QAction::triggered, this, [this] { m_view->zoom(1.25); });
+    QAction* zoomOutAct = new QAction(zoomIcon(false), "Pomniejsz", this);
+    connect(zoomOutAct, &QAction::triggered, this, [this] { m_view->zoom(0.8); });
+    zoomGroup->addAction(zoomInAct);
+    zoomGroup->addAction(zoomOutAct);
+    RibbonGroup* views3d = viewPage->addGroup("Widoki 3D");
+    struct ViewDef
+    {
+        const char* text;
+        CubeFace face;
+        OccView::StandardView view;
+    };
+    const ViewDef viewDefs[] = {
+        {"Z góry", CubeFace::Top, OccView::StandardView::Top},
+        {"Z dołu", CubeFace::Bottom, OccView::StandardView::Bottom},
+        {"Z przodu", CubeFace::Front, OccView::StandardView::Front},
+        {"Z tyłu", CubeFace::Back, OccView::StandardView::Back},
+        {"Z lewej", CubeFace::Left, OccView::StandardView::Left},
+        {"Z prawej", CubeFace::Right, OccView::StandardView::Right},
+        {"Izometryczny", CubeFace::None, OccView::StandardView::Iso},
+    };
+    for (const ViewDef& d : viewDefs) {
+        auto* a = new QAction(viewIcon(d.face), QString::fromUtf8(d.text), this);
+        a->setToolTip("Widok " + a->text().toLower() + " (dopasowany do okna)");
+        const OccView::StandardView v = d.view;
+        connect(a, &QAction::triggered, this, [this, v] { m_view->setStandardView(v); });
+        views3d->addAction(a);
+    }
+    viewPage->addGroup("Okna")->addAction(dockAct);
 
     // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
     // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;

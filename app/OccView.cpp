@@ -432,6 +432,33 @@ void OccView::fitAll()
     m_view->Redraw();
 }
 
+void OccView::setStandardView(StandardView view)
+{
+    if (m_view.IsNull())
+        return;
+    // Oś Z w górę (stół w płaszczyźnie XY), widok "z przodu" patrzy od strony -Y.
+    V3d_TypeOfOrientation o = V3d_XposYnegZpos;
+    switch (view) {
+    case StandardView::Top: o = V3d_Zpos; break;
+    case StandardView::Bottom: o = V3d_Zneg; break;
+    case StandardView::Front: o = V3d_Yneg; break;
+    case StandardView::Back: o = V3d_Ypos; break;
+    case StandardView::Left: o = V3d_Xneg; break;
+    case StandardView::Right: o = V3d_Xpos; break;
+    case StandardView::Iso: o = V3d_XposYnegZpos; break;
+    }
+    m_view->SetProj(o);
+    fitAll();
+}
+
+void OccView::zoom(double factor)
+{
+    if (m_view.IsNull())
+        return;
+    m_view->SetZoom(factor);
+    m_view->Redraw();
+}
+
 void OccView::paintEvent(QPaintEvent*)
 {
     initViewer();

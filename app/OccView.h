@@ -56,6 +56,10 @@ public:
     // Pokazuje model w położeniu z pliku, z kolorami z pliku.
     void showModel(const camcore::ImportedModel& model);
     void fitAll();
+    // Widoki okna (zakładka Widok): kierunek patrzenia na detal, potem dopasowanie.
+    enum class StandardView { Top, Bottom, Front, Back, Left, Right, Iso };
+    void setStandardView(StandardView view);
+    void zoom(double factor); // > 1 powiększa, < 1 pomniejsza (względem środka okna)
 
     // Kontury rysowane grubymi liniami na bryle – wynik rozpoznania cech. Kontur
     // z wysokością dostaje pod sobą przezroczystą ściankę aż do dołu swoich ścian.
