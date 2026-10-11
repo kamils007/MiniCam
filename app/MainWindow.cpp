@@ -278,6 +278,9 @@ void MainWindow::createRibbon()
     });
     connect(m_undo, &QUndoStack::canRedoChanged, redoAct, &QAction::setEnabled);
     addActions({undoAct, redoAct}); // skróty działają w całym oknie
+    // W menu radialnym (PPM) Cofnij i Ponów stoją tam, gdzie w Alphacam: pola 12 i 13.
+    m_radialSlots[11].action = undoAct;
+    m_radialSlots[12].action = redoAct;
     editGroup->addAction(undoAct);
     editGroup->addAction(redoAct);
     editGroup->addAction(soon(QStyle::SP_DialogDiscardButton, "Usuń"));
