@@ -20,7 +20,9 @@ class InputBar;
 class QWidget;
 class QAction;
 class QLabel;
+class QCloseEvent;
 class QMenu;
+class QPrinter;
 class QToolBar;
 class QToolButton;
 class QUndoStack;
@@ -35,6 +37,7 @@ public:
     void openFile(const QString& path);
 
 protected:
+    void closeEvent(QCloseEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
@@ -51,6 +54,13 @@ private:
     void createFileMenu(QMenu* menu, QAction* quitAct); // FileMenu.cpp
     void addRecentFile(const QString& path);
     void updateRecentMenu();
+    void onNew();
+    bool onSave();
+    bool onSaveAs();
+    bool saveTo(const QString& path);
+    bool maybeSave(); // pyta o zapis zmian; false = użytkownik anulował
+    void onPrint(bool preview);
+    void printTo(QPrinter* printer);
     void createDock();
     void createBottomBars();
 
@@ -99,6 +109,7 @@ private:
     camcore::ImportedModel m_original; // model dokładnie jak w pliku (przed wyrównaniem)
     QString m_fileName;
     QMenu* m_recentMenu = nullptr; // Plik → Ostatnie
+    QString m_savePath; // plik, do którego zapisuje "Zapisz" (pusty = zapytaj o nazwę)
     bool m_aligned = false; // czy pokazany model jest wyrównany
     bool m_flipped = false; // czy leży na przeciwnej stronie niż wybrał algorytm
     camcore::AlignSettings m_alignSettings;

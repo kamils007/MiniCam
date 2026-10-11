@@ -17,7 +17,7 @@ if(MSVC)
     endif()
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets PrintSupport)
 find_package(OpenCASCADE REQUIRED)
 
 # ---- Rdzeń: czyste C++ + OCCT, bez Qt ----
@@ -36,6 +36,8 @@ endif()
 add_library(camcore STATIC
     core/ModelImport.cpp
     core/ModelImport.h
+    core/ModelExport.cpp
+    core/ModelExport.h
     core/ModelAlign.cpp
     core/ModelAlign.h
     core/Geometry.h
@@ -87,7 +89,7 @@ qt_add_executable(minicam
     app/AlignSettingsDialog.h
 )
 target_include_directories(minicam PRIVATE app) # polecenia w app/commands widzą InputBar.h, OccView.h
-target_link_libraries(minicam PRIVATE camcore Qt6::Widgets
+target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
     TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów
 )

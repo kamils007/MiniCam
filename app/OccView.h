@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QCursor>
+#include <QImage>
 #include <QPoint>
 #include <QWidget>
 
@@ -60,6 +61,8 @@ public:
     enum class StandardView { Top, Bottom, Front, Back, Left, Right, Iso };
     void setStandardView(StandardView view);
     void zoom(double factor); // > 1 powiększa, < 1 pomniejsza (względem środka okna)
+    // Obraz bieżącego widoku w zadanym rozmiarze, na białym tle (do wydruku).
+    QImage renderImage(int width, int height);
 
     // Kontury rysowane grubymi liniami na bryle – wynik rozpoznania cech. Kontur
     // z wysokością dostaje pod sobą przezroczystą ściankę aż do dołu swoich ścian.

@@ -1,14 +1,30 @@
-// Menu Plik (niebieski przycisk na wstążce) – polecenia jak w Alphacam.
-// Działa Otwórz, Ostatnie i Zakończ; pozostałe są widoczne, ale wyłączone
-// i będą uzupełniane po kolei.
+// Menu Plik (niebieski przycisk na wstążce) – polecenia jak w Alphacam:
+// Nowy, Otwórz, Zapisz, Zapisz jako, Drukarka/Ploter, Podgląd wydruku,
+// Ostatnie, Pomoc, Dostosuj (na razie wyłączone), Zakończ.
 #include "MainWindow.h"
+#include "LayersPanel.h"
+#include "ModelExport.h"
+#include "OccView.h"
 
 #include <QAction>
+#include <QApplication>
+#include <QCloseEvent>
 #include <QDir>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QMenu>
+#include <QMessageBox>
+#include <QPainter>
+#include <QPrintDialog>
+#include <QPrintPreviewDialog>
+#include <QPrinter>
 #include <QSettings>
+#include <QStatusBar>
 #include <QStyle>
+#include <QUndoStack>
+
+#include <algorithm>
+#include <exception>
 
 namespace {
 
@@ -19,33 +35,43 @@ const char* const kRecentKey = "ostatniePliki";
 
 void MainWindow::createFileMenu(QMenu* menu, QAction* quitAct)
 {
-    auto soon = [this, menu](QStyle::StandardPixmap icon, const QString& text,
-                             const QKeySequence& shortcut = {}) {
+    auto add = [this, menu](QStyle::StandardPixmap icon, const QString& text,
+                            const QKeySequence& shortcut = {}) {
         QAction* a = menu->addAction(style()->standardIcon(icon), text);
         a->setShortcut(shortcut);
-        a->setEnabled(false);
-        a->setToolTip(QString(text).remove("…") + " (wkrótce)");
+        addAction(a); // skrót działa w całym oknie, nie tylko przy otwartym menu
         return a;
     };
 
-    soon(QStyle::SP_FileIcon, "Nowy", QKeySequence::New);
+    connect(add(QStyle::SP_FileIcon, "Nowy", QKeySequence::New), &QAction::triggered,
+            this, &MainWindow::onNew);
 
     QAction* openAct = menu->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton), "Otwórz…");
     openAct->setShortcut(QKeySequence::Open);
     openAct->setShortcutContext(Qt::WidgetShortcut); // skrót Ctrl+O obsługuje już okno
     connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
 
-    soon(QStyle::SP_DialogSaveButton, "Zapisz", QKeySequence::Save);
-    soon(QStyle::SP_DialogSaveButton, "Zapisz jako…");
+    connect(add(QStyle::SP_DialogSaveButton, "Zapisz", QKeySequence::Save), &QAction::triggered,
+            this, &MainWindow::onSave);
+    connect(add(QStyle::SP_DialogSaveButton, "Zapisz jako…", QKeySequence::SaveAs),
+            &QAction::triggered, this, &MainWindow::onSaveAs);
     menu->addSeparator();
-    soon(QStyle::SP_ComputerIcon, "Drukarka/Ploter…", QKeySequence::Print);
-    soon(QStyle::SP_FileDialogContentsView, "Podgląd wydruku…");
+    connect(add(QStyle::SP_ComputerIcon, "Drukarka/Ploter…", QKeySequence::Print),
+            &QAction::triggered, this, [this] { onPrint(false); });
+    connect(add(QStyle::SP_FileDialogContentsView, "Podgląd wydruku…"), &QAction::triggered,
+            this, [this] { onPrint(true); });
     menu->addSeparator();
 
     m_recentMenu = menu->addMenu(style()->standardIcon(QStyle::SP_DirOpenIcon), "Ostatnie");
     updateRecentMenu();
 
-    soon(QStyle::SP_DialogHelpButton, "Pomoc");
+    connect(add(QStyle::SP_DialogHelpButton, "Pomoc"), &QAction::triggered, this, [this] {
+        QMessageBox::about(this, "Pomoc – MiniCAM",
+                           "<b>MiniCAM</b><br>Prosty CAM do detali 3D (STEP/IGES/BREP), "
+                           "wzorowany na Alphacam.<br><br>"
+                           "Widok: LPM – obrót, ŚPM/PPM – przesuwanie, kółko – zoom, F – dopasuj.<br>"
+                           "PPM w widoku – menu radialne.");
+    });
 
     QMenu* customise = menu->addMenu(style()->standardIcon(QStyle::SP_FileDialogDetailedView), "Dostosuj");
     for (const char* text : {"Dostosuj wstążkę…", "Pasek narzędzi szybkiego dostępu…",
@@ -85,8 +111,148 @@ void MainWindow::updateRecentMenu()
                                          : QString("%1  %2").arg(number).arg(file);
         ++number;
         QAction* a = m_recentMenu->addAction(text);
-        connect(a, &QAction::triggered, this, [this, file] { openFile(file); });
+        connect(a, &QAction::triggered, this, [this, file] {
+            if (maybeSave())
+                openFile(file);
+        });
     }
     if (files.isEmpty())
         m_recentMenu->addAction("(brak)")->setEnabled(false);
+}
+
+void MainWindow::onNew()
+{
+    if (!maybeSave())
+        return;
+    cancelCommand();
+    m_original = {};
+    m_shown = {};
+    m_fileName.clear();
+    m_savePath.clear();
+    m_aligned = m_flipped = false;
+    m_view->updateModel(m_shown); // pusta bryła = nic nie rysujemy
+    m_layers->setModelName(QString());
+    clearFeatures();
+    m_undo->clear();
+    setWindowTitle("MiniCAM");
+    statusBar()->showMessage("Nowy rysunek");
+}
+
+bool MainWindow::onSave()
+{
+    return m_savePath.isEmpty() ? onSaveAs() : saveTo(m_savePath);
+}
+
+bool MainWindow::onSaveAs()
+{
+    if (m_shown.shape.IsNull()) {
+        QMessageBox::information(this, "Zapisz jako", "Brak bryły do zapisania.");
+        return false;
+    }
+    QString suggested = m_savePath;
+    if (suggested.isEmpty()) {
+        const QStringList recent = QSettings("MiniCAM", "MiniCAM").value(kRecentKey).toStringList();
+        const QString dir = recent.isEmpty() ? QDir::homePath() : QFileInfo(recent.first()).absolutePath();
+        const QString base = m_fileName.isEmpty() ? "rysunek" : QFileInfo(m_fileName).completeBaseName();
+        suggested = QDir(dir).filePath(base + ".step");
+    }
+    QString path = QFileDialog::getSaveFileName(this, "Zapisz jako", suggested,
+                                                "STEP (*.step *.stp);;BREP (*.brep *.brp)");
+    if (path.isEmpty())
+        return false;
+    if (QFileInfo(path).suffix().isEmpty())
+        path += ".step";
+    return saveTo(path);
+}
+
+bool MainWindow::saveTo(const QString& path)
+{
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    try {
+        // Bryła tak, jak jest na ekranie (po wyrównaniu i przesunięciach).
+        camcore::exportModel(m_shown, path.toUtf8().toStdString());
+    } catch (const std::exception& ex) {
+        QApplication::restoreOverrideCursor();
+        QMessageBox::critical(this, "Błąd zapisu", QString::fromUtf8(ex.what()));
+        return false;
+    }
+    QApplication::restoreOverrideCursor();
+
+    m_savePath = path;
+    m_fileName = QFileInfo(path).fileName();
+    m_layers->setModelName(m_fileName);
+    m_undo->setClean();
+    addRecentFile(path);
+    setWindowTitle("MiniCAM – " + m_fileName);
+    statusBar()->showMessage("Zapisano " + QDir::toNativeSeparators(path));
+    return true;
+}
+
+bool MainWindow::maybeSave()
+{
+    if (m_shown.shape.IsNull() || m_undo->isClean())
+        return true;
+    const auto answer = QMessageBox::question(
+        this, "MiniCAM",
+        QString("Rysunek %1 został zmieniony. Zapisać zmiany?").arg(m_fileName),
+        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::Yes);
+    if (answer == QMessageBox::Yes)
+        return onSave();
+    return answer == QMessageBox::No;
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    if (maybeSave())
+        event->accept();
+    else
+        event->ignore();
+}
+
+void MainWindow::onPrint(bool preview)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setPageOrientation(QPageLayout::Landscape);
+    printer.setDocName(m_fileName.isEmpty() ? "MiniCAM" : m_fileName);
+    if (preview) {
+        QPrintPreviewDialog dialog(&printer, this);
+        dialog.setWindowTitle("Podgląd wydruku");
+        connect(&dialog, &QPrintPreviewDialog::paintRequested, this, &MainWindow::printTo);
+        dialog.exec();
+    } else {
+        QPrintDialog dialog(&printer, this);
+        dialog.setWindowTitle("Drukarka/Ploter");
+        if (dialog.exec() == QDialog::Accepted)
+            printTo(&printer);
+    }
+}
+
+// Drukuje bieżący widok (jak na ekranie, na białym tle) dopasowany do strony.
+void MainWindow::printTo(QPrinter* printer)
+{
+    QPainter painter(printer);
+    const QRect page = painter.viewport();
+
+    // Obraz w proporcjach okna widoku; nie większy niż ~4000 px na dłuższym boku.
+    QSize size = m_view->size();
+    size.scale(page.size(), Qt::KeepAspectRatio);
+    const double limit = 4000.0 / std::max(size.width(), size.height());
+    if (limit < 1.0)
+        size *= limit;
+    const QImage image = m_view->renderImage(std::max(size.width(), 1), std::max(size.height(), 1));
+    if (image.isNull()) {
+        statusBar()->showMessage("Nie udało się przygotować obrazu do wydruku");
+        return;
+    }
+
+    // Stopka: nazwa pliku.
+    const int footer = painter.fontMetrics().height() * 2;
+    QRect area = page.adjusted(0, 0, 0, -footer);
+    QSize target = image.size();
+    target.scale(area.size(), Qt::KeepAspectRatio);
+    const QRect imageRect(area.x() + (area.width() - target.width()) / 2,
+                          area.y() + (area.height() - target.height()) / 2, target.width(), target.height());
+    painter.drawImage(imageRect, image);
+    painter.drawText(page.adjusted(0, page.height() - footer, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
+                     "MiniCAM – " + (m_fileName.isEmpty() ? QString("bez nazwy") : m_fileName));
 }

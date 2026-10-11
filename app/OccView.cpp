@@ -25,6 +25,8 @@
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <Geom_Axis2Placement.hxx>
 #include <Graphic3d_TransformPers.hxx>
+#include <Image_PixMap.hxx>
+#include <V3d_ImageDumpOptions.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_DatumAspect.hxx>
 #include <Prs3d_Drawer.hxx>
@@ -378,6 +380,31 @@ void OccView::updateModel(const camcore::ImportedModel& model)
     m_modelSnapPoints.clear();
     addSnapPoints(model.shape, 0.0, m_modelSnapPoints);
     rebuildModel();
+}
+
+QImage OccView::renderImage(int width, int height)
+{
+    initViewer();
+    const Quantity_Color background = m_view->BackgroundColor();
+    m_view->SetBackgroundColor(Quantity_Color(Quantity_NOC_WHITE));
+
+    V3d_ImageDumpOptions options;
+    options.Width = width;
+    options.Height = height;
+    options.BufferType = Graphic3d_BT_RGB;
+    Image_PixMap pixmap;
+    const bool ok = m_view->ToPixMap(pixmap, options);
+
+    m_view->SetBackgroundColor(background);
+    m_view->Redraw();
+    if (!ok)
+        return {};
+
+    // Row(0) to zawsze górny wiersz, niezależnie od kolejności wierszy w pamięci.
+    QImage image(int(pixmap.SizeX()), int(pixmap.SizeY()), QImage::Format_RGB888);
+    for (int y = 0; y < image.height(); ++y)
+        std::copy_n(pixmap.Row(y), size_t(image.width()) * 3, image.scanLine(y));
+    return image;
 }
 
 void OccView::rebuildModel()

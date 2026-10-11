@@ -456,6 +456,8 @@ void MainWindow::showRadialMenu(const QPoint& globalPos)
 
 void MainWindow::onOpen()
 {
+    if (!maybeSave())
+        return;
     const QString path = QFileDialog::getOpenFileName(
         this, "Otwórz model", QString(),
         "Modele 3D (*.step *.stp *.iges *.igs *.brep *.brp);;"
@@ -475,6 +477,7 @@ void MainWindow::openFile(const QString& path)
         // Rdzeń dostaje ścieżkę w UTF-8 – działa też z polskimi znakami.
         m_original = camcore::importModel(path.toUtf8().toStdString());
         m_fileName = QFileInfo(path).fileName();
+        m_savePath.clear(); // "Zapisz" nie nadpisuje pliku źródłowego bez pytania
         addRecentFile(path);
 
         m_flipped = false;
