@@ -69,34 +69,25 @@ bool askLevels(QWidget* parent, double& bottom, double& top)
 
 } // namespace
 
-bool ZLevelsCommand::start()
-{
-    if (host().editState().geometries.empty()) {
-        host().showMessage(name() + ": nie ma geometrii – narysuj je albo rozpoznaj cechy");
-        return false;
-    }
-    if (!askLevels(host().view(), m_bottom, m_top)) {
-        host().showMessage(name() + ": anulowane");
-        return false;
-    }
-    return GeometrySelectCommand::start();
-}
-
 QString ZLevelsCommand::hint() const
 {
-    return QString("wskaż geometrie (Z od %1 do %2)").arg(num(m_bottom), num(m_top));
+    return "wskaż geometrie, którym ustawić poziomy Z";
 }
 
 QString ZLevelsCommand::apply(const std::vector<int>& geometries)
 {
+    // Jak w Alphacam: najpierw wybór geometrii, po PPM okno z poziomami, OK kończy polecenie.
+    double bottom = 0, top = 0;
+    if (!askLevels(host().view(), bottom, top))
+        return name() + ": anulowane";
     const EditState before = host().editState();
     EditState after = before;
     for (int i : geometries) {
         camcore::Contour& c = after.geometries[static_cast<size_t>(i)].contour;
-        c = camcore::withZLevels(c, m_bottom, m_top);
+        c = camcore::withZLevels(c, bottom, top);
     }
     host().commitEdit(name(), before, after);
     return QString("Poziomy Z: %1 geometrii od Z %2 do Z %3, wys. %4 (Ctrl+Z cofa)")
         .arg(geometries.size())
-        .arg(num(m_bottom), num(m_top), num(m_top - m_bottom));
+        .arg(num(bottom), num(top), num(top - bottom));
 }
