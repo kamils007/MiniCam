@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include <QApplication>
+#include <QIcon>
 
 int main(int argc, char* argv[])
 {
@@ -11,6 +12,12 @@ int main(int argc, char* argv[])
 #endif
 
     QApplication app(argc, argv);
+
+    // Ikona okna i paska zadań (kostka z logo), w kilku rozmiarach.
+    QIcon appIcon;
+    for (int size : {16, 24, 32, 48, 64, 128, 256})
+        appIcon.addFile(QString(":/ikona/minicam_%1.png").arg(size), QSize(size, size));
+    app.setWindowIcon(appIcon);
 
     MainWindow window;
     window.resize(1280, 800);

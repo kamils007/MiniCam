@@ -1,0 +1,2 @@
+// Ikona programu w exe (Eksplorator, pasek zadań). Plik .ico ma rozmiary 16-256 px.
+IDI_ICON1 ICON "../resources/ikona/minicam.ico"

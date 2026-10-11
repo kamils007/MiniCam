@@ -103,6 +103,14 @@ qt_add_executable(minicam
 file(GLOB MINICAM_ICONS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/ikony/png/*.png")
 qt_add_resources(minicam "ikony" PREFIX "/" BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources"
     FILES ${MINICAM_ICONS})
+# Ikona programu: PNG dla okna/paska zadań (:/ikona/minicam_<rozmiar>.png),
+# a na Windows dodatkowo .ico w zasobach exe (app/minicam.rc), żeby Eksplorator pokazywał ikonę pliku.
+file(GLOB MINICAM_APP_ICON CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/ikona/*.png")
+qt_add_resources(minicam "ikona_programu" PREFIX "/" BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+    FILES ${MINICAM_APP_ICON})
+if(WIN32)
+    target_sources(minicam PRIVATE app/minicam.rc)
+endif()
 target_include_directories(minicam PRIVATE app) # polecenia w app/commands widzą InputBar.h, OccView.h
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
