@@ -84,7 +84,8 @@ private:
     Command* m_command = nullptr;     // trwające polecenie (np. Przesuń) albo brak
     QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
     QAction* m_repeatAct = nullptr;   // skrót spacji
-    // Pola menu radialnego (PPM), od godz. 3 zgodnie z ruchem wskazówek zegara.
+    // Pola menu radialnego (PPM), od godz. 3 zgodnie z ruchem wskazówek zegara
+    // (pole 1 zaczyna się na godz. 3, środek pola 11 jest na godz. 12).
     // Puste pola (action = nullptr) uzupełniamy poleceniami na bieżąco.
     std::vector<RadialSlot> m_radialSlots;
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)

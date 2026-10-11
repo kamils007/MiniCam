@@ -116,7 +116,9 @@ double RadialMenu::step() const
 
 double RadialMenu::slotAngle(int index) const
 {
-    return -index * step(); // zgodnie z ruchem wskazówek zegara
+    // Zgodnie z ruchem wskazówek zegara, całość obrócona o pół pola: przy 14 polach
+    // żeby środek pola 11 (Usuń, X) wypadał dokładnie na godz. 12, a nie granica pól.
+    return -(index + 0.5) * step();
 }
 
 double RadialMenu::outerAngle(int index) const
@@ -133,7 +135,7 @@ RadialMenu::Hit RadialMenu::hitTest(const QPointF& pos) const
     const double deg = std::atan2(-d.y(), d.x()) * 180.0 / kPi;
     if (r >= kHole && r <= kRing && !m_slots.empty()) {
         const int n = int(m_slots.size());
-        const int i = int(std::lround(-deg / step()));
+        const int i = int(std::lround((slotAngle(0) - deg) / step()));
         return {0, ((i % n) + n) % n};
     }
     if (r >= kOuterFrom && r <= kOuter && m_open >= 0) {

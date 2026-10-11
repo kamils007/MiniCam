@@ -18,7 +18,8 @@ struct RadialSlot
 };
 
 // Menu radialne pod PPM (jak w Alphacam): jeden pierścień pól wokół kursora,
-// ułożonych od godz. 3 zgodnie z ruchem wskazówek zegara.
+// ułożonych od godz. 3 zgodnie z ruchem wskazówek zegara (przy 14 polach środek
+// pola 11 wypada dokładnie na godz. 12).
 class RadialMenu : public QWidget
 {
     Q_OBJECT
