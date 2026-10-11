@@ -161,3 +161,9 @@ cmake --build build -j
   `platforms/qwindows.dll` obok `minicam.exe`; DLL-e OCCT i Qt muszą być w PATH
   albo obok exe. Przy domyślnym, statycznym tripletcie nic nie trzeba kopiować.
 - Plik testowy: dowolny STEP z producenta części, np. z GrabCAD lub katalogu Misumi.
+
+**Menu radialne** (PPM w widoku 3D, gdy nie trwa żadne polecenie): pierścień poleceń
+wokół kursora jak w Alphacam; pozycje z » otwierają podmenu na zewnętrznym łuku.
+Układ zmienia się w Plik → „Dostosuj menu radialne…” albo PPM na wstążce: dodawanie,
+usuwanie, kolejność, podmenu, podpowiedzi, stare menu kontekstowe, import/eksport .ini
+i reset. Podczas wybierania elementów PPM nadal zatwierdza wybór.

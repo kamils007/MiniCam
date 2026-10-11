@@ -9,6 +9,7 @@
 #include "PartContours.h"
 #include "ModelAlign.h"
 #include "ModelImport.h"
+#include "RadialMenu.h"
 #include "commands/Command.h"
 
 class OccView;
@@ -64,6 +65,10 @@ public:
 private:
     // Uruchamia polecenie (poprzednie, jeśli trwa, zostaje przerwane).
     void runCommand(Command* command);
+    // Menu pod PPM w widoku 3D: menu radialne albo zwykłe (stare) menu kontekstowe.
+    void showRadialMenu(const QPoint& globalPos);
+    void customizeRadialMenu(); // okno "Dostosuj menu radialne"
+    QAction* registerCommand(QAction* action, const QString& id); // objectName + lista poleceń
     void dockToHome();
     void showAligned();
     void showModel(const camcore::ImportedModel& model);
@@ -82,6 +87,8 @@ private:
     Command* m_command = nullptr;     // trwające polecenie (np. Przesuń) albo brak
     QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
     QAction* m_repeatAct = nullptr;   // skrót spacji
+    QList<QAction*> m_commands;     // polecenia do menu radialnego i okna Dostosuj
+    RadialMenuConfig m_radialConfig; // układ menu radialnego
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)
     CommandBar* m_commandBar = nullptr;     // belka polecenia (druga od dołu)
     QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce

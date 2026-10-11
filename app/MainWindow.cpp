@@ -4,6 +4,7 @@
 #include "InputBar.h"
 #include "LayersPanel.h"
 #include "OccView.h"
+#include "RadialMenuDialog.h"
 #include "Ribbon.h"
 #include "commands/MoveCommand.h"
 
@@ -93,6 +94,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_view = new OccView(this);
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
+    m_radialConfig = RadialMenuConfig::load();
 
     createDock();
     createBottomBars();
@@ -103,6 +105,7 @@ MainWindow::MainWindow(QWidget* parent)
             m_command->selectionConfirmed();
     });
     connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
+    connect(m_view, &OccView::contextMenuRequested, this, &MainWindow::showRadialMenu);
     connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelCommand);
     connect(m_view, &OccView::selectionChanged, this, [this](int count) {
         if (m_command)
@@ -180,6 +183,7 @@ void MainWindow::createRibbon()
     // w menu Plik i na wstążce, a skrót klawiszowy działa w całym oknie.
     QAction* openAct = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
                                    "Otwórz\nmodel", this);
+    registerCommand(openAct, "open");
     openAct->setShortcut(QKeySequence::Open);
     connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
 
@@ -189,6 +193,7 @@ void MainWindow::createRibbon()
 
     QAction* fitAct = new QAction(style()->standardIcon(QStyle::SP_TitleBarMaxButton),
                                   "Dopasuj\ndo okna", this);
+    registerCommand(fitAct, "fit");
     fitAct->setShortcut(Qt::Key_F);
     connect(fitAct, &QAction::triggered, m_view, &OccView::fitAll);
 
@@ -196,15 +201,18 @@ void MainWindow::createRibbon()
                                         "Auto-Wyrównanie\nCzęści", this);
     autoAlignAct->setToolTip("Wyrównaj bryłę według ustawień z okna Konfiguracja;\n"
                              "każde kolejne kliknięcie odwraca ją na drugą stronę");
+    registerCommand(autoAlignAct, "autoAlign");
     connect(autoAlignAct, &QAction::triggered, this, &MainWindow::onAutoAlign);
 
     QAction* recognizeAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogContentsView),
                                         "Rozpoznaj\ncechy", this);
     recognizeAct->setToolTip("Narysuj kontury 2D z bryły: od dołu, na każdej\npoziomej powierzchni");
+    registerCommand(recognizeAct, "recognize");
     connect(recognizeAct, &QAction::triggered, this, &MainWindow::onRecognizeFeatures);
 
     QAction* settingsAct = new QAction(style()->standardIcon(QStyle::SP_FileDialogDetailedView),
                                        "Rozpoznawanie\ncech modelu…", this);
+    registerCommand(settingsAct, "alignSettings");
     connect(settingsAct, &QAction::triggered, this, &MainWindow::onAlignSettings);
 
     // Skróty muszą być zarejestrowane w oknie, inaczej działałyby tylko
@@ -217,12 +225,25 @@ void MainWindow::createRibbon()
     openMenuAct->setShortcutContext(Qt::WidgetShortcut); // skrót już obsługuje openAct
     connect(openMenuAct, &QAction::triggered, this, &MainWindow::onOpen);
     ribbon->fileMenu()->addSeparator();
+    // Plik → Dostosuj (w Alphacam: File | Customise → Radial Menu).
+    connect(ribbon->fileMenu()->addAction("Dostosuj menu radialne…"), &QAction::triggered, this,
+            &MainWindow::customizeRadialMenu);
+    ribbon->fileMenu()->addSeparator();
     ribbon->fileMenu()->addAction(quitAct);
+    // PPM na wstążce: "Dostosuj menu radialne", jak w Alphacam.
+    ribbon->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ribbon, &QWidget::customContextMenuRequested, this, [this, ribbon](const QPoint& pos) {
+        QMenu menu(this);
+        connect(menu.addAction("Dostosuj menu radialne…"), &QAction::triggered, this,
+                &MainWindow::customizeRadialMenu);
+        menu.exec(ribbon->mapToGlobal(pos));
+    });
 
     // Akcja "pokaż/ukryj okno" gotowa od Qt – zaznaczona, gdy okno jest widoczne.
     QAction* dockAct = m_dock->toggleViewAction();
     dockAct->setText("Okno\nWarstwy");
     dockAct->setIcon(style()->standardIcon(QStyle::SP_FileDialogListView));
+    registerCommand(dockAct, "layersWindow");
 
     RibbonPage* home = ribbon->addPage("Narzędzia główne");
     home->addGroup("Plik")->addAction(openAct);
@@ -232,13 +253,14 @@ void MainWindow::createRibbon()
 
     // Zakładka Edycja – układ grup jak w Alphacam. Na razie działa "Przesuń",
     // pozostałe polecenia są widoczne, ale wyłączone (przyjdą później).
-    auto soon = [this](QStyle::StandardPixmap icon, const QString& text) {
+    auto soon = [this](const QString& id, QStyle::StandardPixmap icon, const QString& text) {
         auto* a = new QAction(style()->standardIcon(icon), text, this);
         a->setEnabled(false);
         a->setToolTip(QString(text).replace('\n', ' ') + " (wkrótce)");
-        return a;
+        a->setProperty("soon", true); // menu radialne dopisuje "(wkrótce)"
+        return registerCommand(a, id);
     };
-    QAction* moveAct = new QAction(moveIcon(), "Przesuń", this);
+    QAction* moveAct = registerCommand(new QAction(moveIcon(), "Przesuń", this), "move");
     moveAct->setToolTip("Przesuń bryłę lub geometrie: wybierz elementy (LPM),\n"
                         "zatwierdź PPM, potem kliknij punkt bazowy i docelowy\n"
                         "albo wpisz przesunięcie dX/dY/dZ");
@@ -247,6 +269,7 @@ void MainWindow::createRibbon()
     RibbonPage* edit = ribbon->addPage("Edycja");
     RibbonGroup* editGroup = edit->addGroup("Edycja");
     QAction* undoAct = new QAction(style()->standardIcon(QStyle::SP_ArrowBack), "Cofnij", this);
+    registerCommand(undoAct, "undo");
     undoAct->setShortcut(QKeySequence::Undo);
     undoAct->setToolTip("Cofnij ostatnią zmianę (Ctrl+Z)");
     undoAct->setEnabled(false);
@@ -258,6 +281,7 @@ void MainWindow::createRibbon()
     });
     connect(m_undo, &QUndoStack::canUndoChanged, undoAct, &QAction::setEnabled);
     QAction* redoAct = new QAction(style()->standardIcon(QStyle::SP_ArrowForward), "Ponów", this);
+    registerCommand(redoAct, "redo");
     redoAct->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Y), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
     redoAct->setToolTip("Ponów cofniętą zmianę (Ctrl+Y)");
     redoAct->setEnabled(false);
@@ -271,20 +295,31 @@ void MainWindow::createRibbon()
     addActions({undoAct, redoAct}); // skróty działają w całym oknie
     editGroup->addAction(undoAct);
     editGroup->addAction(redoAct);
-    editGroup->addAction(soon(QStyle::SP_DialogDiscardButton, "Usuń"));
+    editGroup->addAction(soon("delete", QStyle::SP_DialogDiscardButton, "Usuń"));
     RibbonGroup* clipboard = edit->addGroup("Schowek");
-    clipboard->addAction(soon(QStyle::SP_FileIcon, "Kopiuj"));
-    clipboard->addAction(soon(QStyle::SP_DialogResetButton, "Wytnij"));
-    clipboard->addAction(soon(QStyle::SP_DialogSaveButton, "Wklej"));
+    clipboard->addAction(soon("copy", QStyle::SP_FileIcon, "Kopiuj"));
+    clipboard->addAction(soon("cut", QStyle::SP_DialogResetButton, "Wytnij"));
+    clipboard->addAction(soon("paste", QStyle::SP_DialogSaveButton, "Wklej"));
     RibbonGroup* moveGroup = edit->addGroup("Przesuń, kopiuj itd.");
     moveGroup->addAction(moveAct);
-    moveGroup->addAction(soon(QStyle::SP_BrowserReload, "Obróć"));
-    moveGroup->addAction(soon(QStyle::SP_MediaSeekBackward, "Lustro"));
-    moveGroup->addAction(soon(QStyle::SP_TitleBarMaxButton, "Skaluj"));
+    moveGroup->addAction(soon("rotate", QStyle::SP_BrowserReload, "Obróć"));
+    moveGroup->addAction(soon("mirror", QStyle::SP_MediaSeekBackward, "Lustro"));
+    moveGroup->addAction(soon("scale", QStyle::SP_TitleBarMaxButton, "Skaluj"));
     RibbonGroup* breakGroup = edit->addGroup("Przerwij, połącz itd.");
-    breakGroup->addAction(soon(QStyle::SP_MediaPause, "Przerwij"));
-    breakGroup->addAction(soon(QStyle::SP_DialogCancelButton, "Przytnij"));
-    breakGroup->addAction(soon(QStyle::SP_DialogApplyButton, "Połącz"));
+    breakGroup->addAction(soon("break", QStyle::SP_MediaPause, "Przerwij"));
+    breakGroup->addAction(soon("trim", QStyle::SP_DialogCancelButton, "Przytnij"));
+    breakGroup->addAction(soon("join", QStyle::SP_DialogApplyButton, "Połącz"));
+
+    // Polecenia z menu radialnego Alphacam, których jeszcze nie ma na wstążce –
+    // na razie wyłączone, żeby układ menu był od razu taki jak w Alphacam.
+    soon("zoomWindow", QStyle::SP_FileDialogContentsView, "Powiększ okno");
+    soon("reverseView", QStyle::SP_BrowserReload, "Widok odwrotny");
+    soon("refresh", QStyle::SP_BrowserReload, "Odśwież");
+    soon("views3d", QStyle::SP_DesktopIcon, "Widoki 3D");
+    soon("shading", QStyle::SP_DriveHDIcon, "Cieniowanie");
+    soon("normalToView", QStyle::SP_ArrowUp, "Normalny do widoku");
+    soon("simPaths", QStyle::SP_MediaPlay, "Symulacja ścieżek");
+    soon("simSolid", QStyle::SP_MediaSeekForward, "Symulacja bryłowa");
 
     RibbonPage* extraction = ribbon->addPage("Ekstrakcja modelu bryłowego");
     extraction->addGroup("Cechy")->addAction(recognizeAct);
@@ -319,6 +354,35 @@ void MainWindow::createRibbon()
 
     // Wstążka zajmuje miejsce zwykłego paska menu.
     setMenuWidget(ribbon);
+}
+
+QAction* MainWindow::registerCommand(QAction* action, const QString& id)
+{
+    action->setObjectName(id);
+    m_commands.push_back(action);
+    return action;
+}
+
+void MainWindow::showRadialMenu(const QPoint& globalPos)
+{
+    if (m_radialConfig.legacyMenu) {
+        QMenu* menu = createLegacyMenu(m_radialConfig, m_commands, this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->popup(globalPos);
+        return;
+    }
+    auto* menu = new RadialMenu(m_radialConfig, m_commands, this);
+    menu->popup(globalPos);
+}
+
+void MainWindow::customizeRadialMenu()
+{
+    RadialMenuDialog dialog(m_radialConfig, m_commands, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    m_radialConfig = dialog.config();
+    m_radialConfig.save();
+    statusBar()->showMessage("Zapisano układ menu radialnego");
 }
 
 void MainWindow::onOpen()

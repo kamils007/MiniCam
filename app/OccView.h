@@ -20,6 +20,7 @@
 // Kod: OccView.cpp (rysowanie, wybór, mysz) i OccViewPick.cpp (wskazywanie punktu:
 // krzyż, uchwyty, podgląd przesuwania).
 // Sterowanie: LPM – obrót, ŚPM/PPM – przesuwanie, kółko – zoom.
+// Bez polecenia kliknięcie PPM otwiera menu radialne (contextMenuRequested).
 // W trybie wyboru kliknięcie LPM zaznacza element, kliknięcie PPM zatwierdza wybór;
 // w trybie wskazywania punktu kliknięcie LPM podaje punkt na płaszczyźnie Z = 0.
 class OccView : public QWidget
@@ -78,6 +79,7 @@ public:
 signals:
     void selectionChanged(int count);
     void selectionConfirmed();                     // PPM w trybie wyboru
+    void contextMenuRequested(const QPoint& globalPos); // PPM bez polecenia – menu radialne
     void pointPicked(double x, double y, double z); // LPM w trybie wskazywania punktu
     void cancelRequested();                        // Esc
     void cursorMoved(double x, double y);          // kursor na płaszczyźnie Z = 0

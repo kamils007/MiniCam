@@ -515,6 +515,10 @@ void OccView::onClick(Qt::MouseButton button, const QPoint& pos)
         } else if (button == Qt::RightButton) {
             emit selectionConfirmed();
         }
+    } else if (m_interaction == Interaction::Navigate && button == Qt::RightButton) {
+        // Kliknięcie PPM (bez przeciągania) otwiera menu radialne pod kursorem.
+        const qreal r = devicePixelRatioF();
+        emit contextMenuRequested(mapToGlobal(QPoint(qRound(pos.x() / r), qRound(pos.y() / r))));
     } else if (m_interaction == Interaction::PickPoint && button == Qt::LeftButton) {
         if (m_snap != Snap::None) {
             // Z uchwytem liczy się tylko punkt przyciągnięty; bez niego kliknięcie nic nie daje.
