@@ -9,6 +9,7 @@
 #include "PartContours.h"
 #include "ModelAlign.h"
 #include "ModelImport.h"
+#include "RadialMenu.h"
 #include "commands/Command.h"
 
 class OccView;
@@ -84,8 +85,8 @@ private:
     QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
     QAction* m_repeatAct = nullptr;   // skrót spacji
     // Pola menu radialnego (PPM), od godz. 3 zgodnie z ruchem wskazówek zegara.
-    // nullptr = puste pole; polecenia wpisujemy na bieżąco.
-    QList<QAction*> m_radialSlots;
+    // Puste pola (action = nullptr) uzupełniamy poleceniami na bieżąco.
+    std::vector<RadialSlot> m_radialSlots;
     QUndoStack* m_undo = nullptr; // historia zmian do cofania (Ctrl+Z) i ponawiania (Ctrl+Y)
     CommandBar* m_commandBar = nullptr;     // belka polecenia (druga od dołu)
     QLabel* m_cursorLabel = nullptr;        // współrzędne kursora w stopce

@@ -4,17 +4,27 @@
 #include <QPoint>
 #include <QWidget>
 
+#include <vector>
+
 class QAction;
 
-// Menu radialne pod PPM (jak w Alphacam): pierścień pól wokół kursora,
+// Jedno pole menu radialnego: polecenie (nullptr = puste pole) albo czarne strzałki »,
+// które po najechaniu rozszerzają kółko o zewnętrzny łuk z dodatkowymi polami.
+struct RadialSlot
+{
+    QAction* action = nullptr;
+    bool expands = false;    // pole z » (rozszerza kółko)
+    QList<QAction*> more;    // pola na zewnętrznym łuku (nullptr = puste)
+};
+
+// Menu radialne pod PPM (jak w Alphacam): jeden pierścień pól wokół kursora,
 // ułożonych od godz. 3 zgodnie z ruchem wskazówek zegara.
-// Pole to polecenie (QAction) albo nullptr – puste pole, uzupełniane na bieżąco.
 class RadialMenu : public QWidget
 {
     Q_OBJECT
 
 public:
-    RadialMenu(const QList<QAction*>& items, QWidget* parent = nullptr);
+    RadialMenu(const std::vector<RadialSlot>& items, QWidget* parent = nullptr);
 
     // Pokazuje menu ze środkiem w punkcie ekranu (tam, gdzie kliknięto PPM).
     void popup(const QPoint& globalCenter);
@@ -26,14 +36,25 @@ protected:
     void keyPressEvent(QKeyEvent* e) override;
 
 private:
+    struct Hit
+    {
+        int ring = -1;  // 0 = pierścień, 1 = zewnętrzny łuk, -1 = nic
+        int index = -1;
+
+        bool operator==(const Hit& o) const { return ring == o.ring && index == o.index; }
+    };
+
     QPointF center() const;
-    double step() const;               // szerokość pola w stopniach
-    double slotAngle(int index) const; // środek pola (stopnie, przeciwnie do zegara od godz. 3)
-    int slotAt(const QPointF& pos) const; // -1 = żadne
-    QString tipFor(int index) const;
-    QRect tipRect() const; // ramka podpowiedzi pod pierścieniem (pusta = brak)
+    double step() const;                // szerokość pola pierścienia w stopniach
+    double slotAngle(int index) const;  // środek pola (stopnie, przeciwnie do zegara od godz. 3)
+    double outerAngle(int index) const; // środek pola na łuku otwartych strzałek
+    Hit hitTest(const QPointF& pos) const;
+    QAction* actionAt(const Hit& hit) const;
+    QString tipFor(const Hit& hit) const;
+    QRect tipRect() const; // ramka podpowiedzi pod kółkiem (pusta = brak)
     void updateMask();
 
-    QList<QAction*> m_slots;
-    int m_hover = -1;
+    std::vector<RadialSlot> m_slots;
+    int m_open = -1; // pole z », którego łuk jest rozwinięty
+    Hit m_hover;
 };

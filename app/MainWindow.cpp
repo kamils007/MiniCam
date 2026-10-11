@@ -4,7 +4,6 @@
 #include "InputBar.h"
 #include "LayersPanel.h"
 #include "OccView.h"
-#include "RadialMenu.h"
 #include "Ribbon.h"
 #include "commands/MoveCommand.h"
 
@@ -31,6 +30,7 @@
 #include <QUndoStack>
 
 #include <algorithm>
+#include <utility>
 #include <cmath>
 #include <exception>
 
@@ -94,7 +94,13 @@ MainWindow::MainWindow(QWidget* parent)
     m_view = new OccView(this);
     setCentralWidget(m_view);
     m_alignSettings = loadAlignSettings();
-    m_radialSlots = QList<QAction*>(14, nullptr); // 14 pól jak w Alphacam, na razie puste
+    // Menu radialne: 14 pustych pól jak w Alphacam. Pola 1, 8 i 9 mają czarne strzałki »
+    // – po najechaniu kółko rozszerza się o zewnętrzny łuk z dodatkowymi pustymi polami.
+    m_radialSlots.resize(14);
+    for (auto [index, extra] : {std::pair{0, 6}, {7, 9}, {8, 6}}) {
+        m_radialSlots[index].expands = true;
+        m_radialSlots[index].more = QList<QAction*>(extra, nullptr);
+    }
 
     createDock();
     createBottomBars();

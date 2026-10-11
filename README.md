@@ -162,6 +162,7 @@ cmake --build build -j
   albo obok exe. Przy domyślnym, statycznym tripletcie nic nie trzeba kopiować.
 - Plik testowy: dowolny STEP z producenta części, np. z GrabCAD lub katalogu Misumi.
 
-**Menu radialne** (PPM w widoku 3D, gdy nie trwa żadne polecenie): pierścień 14 pól
-wokół kursora jak w Alphacam. Na razie pola są puste – polecenia wpisuje się w
+**Menu radialne** (PPM w widoku 3D, gdy nie trwa żadne polecenie): jeden pierścień 14 pól
+wokół kursora jak w Alphacam; najechanie na czarne strzałki » rozszerza kółko o łuk
+z dodatkowymi polami. Na razie pola są puste – polecenia wpisuje się w
 `m_radialSlots` (MainWindow). Podczas wybierania elementów PPM nadal zatwierdza wybór.
