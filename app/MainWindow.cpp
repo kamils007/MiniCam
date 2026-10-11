@@ -732,6 +732,8 @@ void MainWindow::createBottomBars()
             m_command->selectionConfirmed();
     });
     connect(m_inputBar, &InputBar::cancelled, this, &MainWindow::cancelCommand);
+    // Podpowiedź z paska także w rogu widoku 3D, pisana jak na starym terminalu.
+    connect(m_inputBar, &InputBar::hintChanged, m_view, &OccView::showHint);
     connect(m_commandBar, &CommandBar::snapChanged, m_view, &OccView::setSnap);
     addToolBar(Qt::BottomToolBarArea, m_commandBar);
     setStyleSheet(styleSheet() + bottomBarsStyleSheet());

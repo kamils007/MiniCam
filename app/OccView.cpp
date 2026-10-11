@@ -448,6 +448,8 @@ QImage OccView::renderImage(int width, int height)
     initViewer();
     const Quantity_Color background = m_view->BackgroundColor();
     m_view->SetBackgroundColor(Quantity_Color(Quantity_NOC_WHITE));
+    if (!m_hint.IsNull())
+        m_context->Erase(m_hint, Standard_False); // podpowiedź nie trafia na wydruk
 
     V3d_ImageDumpOptions options;
     options.Width = width;
@@ -457,6 +459,8 @@ QImage OccView::renderImage(int width, int height)
     const bool ok = m_view->ToPixMap(pixmap, options);
 
     m_view->SetBackgroundColor(background);
+    if (!m_hint.IsNull())
+        m_context->Display(m_hint, 0, -1, Standard_False);
     m_view->Redraw();
     if (!ok)
         return {};

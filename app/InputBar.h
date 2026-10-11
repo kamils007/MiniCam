@@ -61,6 +61,7 @@ signals:
     void selectionDone();                            // OK przy wyborze elementów
     void cancelled();                                // Esc w polu
     void activeChanged(bool pointInput);             // pasek pokazuje pola punktu albo nie
+    void hintChanged(const QString& text);           // polecenie + podpowiedź; pusty = brak polecenia
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;

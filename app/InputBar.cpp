@@ -228,6 +228,7 @@ void InputBar::showIdle()
     m_selectBox->hide();
     m_ok->hide();
     emit activeChanged(false);
+    emit hintChanged(QString());
 }
 
 void InputBar::startSelect(const QString& command, const QString& prompt)
@@ -311,6 +312,7 @@ void InputBar::showPrompt()
     }
     m_prompt->setText(text);
     m_prompt->show();
+    emit hintChanged(m_command->text() + " " + text);
 }
 
 bool InputBar::anyBypassed() const

@@ -28,6 +28,8 @@
 // W trybie wyboru kliknięcie LPM zaznacza element, kliknięcie PPM zatwierdza wybór;
 // w trybie wskazywania punktu kliknięcie LPM podaje punkt na płaszczyźnie Z = 0,
 // a kliknięcie PPM przerywa polecenie (jak Esc).
+class QTimer;
+
 class OccView : public QWidget
 {
     Q_OBJECT
@@ -97,6 +99,12 @@ public:
     void setGeometryVisible(int index, bool visible);
     void setModelVisible(bool visible);
 
+    // Podpowiedź polecenia w prawym górnym rogu widoku, jak na starym terminalu: zielone
+    // litery z jednej linii pojawiają się po kolei, na końcu miga kursor. Gdy zmienia się
+    // tylko końcówka (np. "wybrano 3"), dopisuje tylko ją. Pusty tekst = chowa napis.
+    // Kod: OccViewHint.cpp.
+    void showHint(const QString& text);
+
     // OCCT rysuje sam, Qt nie może malować po tym widżecie.
     QPaintEngine* paintEngine() const override { return nullptr; }
 
@@ -137,6 +145,8 @@ private:
     void updatePickFeedback(const QPoint& pos);  // krzyż albo znacznik uchwytu pod kursorem
     bool snapAt(const QPoint& pos, gp_Pnt& out) const; // najbliższy punkt uchwytu przy kursorze
     QPoint toPixels(const QPointF& p) const;
+    void hintTick();    // kolejna litera podpowiedzi albo mignięcie kursora
+    void redrawHint();
 
     Handle(V3d_Viewer) m_viewer;
     Handle(V3d_View) m_view;
@@ -177,4 +187,10 @@ private:
     QPoint m_lastPos;
     QPoint m_pressPos; // gdzie wciśnięto przycisk – odróżnia kliknięcie od przeciągania
     Interaction m_interaction = Interaction::Navigate;
+
+    Handle(AIS_InteractiveObject) m_hint; // napis podpowiedzi (nie da się go wybrać)
+    QTimer* m_hintTimer = nullptr;
+    QString m_hintText;  // cały napis
+    int m_hintTyped = 0; // ile liter już widać
+    bool m_hintCursor = true;
 };

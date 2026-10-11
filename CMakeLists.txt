@@ -80,6 +80,9 @@ qt_add_executable(minicam
     app/OccView.cpp
     app/OccView.h
     app/OccViewPick.cpp
+    app/OccViewHint.cpp
+    app/RetroFont.cpp
+    app/RetroFont.h
     app/Ribbon.cpp
     app/Ribbon.h
     app/BottomBars.cpp
