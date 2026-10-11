@@ -8,7 +8,8 @@ główne, Ekstrakcja modelu bryłowego, Bryły - Użytkowe).
 wyłączone. „Zapisz CAD…” zapisuje widoczne geometrie do DXF (R12, mm, `core/DxfExport`):
 odcinki → LINE, łuki → ARC, okręgi → CIRCLE, inne krzywe → krótkie odcinki; każdy element
 na swojej wysokości Z. Warstwy użytkownika stają się warstwami DXF (kolor najbliższy
-z palety DXF, nazwa bez polskich znaków i spacji), geometrie APS idą na warstwę „0”.
+z pełnej palety DXF 1–255, elementy mają kolor i typ linii „jak warstwa”, nazwa bez
+polskich znaków i spacji), geometrie APS idą na warstwę „0”.
 
 **Auto-wyrównanie** (Bryły - Użytkowe): ustawienia w „Rozpoznawanie cech modelu…”.
 Przy „Wyrównanie panelu” na stole kładzie się płaszczyzna o największej sumie pól
