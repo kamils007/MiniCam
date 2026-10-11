@@ -128,7 +128,8 @@ minicam/
         ├── Command.h/.cpp         klasa bazowa + CommandHost (co polecenie dostaje od okna)
         ├── DrawCommands.h/.cpp    Linia, Łuk, Koło, Prostokąt (zakładka Geometria)
         ├── JoinCommands.h/.cpp    Połącz, Rozdziel (Edycja)
-        └── MoveCommand.h/.cpp     Przesuń
+        ├── MoveCommand.h/.cpp     Przesuń
+        └── ZLevelsCommand.h/.cpp  Poziomy Z (zakładka 3D)
 ```
 
 ## Sterowanie
