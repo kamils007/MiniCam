@@ -42,6 +42,9 @@ void OccView::showCrosshair(const QPoint& pos)
         m_crosshair->SetWidth(1.0);
         // Nie liczy się do "dopasuj do okna" ani do zakresu głębi widoku.
         m_crosshair->SetInfiniteState(Standard_True);
+        // Zawsze nad bryłami, geometrią i podglądem przesuwania: warstwa
+        // Topmost czyści bufor głębi, więc nic jej nie zasłania.
+        m_crosshair->SetZLayer(Graphic3d_ZLayerId_Topmost);
     }
     const gp_Pnt p = pointOnTable(pos);
     gp_Trsf move;
