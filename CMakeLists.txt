@@ -38,6 +38,10 @@ add_library(camcore STATIC
     core/ModelImport.h
     core/ModelExport.cpp
     core/ModelExport.h
+    core/ArdExport.cpp
+    core/ArdExport.h
+    core/ArdPaths.cpp
+    core/ArdPaths.h
     core/DxfExport.cpp
     core/DxfExport.h
     core/ModelAlign.cpp
