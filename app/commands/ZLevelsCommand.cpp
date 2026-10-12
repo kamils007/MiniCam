@@ -138,7 +138,9 @@ void ZLevelsCommand::selectionConfirmed()
     }
     std::sort(m_geometries.begin(), m_geometries.end());
     // W oknie na start aktualne poziomy (pierwszej wybranej) geometrii.
-    const camcore::Contour& first = host().editState().geometries[static_cast<size_t>(m_geometries.front())].contour;
+    // editState() zwraca kopię – trzymamy ją, a nie referencję do zwolnionej pamięci.
+    const EditState state = host().editState();
+    const camcore::Contour& first = state.geometries[static_cast<size_t>(m_geometries.front())].contour;
     m_top = num(first.zTop);
     m_bottom = num(first.zBottom);
     showDialog();
