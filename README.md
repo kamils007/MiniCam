@@ -103,9 +103,10 @@ wykonuje, Esc anuluje, Ctrl+Z cofa.
 
 **3D → Poziomy Z** (grupa „Ustaw poziomy Z/Materiał”, jak Z levels w Alphacam,
 `app/commands/ZLevelsCommand`, `core/GeometryEdit`): wybór geometrii (LPM), PPM, Enter albo OK
-otwiera okno z górnym i dolnym poziomem Z (dolny może być poniżej 0, na start aktualne poziomy wybranej geometrii) i różnicą
-między nimi liczoną na bieżąco; OK w oknie kończy polecenie – płaska geometria dostaje wysokość:
-leży na górnym poziomie, a ściany schodzą do dolnego. Esc
+otwiera okno „Definiuj poziomy Z” jak w Alphacam: Góra Z i Dół Z (na start aktualne poziomy wybranej
+geometrii; Dół może być poniżej 0, w polach działają wyrażenia), przy każdym przycisk „...” – Z ze
+wskazanego punktu (uchwyt albo pasek wprowadzania), i Różnica liczona na bieżąco. OK kończy
+polecenie – płaska geometria dostaje wysokość: leży na Górze Z, a ściany schodzą do Dołu Z. Esc
 anuluje, Ctrl+Z cofa. Przesuń zmienia położenie geometrii tylko w X i Y –
 poziomy Z zostają, także gdy punkt bazowy albo docelowy złapano uchwytem na innej wysokości. Pozostałe grupy zakładki 3D – później.
 
