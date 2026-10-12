@@ -1,42 +1,564 @@
 #include "MainWindow.h"
+#include "AlignSettingsDialog.h"
+#include "BottomBars.h"
+#include "InputBar.h"
+#include "LayersPanel.h"
 #include "OccView.h"
+#include "Ribbon.h"
+#include "Icons.h"
+#include "AppName.h"
+#include "Shortcuts.h"
+#include "ToolSides.h"
+#include "commands/DeleteCommand.h"
+#include "commands/DrawCommands.h"
+#include "commands/JoinCommands.h"
+#include "commands/TrimCommand.h"
+#include "commands/ZLevelsCommand.h"
+#include "commands/MoveCommand.h"
+#include "commands/ToolDirectionsCommand.h"
+#include "ToolDirectionsDialog.h"
 
-#include "ModelImport.h"
-
+#include <QAction>
+#include <QHBoxLayout>
+#include <QIcon>
+#include <QLabel>
+#include <QPainter>
+#include <QPixmap>
+#include <QSettings>
+#include <QKeyEvent>
 #include <QApplication>
+#include <QDockWidget>
+#include <QEvent>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QMenuBar>
+#include <QMenu>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <QStyle>
+#include <QToolBar>
+#include <QToolButton>
+#include <QUndoCommand>
+#include <QUndoStack>
 
+#include <algorithm>
+#include <functional>
+#include <utility>
+#include <cmath>
 #include <exception>
+
+namespace {
+
+const char* const kDirectionsKey = "widok/kierunki"; // czy pokazywać strzałki kierunku
+
+// Ikona widoku: sześcian w izometrii z zaznaczoną na niebiesko ścianą, od której patrzymy.
+// Ściany niewidoczne w izometrii (spód, tył, lewa) rysujemy przerywaną linią.
+enum class CubeFace { Top, Bottom, Front, Back, Left, Right, None };
+
+QIcon viewIcon(CubeFace face)
+{
+    QPixmap pix(32, 32);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    // Narożniki: T = góra, B = dół; tył, prawo, przód, lewo jak w widoku izometrycznym.
+    const QPointF tBack(16, 3), tRight(28, 9), tFront(16, 15), tLeft(4, 9);
+    const QPointF bBack(16, 17), bRight(28, 23), bFront(16, 29), bLeft(4, 23);
+    auto quad = [&](QPointF a, QPointF b, QPointF c, QPointF d) {
+        const QPointF pts[] = {a, b, c, d};
+        p.drawPolygon(pts, 4);
+    };
+    auto drawFace = [&](CubeFace f) {
+        switch (f) {
+        case CubeFace::Top: quad(tBack, tRight, tFront, tLeft); break;
+        case CubeFace::Bottom: quad(bBack, bRight, bFront, bLeft); break;
+        case CubeFace::Front: quad(tLeft, tFront, bFront, bLeft); break;
+        case CubeFace::Right: quad(tFront, tRight, bRight, bFront); break;
+        case CubeFace::Back: quad(tBack, tRight, bRight, bBack); break;
+        case CubeFace::Left: quad(tBack, tLeft, bLeft, bBack); break;
+        case CubeFace::None: break;
+        }
+    };
+    const QColor blue(60, 130, 220);
+    const bool hidden = face == CubeFace::Bottom || face == CubeFace::Back || face == CubeFace::Left;
+    if (hidden) { // ściana z tyłu – najpierw, przezroczysta
+        p.setPen(QPen(blue.darker(130), 1.2, Qt::DashLine));
+        p.setBrush(QColor(60, 130, 220, 110));
+        drawFace(face);
+    }
+    p.setPen(QPen(QColor(50, 50, 50), 1.2));
+    for (CubeFace f : {CubeFace::Top, CubeFace::Front, CubeFace::Right}) {
+        p.setBrush(f == face ? blue : QColor(235, 235, 235, hidden ? 150 : 255));
+        drawFace(f);
+    }
+    return QIcon(pix);
+}
+
+// Ikona lupy z plusem albo minusem (powiększ / pomniejsz).
+QIcon zoomIcon(bool in)
+{
+    QPixmap pix(32, 32);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(QPen(QColor(60, 60, 60), 3, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(20, 20), QPointF(29, 29));
+    p.setPen(QPen(QColor(60, 60, 60), 2));
+    p.setBrush(QColor(225, 238, 252));
+    p.drawEllipse(QPointF(13, 13), 9, 9);
+    p.setPen(QPen(QColor(30, 100, 200), 2.5));
+    p.drawLine(QPointF(9, 13), QPointF(17, 13));
+    if (in)
+        p.drawLine(QPointF(13, 9), QPointF(13, 17));
+    return QIcon(pix);
+}
+
+// Jedna zmiana na liście cofania: stan przed i po. Qt wywołuje redo() od razu przy
+// dodaniu na stos – wtedy zmiana jest już zrobiona, więc pierwszy raz nic nie robimy.
+class EditCommand : public QUndoCommand
+{
+public:
+    EditCommand(MainWindow* window, const QString& text, EditState before, EditState after)
+        : QUndoCommand(text), m_window(window), m_before(std::move(before)), m_after(std::move(after))
+    {
+    }
+    void undo() override { m_window->restoreEditState(m_before); }
+    void redo() override
+    {
+        if (m_first) {
+            m_first = false;
+            return;
+        }
+        m_window->restoreEditState(m_after);
+    }
+
+private:
+    MainWindow* m_window;
+    EditState m_before, m_after;
+    bool m_first = true;
+};
+
+} // namespace
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
-    setWindowTitle("MiniCAM");
+    setWindowTitle(kAppName);
 
+    m_undo = new QUndoStack(this);
     m_view = new OccView(this);
     setCentralWidget(m_view);
+    m_alignSettings = loadAlignSettings();
+    // Menu radialne: 14 pustych pól jak w Alphacam. Pola 1, 8 i 9 mają czarne strzałki »
+    // – po najechaniu kółko rozszerza się o zewnętrzny łuk z dodatkowymi pustymi polami.
+    m_radialSlots.resize(14);
+    for (auto [index, extra] : {std::pair{0, 6}, {7, 9}, {8, 6}}) {
+        m_radialSlots[index].expands = true;
+        m_radialSlots[index].more = QList<QAction*>(extra, nullptr);
+    }
 
-    QMenu* fileMenu = menuBar()->addMenu("&Plik");
-    QAction* openAct = fileMenu->addAction("&Otwórz model…", this, &MainWindow::onOpen);
-    openAct->setShortcut(QKeySequence::Open);
-    fileMenu->addSeparator();
-    QAction* quitAct = fileMenu->addAction("&Zakończ", this, &QWidget::close);
-    quitAct->setShortcut(QKeySequence::Quit);
-
-    QMenu* viewMenu = menuBar()->addMenu("&Widok");
-    QAction* fitAct = viewMenu->addAction("&Dopasuj do okna", m_view, &OccView::fitAll);
-    fitAct->setShortcut(Qt::Key_F);
-
+    createDock();
+    createBottomBars();
+    createRibbon();
+    // Zdarzenia z widoku trafiają do trwającego polecenia.
+    connect(m_view, &OccView::selectionConfirmed, this, [this] {
+        if (m_command)
+            m_command->selectionConfirmed();
+    });
+    connect(m_view, &OccView::pointPicked, this, &MainWindow::onPointPicked);
+    connect(m_view, &OccView::contextMenuRequested, this, &MainWindow::showRadialMenu);
+    connect(m_view, &OccView::cancelRequested, this, &MainWindow::cancelCommand);
+    connect(m_view, &OccView::selectionChanged, this, [this](int count) {
+        if (m_command)
+            m_command->selectionChanged(count);
+    });
+    // Klawiatura w widoku 3D trafia do paska wprowadzania (pisanie liczb, Enter, Tab).
+    m_view->installEventFilter(this);
     statusBar()->showMessage("Otwórz bryłę: Plik → Otwórz (Ctrl+O)");
+}
+
+void MainWindow::createDock()
+{
+    // Dokowane okno po lewej – miejsce na późniejsze dodatki (np. lista operacji).
+    // Można je przeciągnąć na prawą stronę, odczepić jako osobne okno albo zamknąć.
+    m_dock = new QDockWidget("Warstwy", this);
+    m_dock->setObjectName("dodatkiDock"); // potrzebne do zapamiętania układu okien
+    m_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    // Panel warstw jak w Alphacam; checkboxy sterują widocznością w widoku 3D.
+    m_layers = new LayersPanel(m_dock);
+    connect(m_layers, &LayersPanel::geometryVisibilityChanged, this, &MainWindow::setGeometryVisible);
+    connect(m_layers, &LayersPanel::modelVisibilityChanged, m_view, &OccView::setModelVisible);
+    connect(m_layers, &LayersPanel::geometriesSelected, m_view, &OccView::highlightGeometry);
+    m_dock->setWidget(m_layers);
+    m_dock->setMinimumWidth(220);
+    // Tło trochę jaśniejsze niż pas ikon na wstążce, kolory niezależne od motywu Windows.
+    m_dock->setStyleSheet(R"(
+        QDockWidget { color: black; }
+        QDockWidget::title { background: #d4d4d4; padding: 4px; }
+        QDockWidget > QWidget { background: #efefef; color: black; border: none; }
+        QTreeWidget { background: #efefef; color: black; border: none; }
+        QTreeWidget::item:selected { background: #cfe3f7; color: black; }
+        QToolBar { background: #e6e6e6; border: none; spacing: 2px; }
+        QToolBar#layersSide { border-right: 1px solid #c8c8c8; }
+        QToolBar#layersBar { border-bottom: 1px solid #c8c8c8; }
+        QToolButton:checked { background: #cfe3f7; border: 1px solid #7aa7d6; }
+    )");
+    addDockWidget(Qt::LeftDockWidgetArea, m_dock);
+
+    // Odczepione okno na Windows ma systemowy pasek tytułu – dwuklik w niego
+    // maksymalizowałby okno. Przechwytujemy go i przyczepiamy okno z powrotem.
+    m_dock->installEventFilter(this);
+}
+
+void MainWindow::dockToHome()
+{
+    m_dock->setFloating(false);
+    addDockWidget(Qt::LeftDockWidgetArea, m_dock); // "baza" – lewa strona okna
+    m_dock->show();
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == m_view && event->type() == QEvent::KeyPress) {
+        auto* e = static_cast<QKeyEvent*>(event);
+        if (m_inputBar->handleViewKey(e))
+            return true;
+        // Enter w trakcie wyboru elementów działa jak PPM.
+        if (m_command && m_command->isSelecting() && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)) {
+            m_command->selectionConfirmed();
+            return true;
+        }
+    }
+    if (watched == m_dock && m_dock->isFloating()
+        && (event->type() == QEvent::NonClientAreaMouseButtonDblClick
+            || event->type() == QEvent::MouseButtonDblClick)) {
+        dockToHome();
+        return true; // zdarzenie obsłużone – system go już nie dostanie
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::createRibbon()
+{
+    // Akcje (QAction) to "polecenia" programu. Ten sam obiekt może siedzieć
+    // w menu Plik i na wstążce, a skrót klawiszowy działa w całym oknie.
+    QAction* openAct = new QAction(appIcon("otworz-model"),
+                                   "Otwórz\nmodel", this);
+    shortcuts::bind(openAct, shortcuts::kOpen);
+    connect(openAct, &QAction::triggered, this, &MainWindow::onOpen);
+
+    QAction* quitAct = new QAction("Zakończ", this);
+    shortcuts::bind(quitAct, shortcuts::kQuit);
+    connect(quitAct, &QAction::triggered, this, &QWidget::close);
+
+    QAction* fitAct = new QAction(appIcon("dopasuj-do-okna"),
+                                  "Dopasuj\ndo okna", this);
+    shortcuts::bind(fitAct, shortcuts::kFitAll);
+    connect(fitAct, &QAction::triggered, m_view, &OccView::fitAll);
+
+    QAction* autoAlignAct = new QAction(appIcon("auto-wyrownanie"),
+                                        "Auto-Wyrównanie\nCzęści", this);
+    autoAlignAct->setToolTip("Wyrównaj bryłę według ustawień z okna Konfiguracja;\n"
+                             "każde kolejne kliknięcie odwraca ją na drugą stronę");
+    connect(autoAlignAct, &QAction::triggered, this, &MainWindow::onAutoAlign);
+
+    QAction* recognizeAct = new QAction(appIcon("rozpoznaj-cechy"),
+                                        "Rozpoznaj\ncechy", this);
+    recognizeAct->setToolTip("Narysuj kontury 2D z bryły: od dołu, na każdej\npoziomej powierzchni");
+    connect(recognizeAct, &QAction::triggered, this, &MainWindow::onRecognizeFeatures);
+
+    QAction* settingsAct = new QAction(appIcon("ustawienia-rozpoznawania"),
+                                       "Rozpoznawanie\ncech modelu…", this);
+    connect(settingsAct, &QAction::triggered, this, &MainWindow::onAlignSettings);
+
+    // Zielone strzałki kierunku i strony narzędzia przy geometriach – włącz/wyłącz.
+    // Stan zapamiętuje się między uruchomieniami programu.
+    QAction* directionsAct = new QAction(appIcon("pokaz-kierunki"), "Pokaż\nkierunki", this);
+    directionsAct->setCheckable(true);
+    directionsAct->setChecked(QSettings("MiniCAM", "MiniCAM").value(kDirectionsKey, true).toBool());
+    shortcuts::bind(directionsAct, shortcuts::kToggleDirections);
+    directionsAct->setToolTip("Pokaż/ukryj zielone strzałki kierunku i strony narzędzia (" +
+                              shortcuts::text(shortcuts::kToggleDirections) + ")");
+    m_view->setDirectionsVisible(directionsAct->isChecked());
+    connect(directionsAct, &QAction::toggled, this, [this](bool on) {
+        m_view->setDirectionsVisible(on);
+        QSettings("MiniCAM", "MiniCAM").setValue(kDirectionsKey, on);
+        statusBar()->showMessage(QString("Kierunki narzędzia: %1 (%2)")
+                                     .arg(on ? "widoczne" : "ukryte", shortcuts::text(shortcuts::kToggleDirections)));
+    });
+
+    // Skróty muszą być zarejestrowane w oknie, inaczej działałyby tylko
+    // przy otwartym menu.
+    addActions({openAct, quitAct, fitAct, directionsAct});
+
+    auto* ribbon = new Ribbon(this);
+    createFileMenu(ribbon->fileMenu(), quitAct);
+
+    // Akcja "pokaż/ukryj okno" gotowa od Qt – zaznaczona, gdy okno jest widoczne.
+    QAction* dockAct = m_dock->toggleViewAction();
+    dockAct->setText("Okno\nWarstwy");
+    dockAct->setIcon(appIcon("okno-warstwy"));
+
+    RibbonPage* home = ribbon->addPage("Narzędzia główne");
+    home->addGroup("Plik")->addAction(openAct);
+    // Grupa CAD jak w Alphacam: Wczytaj CAD (na razie wyłączone) i Zapisz CAD (DXF).
+    QAction* inputCadAct = new QAction(appIcon("wczytaj-cad"), "Wczytaj\nCAD…", this);
+    inputCadAct->setEnabled(false);
+    inputCadAct->setToolTip("Wczytaj CAD – rysunek z innego programu (wkrótce)");
+    QAction* outputCadAct = new QAction(appIcon("zapisz-cad"), "Zapisz\nCAD…", this);
+    outputCadAct->setToolTip("Zapisz CAD – geometrie 2D do pliku DXF\n"
+                             "(na swoich wysokościach Z, warstwy jako warstwy DXF)");
+    connect(outputCadAct, &QAction::triggered, this, &MainWindow::onOutputCad);
+    RibbonGroup* cadGroup = home->addGroup("CAD");
+    cadGroup->addAction(inputCadAct);
+    cadGroup->addAction(outputCadAct);
+    RibbonGroup* viewGroup = home->addGroup("Widok");
+    viewGroup->addAction(fitAct);
+    viewGroup->addAction(dockAct);
+
+    // Zakładka Edycja – układ grup jak w Alphacam. Na razie działa "Przesuń",
+    // pozostałe polecenia są widoczne, ale wyłączone (przyjdą później).
+    auto soon = [this](const QString& icon, const QString& text) {
+        auto* a = new QAction(appIcon(icon), text, this);
+        a->setEnabled(false);
+        a->setToolTip(QString(text).replace('\n', ' ') + " (wkrótce)");
+        return a;
+    };
+    QAction* moveAct = new QAction(appIcon("przesun"), "Przesuń", this);
+    moveAct->setToolTip("Przesuń bryłę lub geometrie: wybierz elementy (LPM),\n"
+                        "zatwierdź PPM, potem kliknij punkt bazowy i docelowy\n"
+                        "albo wpisz przesunięcie dX/dY/dZ");
+    connect(moveAct, &QAction::triggered, this, [this] { runCommand(new MoveCommand(*this, this)); });
+
+    RibbonPage* edit = ribbon->addPage("Edycja");
+    RibbonGroup* editGroup = edit->addGroup("Edycja");
+    QAction* undoAct = new QAction(appIcon("cofnij"), "Cofnij", this);
+    shortcuts::bind(undoAct, shortcuts::kUndo);
+    undoAct->setToolTip("Cofnij ostatnią zmianę (Ctrl+Z)");
+    undoAct->setEnabled(false);
+    connect(undoAct, &QAction::triggered, this, [this] {
+        cancelCommand();
+        const QString what = m_undo->undoText();
+        m_undo->undo();
+        statusBar()->showMessage("Cofnięto: " + what);
+    });
+    connect(m_undo, &QUndoStack::canUndoChanged, undoAct, &QAction::setEnabled);
+    QAction* redoAct = new QAction(appIcon("ponow"), "Ponów", this);
+    shortcuts::bind(redoAct, shortcuts::kRedo);
+    redoAct->setToolTip("Ponów cofniętą zmianę (Ctrl+Y)");
+    redoAct->setEnabled(false);
+    connect(redoAct, &QAction::triggered, this, [this] {
+        cancelCommand();
+        const QString what = m_undo->redoText();
+        m_undo->redo();
+        statusBar()->showMessage("Ponowiono: " + what);
+    });
+    connect(m_undo, &QUndoStack::canRedoChanged, redoAct, &QAction::setEnabled);
+    addActions({undoAct, redoAct}); // skróty działają w całym oknie
+    editGroup->addAction(undoAct);
+    editGroup->addAction(redoAct);
+    QAction* deleteAct = new QAction(appIcon("usun"), "Usuń", this);
+    shortcuts::bind(deleteAct, shortcuts::kDelete);
+    deleteAct->setToolTip("Usuń bryłę lub geometrie: wybierz elementy (LPM),\n"
+                          "PPM usuwa (Del, Ctrl+Z cofa)");
+    connect(deleteAct, &QAction::triggered, this, [this] { runCommand(new DeleteCommand(*this, this)); });
+    addAction(deleteAct); // skrót Del działa w całym oknie
+    editGroup->addAction(deleteAct);
+    // W menu radialnym (PPM) polecenia stoją tam, gdzie w Alphacam: Usuń (pole 11, godz. 12),
+    // Cofnij i Ponów (pola 12 i 13), Przesuń w łuku pola 8.
+    m_radialSlots[10].action = deleteAct; // X na godz. 12
+    m_radialSlots[7].more[4] = moveAct; // środek łuku "Przesuń, kopiuj itd." (godz. 9)
+    m_radialSlots[11].action = undoAct;
+    m_radialSlots[12].action = redoAct;
+    RibbonGroup* clipboard = edit->addGroup("Schowek");
+    clipboard->addAction(soon("kopiuj", "Kopiuj"));
+    clipboard->addAction(soon("wytnij", "Wytnij"));
+    clipboard->addAction(soon("wklej", "Wklej"));
+    RibbonGroup* moveGroup = edit->addGroup("Przesuń, kopiuj itd.");
+    moveGroup->addAction(moveAct);
+    moveGroup->addAction(soon("obroc", "Obróć"));
+    moveGroup->addAction(soon("lustro", "Lustro"));
+    moveGroup->addAction(soon("skaluj", "Skaluj"));
+    RibbonGroup* breakGroup = edit->addGroup("Przerwij, połącz itd.");
+    breakGroup->addAction(soon("przerwij", "Przerwij"));
+    QAction* trimAct = new QAction(appIcon("przytnij"), "Utnij", this);
+    trimAct->setToolTip("Utnij geometrie: wybierz geometrie tnące (LPM), PPM,\n"
+                        "potem kliknij kawałki do usunięcia, PPM ucina (Ctrl+Z cofa)");
+    connect(trimAct, &QAction::triggered, this, [this] { runCommand(new TrimCommand(*this, this)); });
+    breakGroup->addAction(trimAct);
+    QAction* joinAct = new QAction(appIcon("polacz"), "Połącz", this);
+    joinAct->setToolTip("Połącz geometrie stykające się końcami w jedną:\n"
+                        "wybierz geometrie (LPM), PPM łączy (Ctrl+Z cofa)");
+    connect(joinAct, &QAction::triggered, this, [this] { runCommand(new JoinCommand(*this, this)); });
+    breakGroup->addAction(joinAct);
+    QAction* explodeAct = new QAction(appIcon("rozdziel"), "Rozdziel", this);
+    explodeAct->setToolTip("Rozdziel geometrię na osobne elementy (odcinki, łuki):\n"
+                           "wybierz geometrie (LPM), PPM rozdziela (Ctrl+Z cofa)");
+    connect(explodeAct, &QAction::triggered, this, [this] { runCommand(new ExplodeCommand(*this, this)); });
+    breakGroup->addAction(explodeAct);
+
+    RibbonPage* extraction = ribbon->addPage("Ekstrakcja modelu bryłowego");
+    extraction->addGroup("Cechy")->addAction(recognizeAct);
+
+    RibbonPage* solids = ribbon->addPage("Bryły - Użytkowe");
+    solids->addGroup("Wyrównanie")->addAction(autoAlignAct);
+    solids->addGroup("Ustawienia")->addAction(settingsAct);
+
+    // Zakładka Widok: widoki okna (kierunek patrzenia), powiększenie i okna.
+    RibbonPage* viewPage = ribbon->addPage("Widok");
+    RibbonGroup* zoomGroup = viewPage->addGroup("Powiększenie");
+    zoomGroup->addAction(fitAct);
+    QAction* zoomInAct = new QAction(zoomIcon(true), "Powiększ", this);
+    connect(zoomInAct, &QAction::triggered, this, [this] { m_view->zoom(1.25); });
+    QAction* zoomOutAct = new QAction(zoomIcon(false), "Pomniejsz", this);
+    connect(zoomOutAct, &QAction::triggered, this, [this] { m_view->zoom(0.8); });
+    zoomGroup->addAction(zoomInAct);
+    zoomGroup->addAction(zoomOutAct);
+    RibbonGroup* views3d = viewPage->addGroup("Widoki 3D");
+    struct ViewDef
+    {
+        const char* text;
+        CubeFace face;
+        OccView::StandardView view;
+    };
+    const ViewDef viewDefs[] = {
+        {"Z góry", CubeFace::Top, OccView::StandardView::Top},
+        {"Z dołu", CubeFace::Bottom, OccView::StandardView::Bottom},
+        {"Z przodu", CubeFace::Front, OccView::StandardView::Front},
+        {"Z tyłu", CubeFace::Back, OccView::StandardView::Back},
+        {"Z lewej", CubeFace::Left, OccView::StandardView::Left},
+        {"Z prawej", CubeFace::Right, OccView::StandardView::Right},
+        {"Izometryczny", CubeFace::None, OccView::StandardView::Iso},
+    };
+    for (const ViewDef& d : viewDefs) {
+        auto* a = new QAction(viewIcon(d.face), QString::fromUtf8(d.text), this);
+        a->setToolTip("Widok " + a->text().toLower() + " (dopasowany do okna)");
+        const OccView::StandardView v = d.view;
+        connect(a, &QAction::triggered, this, [this, v] { m_view->setStandardView(v); });
+        views3d->addAction(a);
+    }
+    viewPage->addGroup("Okna")->addAction(dockAct);
+
+    // Zakładka Geometria – rysowanie jak w Alphacam (Geometria → 2D): Linia, Łuk ▾, Koło ▾,
+    // Prostokąt. Punkty z kliknięcia (z uchwytami) albo z paska wprowadzania, PPM/Esc kończy.
+    auto drawAct = [this](const QString& icon, const QString& text, const QString& tip,
+                          std::function<Command*()> make) {
+        auto* a = new QAction(appIcon(icon), text, this);
+        a->setToolTip(tip);
+        connect(a, &QAction::triggered, this, [this, make] { runCommand(make()); });
+        return a;
+    };
+    using Arc = ArcCommand::Method;
+    using Circle = CircleCommand::Method;
+    auto arcAct = [&](const QString& icon, const QString& text, const QString& tip, Arc m) {
+        return drawAct(icon, text, tip, [this, m] { return new ArcCommand(m, *this, this); });
+    };
+    auto circleAct = [&](const QString& icon, const QString& text, const QString& tip, Circle m) {
+        return drawAct(icon, text, tip, [this, m] { return new CircleCommand(m, *this, this); });
+    };
+    QAction* lineAct = drawAct("linia", "Linia",
+                               "Odcinki: punkt 'Od', potem kolejne punkty 'Do' (jedna geometria);\n"
+                               "kliknięcie w początek zamyka kontur, PPM lub Esc kończy",
+                               [this] { return new LineCommand(*this, this); });
+    const QList<QAction*> arcActs = {
+        arcAct("luk-3-punkty", "Początek + Drugi + Koniec", "Łuk przez trzy punkty", Arc::StartSecondEnd),
+        arcAct("luk-2-punkty-promien", "2 punkty + Promień",
+               "Łuk przeciwnie do ruchu wskazówek zegara od początku do końca o podanym promieniu",
+               Arc::TwoPointsRadius),
+        arcAct("luk-2-punkty-srodek", "2 punkty + Środek",
+               "Łuk przeciwnie do ruchu wskazówek zegara: początek, koniec, środek", Arc::TwoPointsCentre),
+        arcAct("luk-srodek-kat", "Początek + Środek + Kąt rozwarcia",
+               "Łuk od początku wokół środka o podany kąt (dodatni – przeciwnie do wskazówek zegara)",
+               Arc::StartCentreAngle),
+    };
+    const QList<QAction*> circleActs = {
+        circleAct("kolo-srodek-srednica", "Środek + Średnica", "Podaj średnicę, potem klikaj środki kół",
+                  Circle::CentreDiameter),
+        circleAct("kolo-srodek-promien", "Środek + Promień", "Podaj promień, potem klikaj środki kół",
+                  Circle::CentreRadius),
+        circleAct("kolo-srodek-punkt", "Środek + Punkt", "Środek koła i punkt na okręgu", Circle::CentrePoint),
+        circleAct("kolo-2-punkty", "2 punkty", "Dwa przeciwległe punkty okręgu (średnica)", Circle::TwoPoints),
+        circleAct("kolo-3-punkty", "3 punkty", "Okrąg przez trzy punkty", Circle::ThreePoints),
+    };
+    QAction* rectangleAct = drawAct("prostokat", "Prostokąt", "Prostokąt z dwóch przeciwległych narożników",
+                                    [this] { return new RectangleCommand(*this, this); });
+    RibbonPage* geometryPage = ribbon->addPage("Geometria");
+    RibbonGroup* draw2d = geometryPage->addGroup("2D");
+    draw2d->addAction(lineAct);
+    draw2d->addMenu(appIcon("luk-3-punkty"), "Łuk", arcActs);
+    draw2d->addMenu(appIcon("kolo-srodek-srednica"), "Koło", circleActs);
+    draw2d->addAction(rectangleAct);
+    QList<QAction*> drawActs = {lineAct, rectangleAct};
+    drawActs << arcActs << circleActs;
+
+    // Zakładka 3D (jak w Alphacam). Na razie tylko Poziomy Z w grupie
+    // "Ustaw poziomy Z/Materiał"; Panele, Edycja powierzchni, Edycja geometrii,
+    // Narzędzia STL i Obrót części 3D – później.
+    QAction* zLevelsAct = new QAction(appIcon("poziomy-z"), "Poziomy Z", this);
+    zLevelsAct->setToolTip("Poziomy Z: dolny i górny poziom dla wybranych geometrii – płaska geometria dostaje wysokość");
+    connect(zLevelsAct, &QAction::triggered, this, [this] { runCommand(new ZLevelsCommand(*this, this)); });
+    RibbonPage* page3d = ribbon->addPage("3D");
+    page3d->addGroup("Ustaw poziomy Z/Materiał")->addAction(zLevelsAct);
+
+    // Zakładka Technologia (jak Machine w Alphacam). Grupa "Narzędzia i kierunki":
+    // okno Kierunki narzędzia (jak Tool Directions) i przełącznik strzałek kierunku (Ctrl+G).
+    RibbonPage* machinePage = ribbon->addPage("Technologia");
+    QAction* toolDirectionsAct = new QAction(appIcon("kierunki"), "Kierunki\nnarzędzia…", this);
+    toolDirectionsAct->setToolTip("Kierunek i strona narzędzia geometrii otwartych i zamkniętych:\n"
+                                  "wszystkie geometrie albo wybrane (LPM, PPM zmienia; Ctrl+Z cofa)");
+    connect(toolDirectionsAct, &QAction::triggered, this, [this] {
+        cancelCommand();
+        ToolDirectionsDialog dialog(this);
+        const int result = dialog.exec();
+        if (result == ToolDirectionsDialog::AllGeometries)
+            statusBar()->showMessage(ToolDirectionsCommand::applyTo(*this, {}, dialog.change()));
+        else if (result == ToolDirectionsDialog::SelectGeometries)
+            runCommand(new ToolDirectionsCommand(dialog.change(), *this, this));
+    });
+    RibbonGroup* directionsGroup = machinePage->addGroup("Narzędzia i kierunki");
+    directionsGroup->addAction(toolDirectionsAct);
+    directionsGroup->addAction(directionsAct);
+
+    // Spacja powtarza ostatnie polecenie (jak w Alphacam) – działa tak, jakby kliknąć
+    // jego przycisk na wstążce. Zapamiętujemy polecenia, które coś robią z modelem;
+    // widok, okna, plik i Cofnij/Ponów się nie liczą.
+    QList<QAction*> repeatable = {moveAct, deleteAct, recognizeAct, autoAlignAct, settingsAct};
+    repeatable << drawActs << trimAct << joinAct << explodeAct << zLevelsAct << toolDirectionsAct;
+    for (QAction* a : repeatable) {
+        connect(a, &QAction::triggered, this, [this, a] {
+            m_lastCommand = a;
+            m_repeatAct->setToolTip("Powtórz: " + a->text().replace('\n', ' ') + " (spacja)");
+        });
+    }
+    // Skrót okna: pole tekstowe z fokusem zabiera spację dla siebie, więc pisanie
+    // w polach paska wprowadzania nie powtarza polecenia.
+    m_repeatAct = new QAction("Powtórz ostatnie polecenie", this);
+    shortcuts::bind(m_repeatAct, shortcuts::kRepeatCommand);
+    connect(m_repeatAct, &QAction::triggered, this, [this] {
+        if (!m_lastCommand) {
+            statusBar()->showMessage("Spacja powtarza ostatnie polecenie – na razie żadnego nie było");
+            return;
+        }
+        if (m_command || !m_lastCommand->isEnabled())
+            return; // w trakcie polecenia spacja nic nie robi
+        m_lastCommand->trigger();
+    });
+    addAction(m_repeatAct);
+
+    // Wstążka zajmuje miejsce zwykłego paska menu.
+    setMenuWidget(ribbon);
+}
+
+void MainWindow::showRadialMenu(const QPoint& globalPos)
+{
+    auto* menu = new RadialMenu(m_radialSlots, this); // usuwa się sam po zamknięciu
+    menu->popup(globalPos);
 }
 
 void MainWindow::onOpen()
 {
+    if (!maybeSave())
+        return;
     const QString path = QFileDialog::getOpenFileName(
         this, "Otwórz model", QString(),
         "Modele 3D (*.step *.stp *.iges *.igs *.brep *.brp);;"
@@ -54,17 +576,291 @@ void MainWindow::openFile(const QString& path)
 
     try {
         // Rdzeń dostaje ścieżkę w UTF-8 – działa też z polskimi znakami.
-        const TopoDS_Shape shape = camcore::importModel(path.toUtf8().toStdString());
-        m_view->showShape(shape);
+        m_original = camcore::importModel(path.toUtf8().toStdString());
+        m_fileName = QFileInfo(path).fileName();
+        m_savePath.clear(); // "Zapisz" nie nadpisuje pliku źródłowego bez pytania
+        addRecentFile(path);
+
+        m_flipped = false;
+        m_aligned = m_alignSettings.alignAfterImport;
+        QString how = "położenie z pliku";
+        if (m_aligned) {
+            showAligned();
+            how = "wyrównano automatycznie";
+        } else {
+            showModel(m_original);
+        }
         QApplication::restoreOverrideCursor();
 
-        setWindowTitle("MiniCAM – " + QFileInfo(path).fileName());
-        statusBar()->showMessage(QString("Wczytano %1 w %2 ms")
-                                     .arg(QFileInfo(path).fileName())
-                                     .arg(timer.elapsed()));
+        setWindowTitle(kAppName + " – " + m_fileName);
+        statusBar()->showMessage(QString("Wczytano %1 w %2 ms (%3)")
+                                     .arg(m_fileName)
+                                     .arg(timer.elapsed())
+                                     .arg(how));
     } catch (const std::exception& ex) {
         QApplication::restoreOverrideCursor();
         statusBar()->clearMessage();
         QMessageBox::critical(this, "Błąd wczytywania", QString::fromUtf8(ex.what()));
     }
+}
+
+void MainWindow::showAligned()
+{
+    // Liczymy zawsze od oryginału z pliku – wynik zależy tylko od ustawień i m_flipped.
+    const gp_Trsf trsf = camcore::computeAlignment(m_original.shape, m_alignSettings, m_flipped);
+    showModel(camcore::transformed(m_original, trsf));
+}
+
+void MainWindow::showModel(const camcore::ImportedModel& model)
+{
+    m_shown = model;
+    m_undo->clear(); // nowa bryła albo nowe położenie – starej historii nie da się już cofnąć
+    m_view->showModel(model);
+    m_layers->setModelName(m_fileName);
+    clearFeatures(); // cechy dotyczyły poprzedniego położenia bryły
+}
+
+void MainWindow::clearFeatures()
+{
+    m_contours = {};
+    m_geometries.clear();
+    m_layerList.clearUserLayers(); // warstwy z rozpoznawania dotyczyły poprzedniej bryły
+    showGeometries();
+}
+
+namespace {
+
+QString num(double v) { return QString::number(v, 'f', v == std::floor(v) ? 0 : 1); }
+
+QString geometryText(size_t index, const camcore::Contour& c)
+{
+    const QString shape = c.diameter > 0 ? "Ø" + num(c.diameter) : num(c.sizeX) + " × " + num(c.sizeY);
+    return QString("Geometria %1: %2, wys. %3").arg(index + 1).arg(shape, num(c.zTop - c.zBottom));
+}
+
+} // namespace
+
+// Rysuje geometrie według ich właściwości i odświeża warstwę APS w panelu.
+void MainWindow::showGeometries()
+{
+    std::vector<OccView::Contour> contours;
+    std::vector<LayersPanel::GeometryRow> rows;
+    for (size_t i = 0; i < m_geometries.size(); ++i) {
+        const camcore::Geometry& g = m_geometries[i];
+        // Kolor z warstwy geometrii.
+        contours.push_back({g.contour.wire, m_layerList.layerOrAps(g.layer).color, g.contour.zTop - g.contour.zBottom,
+                            camcore::directionMarker(g.contour.wire, g.direction, g.toolSide)});
+        rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
+    }
+    // Panel pokazuje wszystkie warstwy użytkownika z listy (także puste –
+    // przydadzą się przy ręcznym dodawaniu warstw).
+    std::vector<LayersPanel::LayerRow> userLayers;
+    for (size_t i = 1; i < m_layerList.all().size(); ++i) {
+        const camcore::Layer& layer = m_layerList.all()[i];
+        double r, g, b;
+        layer.color.Values(r, g, b, Quantity_TOC_sRGB);
+        userLayers.push_back({QString::fromStdString(layer.name), QColor::fromRgbF(r, g, b)});
+    }
+    m_layers->setUserLayers(userLayers);
+
+    m_view->showGeometry(contours);
+    for (size_t i = 0; i < m_geometries.size(); ++i)
+        if (!m_geometries[i].visible)
+            m_view->setGeometryVisible(static_cast<int>(i), false);
+    m_layers->setGeometries(rows);
+}
+
+void MainWindow::setGeometryVisible(int index, bool visible)
+{
+    if (index < 0 || index >= static_cast<int>(m_geometries.size()))
+        return;
+    m_geometries[static_cast<size_t>(index)].visible = visible; // właściwość geometrii
+    m_view->setGeometryVisible(index, visible);
+}
+
+void MainWindow::onRecognizeFeatures()
+{
+    if (m_shown.shape.IsNull()) {
+        statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
+        return;
+    }
+    m_undo->clear(); // geometrie budujemy od nowa – starych zmian nie da się już cofnąć
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    m_contours = camcore::buildPartContours(m_shown.shape);
+    QApplication::restoreOverrideCursor();
+
+    // Kontur zewnętrzny (obrys bryły) idzie do warstwy userKonturZew, pozostałe
+    // kontury dostają warstwę według reguł z layerForContour (otwory, kontury
+    // wewnętrzne, kieszenie okrągłe); reszta to na razie geometrie niesklasyfikowane – APS.
+    m_geometries.clear();
+    m_layerList.clearUserLayers();
+    // Geometria trafia do warstwy; warstwa użytkownika powstaje przy pierwszej
+    // geometrii, która do niej trafia (createLayer zwraca istniejącą, jeśli już jest).
+    auto add = [this](const camcore::Contour& c, const std::string& layer) {
+        if (layer != camcore::kApsLayer)
+            m_layerList.createLayer(layer, camcore::autoLayerColor(layer));
+        camcore::Geometry g;
+        g.contour = c;
+        g.layer = layer;
+        m_geometries.push_back(g);
+    };
+    if (!m_contours.outline.geometry.empty())
+        add(m_contours.outline, camcore::kOuterContourLayer);
+    for (const camcore::Contour& c : m_contours.inner)
+        add(c, camcore::layerForContour(c, true));
+    for (const camcore::Pocket& p : m_contours.pockets)
+        for (const camcore::Contour& c : p.contours)
+            add(c, camcore::layerForContour(c, false));
+    // Domyślna strona frezowania i kierunek (obrys na zewnątrz, reszta z bryły).
+    camcore::assignToolSides(m_geometries, m_shown.shape);
+    showGeometries();
+    statusBar()->showMessage(QString("Wyciągnięto %1 geometrii").arg(m_geometries.size()));
+}
+
+void MainWindow::createBottomBars()
+{
+    m_commandBar = new CommandBar(this, this);
+    m_inputBar = m_commandBar->inputBar();
+    connect(m_inputBar, &InputBar::pointEntered, this, &MainWindow::onPointEntered);
+    connect(m_inputBar, &InputBar::valueEntered, this, [this](double value) {
+        m_view->setFocus(); // jak po punkcie: pisanie wraca do widoku
+        if (m_command)
+            m_command->valueEntered(value);
+    });
+    connect(m_inputBar, &InputBar::selectionDone, this, [this] {
+        if (m_command)
+            m_command->selectionConfirmed();
+    });
+    connect(m_inputBar, &InputBar::cancelled, this, &MainWindow::cancelCommand);
+    // Podpowiedź z paska także w rogu widoku 3D, pisana jak na starym terminalu.
+    connect(m_inputBar, &InputBar::hintChanged, m_view, &OccView::showHint);
+    connect(m_commandBar, &CommandBar::snapChanged, m_view, &OccView::setSnap);
+    addToolBar(Qt::BottomToolBarArea, m_commandBar);
+    setStyleSheet(styleSheet() + bottomBarsStyleSheet());
+
+    // Stopka: komunikaty, współrzędne kursora, widoki i przełączniki.
+    m_cursorLabel = new QLabel("X –   Y –", this);
+    m_cursorLabel->setObjectName("cursorLabel");
+    m_cursorLabel->setMinimumWidth(190);
+    m_cursorLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    statusBar()->addPermanentWidget(m_cursorLabel);
+    connect(m_view, &OccView::cursorMoved, this, [this](double x, double y) {
+        m_cursorLabel->setText(QString("X %1   Y %2").arg(x, 0, 'f', 3).arg(y, 0, 'f', 3));
+    });
+    setupFooter(statusBar());
+
+    // Esc przerywa polecenie także wtedy, gdy widok 3D nie ma fokusu.
+    auto* escAct = new QAction(this);
+    shortcuts::bind(escAct, shortcuts::kCancelCommand);
+    connect(escAct, &QAction::triggered, this, &MainWindow::cancelCommand);
+    addAction(escAct);
+}
+
+void MainWindow::runCommand(Command* command)
+{
+    cancelCommand();
+    m_command = command;
+    if (!m_command->start()) {
+        m_command->deleteLater();
+        m_command = nullptr;
+    }
+}
+
+void MainWindow::onPointPicked(double x, double y, double z)
+{
+    // Kliknięcie w widoku: wartości wpisane (przypięte) w pasku wprowadzania
+    // zastępują odpowiednie współrzędne kursora.
+    if (const auto p = m_inputBar->resolveClick(x, y, z))
+        onPointEntered(p->X(), p->Y(), p->Z());
+    else
+        statusBar()->showMessage("Błędna wartość w pasku wprowadzania – popraw pole zaznaczone na czerwono");
+}
+
+void MainWindow::onPointEntered(double x, double y, double z)
+{
+    // Po zatwierdzeniu punktu klawiatura wraca do widoku – kolejne pisanie
+    // zaczyna się od pierwszego pola następnego punktu.
+    m_view->setFocus();
+    if (m_command)
+        m_command->pointEntered(gp_Pnt(x, y, z));
+}
+
+void MainWindow::cancelCommand()
+{
+    if (m_command)
+        m_command->cancel();
+}
+
+void MainWindow::commandFinished(const QString& message)
+{
+    // Polecenie woła to ze swojej metody – usuwamy je dopiero po powrocie do pętli zdarzeń.
+    if (m_command) {
+        m_command->deleteLater();
+        m_command = nullptr;
+    }
+    m_inputBar->showIdle();
+    m_view->setInteraction(OccView::Interaction::Navigate);
+    statusBar()->showMessage(message);
+}
+
+void MainWindow::showMessage(const QString& message)
+{
+    statusBar()->showMessage(message);
+}
+
+void MainWindow::releaseSnap()
+{
+    m_commandBar->releaseSnap();
+}
+
+void MainWindow::commitEdit(const QString& text, const EditState& before, const EditState& after)
+{
+    restoreEditState(after);
+    m_undo->push(new EditCommand(this, text, before, after));
+}
+
+void MainWindow::restoreEditState(const EditState& state)
+{
+    const bool modelChanged = !state.shown.shape.IsSame(m_shown.shape);
+    const bool hadModel = !m_shown.shape.IsNull();
+    m_shown = state.shown;
+    m_geometries = state.geometries;
+    if (modelChanged) {
+        m_view->updateModel(m_shown);
+        // Bryła usunięta albo przywrócona (Usuń / Cofnij) – panel Warstwy pokazuje, czy jest.
+        if (hadModel != !m_shown.shape.IsNull())
+            m_layers->setModelName(hadModel ? QString() : m_fileName);
+    }
+    showGeometries();
+}
+
+void MainWindow::onAutoAlign()
+{
+    if (m_original.shape.IsNull()) {
+        statusBar()->showMessage("Najpierw otwórz model (Ctrl+O)");
+        return;
+    }
+    if (!m_aligned) {
+        // Pierwsze użycie (gdy "Wyrównaj po imporcie" jest wyłączone): zwykłe wyrównanie.
+        m_aligned = true;
+        statusBar()->showMessage("Wyrównano " + m_fileName);
+    } else {
+        // Kolejne kliknięcia: przekładamy bryłę na drugą stronę i z powrotem.
+        m_flipped = !m_flipped;
+        statusBar()->showMessage(m_flipped ? "Odwrócono na drugą stronę"
+                                           : "Przywrócono stronę wybraną automatycznie");
+    }
+    showAligned();
+}
+
+void MainWindow::onAlignSettings()
+{
+    AlignSettingsDialog dialog(m_alignSettings, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    m_alignSettings = dialog.settings();
+    saveAlignSettings(m_alignSettings);
+    // Nowe ustawienia od razu widać na wyrównanej bryle.
+    if (m_aligned && !m_original.shape.IsNull())
+        showAligned();
 }

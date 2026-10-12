@@ -25,6 +25,16 @@
       "displayName": "x64 Release",
       "inherits": "windows-base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "x64-debug-dll",
+      "displayName": "x64 Debug (DLL)",
+      "description": "Biblioteki jako DLL – szybsze linkowanie do codziennej pracy",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
     }
   ]
 }
