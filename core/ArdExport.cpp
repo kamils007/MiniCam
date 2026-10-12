@@ -1,7 +1,10 @@
 #include "ArdExport.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
+#include <utility>
 
 namespace camcore {
 
@@ -23,6 +26,13 @@ public:
         u16(static_cast<uint16_t>(v >> 16));
     }
     void i32(int32_t v) { u32(static_cast<uint32_t>(v)); }
+    void f64(double v)
+    {
+        uint64_t bits;
+        std::memcpy(&bits, &v, sizeof bits);
+        u32(static_cast<uint32_t>(bits));
+        u32(static_cast<uint32_t>(bits >> 32));
+    }
     void f32(float v)
     {
         uint32_t bits;
@@ -57,6 +67,7 @@ private:
 // Znaczniki rekordów (pierwszy bajt rekordu).
 enum Tag : uint8_t {
     kTagEnd = 0x00,
+    kTagPath = 0x02,
     kTagLayer = 0x10,
     kTagTextStyle = 0x15,
     kTagDataStart = 0x21,
@@ -89,6 +100,74 @@ constexpr uint32_t kFirstLayerId = 4; // identyfikatory warstw w pliku zaczynaj�
 // Identyfikator z rekordu 0x2E. Znaczenie nieznane; w plikach z Alphacama był
 // taki sam w obu zapisach, więc zapisujemy go bez zmian.
 const char* const kIdentifier = "pBIjARRGz2JjQAVHeYo2X9gE770a8RqPaovRhaQ9skkSAAAAAeYn";
+
+// Atrybuty zapisywane w pliku: Alphacam numeruje nazwy w rekordzie 0x1D
+// po kolei od 1, a geometrie odwołują się do tych numerów.
+const char* const kAttributeNames[] = {
+    "LicomUKDMBGeoZLevelBottom",  // 1: dół ścian geometrii
+    "LicomUKDMBGeoZLevelTop",     // 2: góra ścian geometrii
+    "LicomUKDMBTempElementDirX1", // 3–6: zapisuje je Alphacam, znaczenie nieznane
+    "LicomUKDMBTempElementDirX2",
+    "LicomUKDMBTempElementDirY1",
+    "LicomUKDMBTempElementDirY2",
+    "_LicomUKDMBTempPickZ",       // 7: Alphacam wpisuje tu górę ścian
+};
+constexpr uint32_t kAttrZBottom = 1, kAttrZTop = 2, kAttrPickZ = 7;
+constexpr uint32_t kAttrTypeDouble = 5;
+constexpr uint8_t kElementLine = 0x01;
+
+// Rekord geometrii 0x02. Pola, których znaczenia nie znamy, mają wartości
+// z pliku Alphacama (kwadrat 100×100 na warstwie APS).
+void writePath(Writer& w, const ArdPath& path)
+{
+    double xmin = 0, ymin = 0, xmax = 0, ymax = 0;
+    for (size_t i = 0; i < path.segments.size(); ++i) {
+        const ArdSegment& s = path.segments[i];
+        if (i == 0) {
+            xmin = xmax = s.x1;
+            ymin = ymax = s.y1;
+        }
+        for (const auto& [x, y] : {std::pair{s.x1, s.y1}, std::pair{s.x2, s.y2}}) {
+            xmin = std::min(xmin, x);
+            xmax = std::max(xmax, x);
+            ymin = std::min(ymin, y);
+            ymax = std::max(ymax, y);
+        }
+    }
+
+    w.u8(kTagPath);
+    w.u32(8);
+    w.u32(0x08000002);
+    w.zeros(12);
+    w.f64(xmin); // obrys geometrii
+    w.f64(ymin);
+    w.f64(xmax);
+    w.f64(ymax);
+    w.zeros(4);
+    w.u32(path.layerNumber);
+    w.zeros(161);
+    w.u32(static_cast<uint32_t>(path.segments.size()));
+    w.zeros(12);
+    for (const auto& [id, z] : {std::pair{kAttrZBottom, path.zBottom}, std::pair{kAttrZTop, path.zTop},
+                                std::pair{kAttrPickZ, path.zTop}}) {
+        w.u32(id);
+        w.u32(kAttrTypeDouble);
+        w.f64(z);
+    }
+    w.u32(0); // koniec atrybutów
+    w.zeros(48);
+    for (const ArdSegment& s : path.segments) {
+        w.u8(kElementLine);
+        w.u32(0x400);
+        w.f64(0); // dla odcinka 0 (u łuku zapewne coś innego)
+        w.f64(s.x1);
+        w.f64(s.y1);
+        w.f64(s.x2);
+        w.f64(s.y2);
+        w.zeros(4);
+    }
+    w.u8(0);
+}
 
 void writeLayer(Writer& w, uint32_t number, const std::string& name, int32_t color)
 {
@@ -146,7 +225,17 @@ std::string utf8ToCp1250(const std::string& text)
     return out;
 }
 
-std::string writeArd(const LayerList& layers, const std::string& jpeg)
+uint32_t ardLayerNumber(const LayerList& layers, const std::string& name)
+{
+    const auto& all = layers.all();
+    for (size_t i = 1; i < all.size(); ++i)
+        if (all[i].name == name)
+            return static_cast<uint32_t>(std::size(kDefaultLayers) + i);
+    return 1;
+}
+
+std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
+                     const std::string& jpeg)
 {
     Writer w;
     w.bytes("Licom-APS File V1.94\r\n\x1A");
@@ -156,13 +245,16 @@ std::string writeArd(const LayerList& layers, const std::string& jpeg)
     w.bytes(jpeg);
 
     w.u8(kTagVariables);
-    int32_t value = 1;
-    for (const char* name : {"LicomUKDMBTempElementDirX1", "LicomUKDMBTempElementDirX2",
-                             "LicomUKDMBTempElementDirY1", "LicomUKDMBTempElementDirY2"}) {
+    int32_t number = 1;
+    for (const char* name : kAttributeNames) {
         w.utf16(name);
-        w.i32(value++);
+        w.i32(number++);
     }
-    w.u32(0); // koniec listy zmiennych
+    w.u32(0); // koniec listy nazw
+
+    for (const ArdPath& path : paths)
+        if (!path.segments.empty())
+            writePath(w, path);
 
     w.u8(kTagIdentifier);
     const uint32_t identifierPos = static_cast<uint32_t>(w.size());
@@ -171,11 +263,11 @@ std::string writeArd(const LayerList& layers, const std::string& jpeg)
     // Najpierw warstwy domyślne Alphacama (APS to nasza warstwa APS), potem
     // warstwy użytkownika MiniCAM. Kolory MiniCAM (RGB) nie mają jeszcze
     // odpowiednika w indeksach Alphacama, więc dostają kolor domyślny.
-    uint32_t number = 1;
+    uint32_t layerNumber = 1;
     for (const DefaultLayer& l : kDefaultLayers)
-        writeLayer(w, number++, l.name, l.color);
+        writeLayer(w, layerNumber++, l.name, l.color);
     for (size_t i = 1; i < layers.all().size(); ++i)
-        writeLayer(w, number++, layers.all()[i].name, -1);
+        writeLayer(w, layerNumber++, layers.all()[i].name, -1);
 
     w.u8(kTagTextStyle);
     w.u32(8);     // numer warstwy (ostatnia z domyślnych)

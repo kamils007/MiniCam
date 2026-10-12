@@ -6,7 +6,7 @@
 #include "AppName.h"
 #include "Shortcuts.h"
 #include "LayersPanel.h"
-#include "ArdExport.h"
+#include "ArdPaths.h"
 #include "DxfExport.h"
 #include "ModelExport.h"
 #include "OccView.h"
@@ -241,8 +241,9 @@ void MainWindow::onSaveArd()
     buffer.open(QIODevice::WriteOnly);
     m_view->renderImage(800, 460).save(&buffer, "JPG", 90);
 
-    // Na razie bez bryły i geometrii – tylko nagłówek, miniatura i warstwy (FORMAT-ARD.md).
-    const std::string ard = camcore::writeArd(m_layerList, jpeg.toStdString());
+    // Bez bryły: geometrie 2D (łuki jako odcinki), warstwy i miniatura (FORMAT-ARD.md).
+    const std::string ard = camcore::writeArd(m_layerList, camcore::ardPaths(m_geometries, m_layerList),
+                                              jpeg.toStdString());
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)
         || file.write(ard.data(), static_cast<qint64>(ard.size())) != static_cast<qint64>(ard.size())
@@ -250,7 +251,7 @@ void MainWindow::onSaveArd()
         QMessageBox::critical(this, "Błąd zapisu", "Nie udało się zapisać pliku " + QDir::toNativeSeparators(path));
         return;
     }
-    statusBar()->showMessage("Zapisano dla Alphacam (bez bryły): " + QDir::toNativeSeparators(path));
+    statusBar()->showMessage("Zapisano dla Alphacam (geometrie bez bryły): " + QDir::toNativeSeparators(path));
 }
 
 bool MainWindow::maybeSave()
