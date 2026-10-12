@@ -17,14 +17,14 @@ struct ArdSegment
 // o danym identyfikatorze (zob. ardLayerId), z poziomami Z ścian.
 struct ArdPath
 {
-    uint32_t layerId = 4; // 4 = GEOMETRIE APS
+    uint32_t layerId = 1; // bez warstw użytkownika 1 = GEOMETRIE APS
     double zBottom = 0, zTop = 0;
     std::vector<ArdSegment> segments;
 };
 
 // Identyfikator warstwy w pliku .ard, do którego odwołuje się geometria:
-// warstwy użytkownika MiniCAM dostają 12, 13, … (po ośmiu warstwach domyślnych
-// Alphacama o identyfikatorach 4…11); APS i nieznana nazwa → 4 (GEOMETRIE APS).
+// warstwy użytkownika MiniCAM dostają 1…n (jak w Alphacamie), osiem warstw
+// domyślnych Alphacama n + 1…n + 8; APS i nieznana nazwa → n + 1 (GEOMETRIE APS).
 uint32_t ardLayerId(const LayerList& layers, const std::string& name);
 
 // Zapisuje projekt w formacie Alphacam .ard ("Licom-APS File V1.94"): nagłówek,

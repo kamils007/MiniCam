@@ -95,13 +95,15 @@ const DefaultLayer kDefaultLayers[] = {
     {"TEXT", 32},
     {"", -1},
 };
-constexpr uint32_t kFirstLayerId = 4; // identyfikatory warstw domyślnych w pliku: 4…11
-// Warstwy użytkownika: dalsze identyfikatory i numery, rodzaj 0x38 (jak warstwy
-// utworzone w Alphacamie), kolor jako RGB.
-constexpr uint32_t kFirstUserLayerId = kFirstLayerId + std::size(kDefaultLayers);
+// Identyfikatory warstw jak w pliku Alphacama z warstwami TEST1/TEST2: warstwy
+// użytkownika mają 1…n, warstwy domyślne zaraz po nich (GEOMETRIE APS = n + 1).
+// Warstwy użytkownika mają rodzaj 0x38 (jak utworzone w Alphacamie) i kolor RGB.
 constexpr uint32_t kUserLayerKind = 0x38;
-// Geometria odwołuje się do identyfikatora rekordu warstwy; APS to pierwsza z domyślnych.
-constexpr uint32_t kApsLayerRef = kFirstLayerId;
+
+uint32_t userLayerCount(const LayerList& layers)
+{
+    return static_cast<uint32_t>(layers.all().size() - 1); // bez APS
+}
 
 // Identyfikator z rekordu 0x2E. Znaczenie nieznane; w plikach z Alphacama był
 // taki sam w obu zapisach, więc zapisujemy go bez zmian.
@@ -175,10 +177,10 @@ void writePath(Writer& w, const ArdPath& path, uint32_t number, bool hasNext)
 }
 
 // Warstwa domyślna Alphacama: identyfikator, rodzaj 0, nazwa, numer (dwa razy), kolor.
-void writeDefaultLayer(Writer& w, uint32_t number, const std::string& name, int32_t color)
+void writeDefaultLayer(Writer& w, uint32_t id, uint32_t number, const std::string& name, int32_t color)
 {
     w.u8(kTagLayer);
-    w.u32(kFirstLayerId + number - 1);
+    w.u32(id);
     w.u32(0);
     w.str16(name);
     w.u32(number);
@@ -259,8 +261,8 @@ uint32_t ardLayerId(const LayerList& layers, const std::string& name)
     const auto& all = layers.all();
     for (size_t i = 1; i < all.size(); ++i)
         if (all[i].name == name)
-            return kFirstUserLayerId + static_cast<uint32_t>(i) - 1;
-    return kApsLayerRef;
+            return static_cast<uint32_t>(i);
+    return userLayerCount(layers) + 1; // GEOMETRIE APS
 }
 
 std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
@@ -300,8 +302,10 @@ std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
     // Najpierw warstwy domyślne Alphacama (APS to nasza warstwa APS), potem
     // warstwy użytkownika MiniCAM z ich kolorami.
     uint32_t layerNumber = 1;
-    for (const DefaultLayer& l : kDefaultLayers)
-        writeDefaultLayer(w, layerNumber++, l.name, l.color);
+    for (const DefaultLayer& l : kDefaultLayers) {
+        writeDefaultLayer(w, userLayerCount(layers) + layerNumber, layerNumber, l.name, l.color);
+        ++layerNumber;
+    }
     for (size_t i = 1; i < layers.all().size(); ++i)
         writeUserLayer(w, ardLayerId(layers, layers.all()[i].name), layerNumber++, layers.all()[i]);
 
