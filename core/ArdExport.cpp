@@ -95,7 +95,13 @@ const DefaultLayer kDefaultLayers[] = {
     {"TEXT", 32},
     {"", -1},
 };
-constexpr uint32_t kFirstLayerId = 4; // identyfikatory warstw w pliku zaczynają się od 4
+constexpr uint32_t kFirstLayerId = 4; // identyfikatory warstw domyślnych w pliku: 4…11
+// Warstwy użytkownika: dalsze identyfikatory i numery, rodzaj 0x38 (jak warstwy
+// utworzone w Alphacamie), kolor jako RGB.
+constexpr uint32_t kFirstUserLayerId = kFirstLayerId + std::size(kDefaultLayers);
+constexpr uint32_t kUserLayerKind = 0x38;
+// Geometria odwołuje się do identyfikatora rekordu warstwy; APS to pierwsza z domyślnych.
+constexpr uint32_t kApsLayerRef = kFirstLayerId;
 
 // Identyfikator z rekordu 0x2E. Znaczenie nieznane; w plikach z Alphacama był
 // taki sam w obu zapisach, więc zapisujemy go bez zmian.
@@ -116,9 +122,9 @@ constexpr uint32_t kAttrZBottom = 1, kAttrZTop = 2, kAttrPickZ = 7;
 constexpr uint32_t kAttrTypeDouble = 5;
 constexpr uint8_t kElementLine = 0x01;
 
-// Rekord geometrii 0x02. Pola, których znaczenia nie znamy, mają wartości
-// z pliku Alphacama (kwadrat 100×100 na warstwie APS).
-void writePath(Writer& w, const ArdPath& path)
+// Jedna geometria z listy 0x02. Pola, których znaczenia nie znamy, mają wartości
+// z plików Alphacama (kwadraty 100×100 i 40×40).
+void writePath(Writer& w, const ArdPath& path, uint32_t number, bool hasNext)
 {
     double xmin = 0, ymin = 0, xmax = 0, ymax = 0;
     for (size_t i = 0; i < path.segments.size(); ++i) {
@@ -135,18 +141,17 @@ void writePath(Writer& w, const ArdPath& path)
         }
     }
 
-    w.u8(kTagPath);
-    w.u32(8);
+    w.u32(path.layerId);
     w.u32(0x08000002);
     w.zeros(12);
     w.f64(xmin); // obrys geometrii
     w.f64(ymin);
     w.f64(xmax);
     w.f64(ymax);
-    w.zeros(4);
-    w.u32(path.layerNumber);
+    w.u32(hasNext ? 1 : 0); // po tej geometrii jest następna
+    w.u32(1);
     w.zeros(161);
-    w.u32(static_cast<uint32_t>(path.segments.size()));
+    w.u32(number); // numer geometrii (od 1)
     w.zeros(12);
     for (const auto& [id, z] : {std::pair{kAttrZBottom, path.zBottom}, std::pair{kAttrZTop, path.zTop},
                                 std::pair{kAttrPickZ, path.zTop}}) {
@@ -166,10 +171,11 @@ void writePath(Writer& w, const ArdPath& path)
         w.f64(s.y2);
         w.zeros(4);
     }
-    w.u8(0);
+    w.u8(0); // koniec elementów
 }
 
-void writeLayer(Writer& w, uint32_t number, const std::string& name, int32_t color)
+// Warstwa domyślna Alphacama: identyfikator, rodzaj 0, nazwa, numer (dwa razy), kolor.
+void writeDefaultLayer(Writer& w, uint32_t number, const std::string& name, int32_t color)
 {
     w.u8(kTagLayer);
     w.u32(kFirstLayerId + number - 1);
@@ -179,6 +185,29 @@ void writeLayer(Writer& w, uint32_t number, const std::string& name, int32_t col
     w.u32(number);
     w.i32(color);
     w.zeros(104);
+}
+
+// Warstwa użytkownika, jak TEST1/TEST2 z Alphacama: numer, kolor jako bajty
+// R, G, B, 0, a pole 7 na pozycji 16 – znaczenie nieznane, przepisane.
+void writeUserLayer(Writer& w, uint32_t id, uint32_t number, const Layer& layer)
+{
+    double r, g, b;
+    layer.color.Values(r, g, b, Quantity_TOC_sRGB);
+    auto byte = [](double v) { return static_cast<uint8_t>(std::clamp(v, 0.0, 1.0) * 255.0 + 0.5); };
+
+    w.u8(kTagLayer);
+    w.u32(id);
+    w.u32(kUserLayerKind);
+    w.str16(layer.name);
+    w.u32(number);
+    w.u32(0);
+    w.u8(byte(r));
+    w.u8(byte(g));
+    w.u8(byte(b));
+    w.u8(0);
+    w.u32(0);
+    w.u32(7);
+    w.zeros(96);
 }
 
 } // namespace
@@ -225,13 +254,13 @@ std::string utf8ToCp1250(const std::string& text)
     return out;
 }
 
-uint32_t ardLayerNumber(const LayerList& layers, const std::string& name)
+uint32_t ardLayerId(const LayerList& layers, const std::string& name)
 {
     const auto& all = layers.all();
     for (size_t i = 1; i < all.size(); ++i)
         if (all[i].name == name)
-            return static_cast<uint32_t>(std::size(kDefaultLayers) + i);
-    return 1;
+            return kFirstUserLayerId + static_cast<uint32_t>(i) - 1;
+    return kApsLayerRef;
 }
 
 std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
@@ -252,22 +281,29 @@ std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
     }
     w.u32(0); // koniec listy nazw
 
+    // Lista geometrii: znacznik 0x02 raz, potem geometrie jedna po drugiej;
+    // każda mówi, czy po niej jest następna.
+    std::vector<const ArdPath*> written;
     for (const ArdPath& path : paths)
         if (!path.segments.empty())
-            writePath(w, path);
+            written.push_back(&path);
+    if (!written.empty()) {
+        w.u8(kTagPath);
+        for (size_t i = 0; i < written.size(); ++i)
+            writePath(w, *written[i], static_cast<uint32_t>(i + 1), i + 1 < written.size());
+    }
 
     w.u8(kTagIdentifier);
     const uint32_t identifierPos = static_cast<uint32_t>(w.size());
     w.str16(kIdentifier);
 
     // Najpierw warstwy domyślne Alphacama (APS to nasza warstwa APS), potem
-    // warstwy użytkownika MiniCAM. Kolory MiniCAM (RGB) nie mają jeszcze
-    // odpowiednika w indeksach Alphacama, więc dostają kolor domyślny.
+    // warstwy użytkownika MiniCAM z ich kolorami.
     uint32_t layerNumber = 1;
     for (const DefaultLayer& l : kDefaultLayers)
-        writeLayer(w, layerNumber++, l.name, l.color);
+        writeDefaultLayer(w, layerNumber++, l.name, l.color);
     for (size_t i = 1; i < layers.all().size(); ++i)
-        writeLayer(w, layerNumber++, layers.all()[i].name, -1);
+        writeUserLayer(w, ardLayerId(layers, layers.all()[i].name), layerNumber++, layers.all()[i]);
 
     w.u8(kTagTextStyle);
     w.u32(8);     // numer warstwy (ostatnia z domyślnych)

@@ -43,7 +43,7 @@ std::vector<ArdPath> ardPaths(const std::vector<Geometry>& geometries, const Lay
     std::vector<ArdPath> paths;
     for (const Geometry& g : geometries) {
         ArdPath path;
-        path.layerNumber = ardLayerNumber(layers, g.layer);
+        path.layerId = ardLayerId(layers, g.layer);
         path.zBottom = g.contour.zBottom;
         path.zTop = g.contour.zTop;
         for (const TopoDS_Edge& edge : g.contour.geometry) {
