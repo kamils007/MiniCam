@@ -1,6 +1,6 @@
 # Rozpoznanie importu STEP — SolidImport 2025
 
-Analiza statyczna 15.10.2026. Konwersji na Windows jeszcze nie wykonano.
+Analiza i próby 15.10.2026. Test 2 wykonano na Windows; nie utworzył Parasolidu.
 
 ## Dostarczone pliki
 
@@ -29,22 +29,13 @@ Pliki producenta i model użytkownika nie są publikowane w repozytorium.
 | RVA 0x10510 | Wspólne tłumaczenie wywołuje metody IDispatch komponentu SolidLink |
 
 Sam eksport StepInputFile nie jest prostą funkcją `STEP → plik X_B`.
-Dokładne typy argumentów, inicjalizacja i zwracany wynik nadal wymagają
-weryfikacji przed natywnym wywołaniem. Nie wywoływać go na podstawie samej nazwy.
+Kontrakt wywołania eksportów odtworzono z dostarczonej DLL; test 3 używa
+kontekstu VARIANT x64 i ścieżki UTF-16. Weryfikacja wykonania pozostaje otwarta.
 
 Zależności statyczne SolidImport obejmują MFC, runtime MSVC i biblioteki
 systemowe. Feature.dll i PSKERNEL.dll nie występują w jej zwykłej tablicy
 importów. Nie oznacza to braku zależności pośrednich: translacja korzysta z COM,
 a dalsza ścieżka importu może korzystać z hosta i innych komponentów.
-
-## Następny krok
-
-Na komputerze użytkownika odczytać rejestrację `SolidLink.Document.*` przez
-[diagnostykę 1](../../tools/solidimport/README_PL.md). Raport poda CLSID,
-rzeczywisty serwer oraz lokalizację ewentualnej biblioteki typów.
-Następnie sprawdzić kontrakt translatora i przygotować izolowany test
-STEP → Parasolid na dostarczonym modelu. Obecny etap nie potwierdza jeszcze
-konwersji, działania przy zamkniętym ALPHACAM-ie ani przenośności translatora.
 
 ## Wynik diagnostyki 1 i interfejs SolidLink
 
@@ -86,4 +77,36 @@ Kod 0 z TranslateSolid jest traktowany jako powodzenie zgodnie z gałęzią
 SolidImport.dll 0x1095D. Raport dodatkowo wymaga niepustego pliku z pełnym
 nagłówkiem Parasolid i zachowania skrótów wejścia, kopii i serwera.
 To nadal nie zastępuje dalszego importu i porównania geometrii przez Feature.dll.
-Test 2 nie został jeszcze wykonany na Windows.
+Wynik testu 2 z Windows: aktywacja COM poprawna, GetFileType = 11,
+TranslateSolid = 1, GetInteropResult = 0, brak wyjściowego pliku. Wejście,
+wersja robocza i serwer zachowały skróty. GetInteropResult = 0 nie dowodzi
+konwersji — w tym przebiegu stan komponentu pozostał początkowy.
+
+### Test 3 — oryginalna inicjalizacja SolidImport
+
+[Instrukcja](../../tools/solidimport/README_TEST_3_PL.md),
+[implementacja](../../tools/solidimport/test_solidimport_init.py).
+
+W SolidLink.exe procedura tłumaczenia RVA 0x332C0 sprawdza na wejściu
+stan przygotowania sesji i przy braku tego stanu natychmiast zwraca 1.
+To pasuje do wyniku testu 2, ale nie jest jeszcze potwierdzeniem przyczyny
+w wykonaniu z debugerem. Następna próba korzysta z całego oryginalnego
+InitAlphacamAddIn (RVA 0x7A30), a potem StepInputFile (0xC8B0).
+Nie wywołuje prywatnych procedur autoryzacji ani nie podmienia ich stanu.
+
+Prywatny host odsyła rzeczywiste ProgramLevel, SpecialKey, License, Path
+oraz ProgramLetter przez wybrane gettery otwartego ALPHACAM-u. Init zachowuje
+własną kontrolę License dla poziomu 14. Prywatna ramka zapisuje rejestracje
+funkcji lokalnie i przekazuje tylko ReadTextFile do rzeczywistej ramki.
+Pozostałe nieobsługiwane metody zatrzymują proces z logiem.
+
+Po translacji procedura 0x9070 zaczyna import od ActiveDrawing (app +0x48).
+W tym miejscu test kopiuje kompletny plik pośredni i kończy proces kodem 83,
+bez udostępnienia rysunku. Osobny TEMP/TMP jest ustawiany przed startem procesu.
+Raport rozróżnia przechwycenie Parasolidu, walidację geometrii i pełny ARD;
+dwa ostatnie etapy pozostają niepotwierdzone. Nie sprawdzamy normalnego
+zwolnienia DLL, zamkniętego ALPHACAM-u ani natywnego wykonania testu 3 tutaj.
+
+Walidacja przenośnej części: 11 testów odczytu konfiguracji, odrzucania
+fałszywego sukcesu oraz zachowania/przechwycenia plików. Próba Windows testu 3
+jest do wykonania na instalacji użytkownika.

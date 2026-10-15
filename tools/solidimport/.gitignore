@@ -7,3 +7,6 @@ solidlink_test_*/
 *.po
 *.stp
 *.step
+
+solidimport_test_3_*/
+solidimport_test_3_*.zip
