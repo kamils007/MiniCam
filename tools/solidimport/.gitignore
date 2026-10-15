@@ -1,5 +1,8 @@
 __pycache__/
 solidlink_diag_*/
+solidlink_test_*/
+*.x_t
+*.x_b
 *.dll
 *.po
 *.stp

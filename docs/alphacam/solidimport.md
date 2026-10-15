@@ -45,3 +45,45 @@ rzeczywisty serwer oraz lokalizację ewentualnej biblioteki typów.
 Następnie sprawdzić kontrakt translatora i przygotować izolowany test
 STEP → Parasolid na dostarczonym modelu. Obecny etap nie potwierdza jeszcze
 konwersji, działania przy zamkniętym ALPHACAM-ie ani przenośności translatora.
+
+## Wynik diagnostyki 1 i interfejs SolidLink
+
+Raport z Windows wskazał klasę `SolidLink.Document.2025.3`, CLSID
+`80C33292-C478-4543-9DC1-5381A5156F05` i istniejący serwer:
+
+```text
+C:\Program Files\Common Files\Hexagon\SolidLink 2025.3\code\bin\Solidlink.exe
+```
+
+Przesłany SolidLink.exe ma 1 276 496 bajtów i SHA-256
+`283a9ce685944a12c66c0be8568e48f23eddc9efe63456deafdf308faf24ee4d`.
+Jego zasób TYPELIB/1/1033 zawiera 26 metod ISolidLink,
+IID `B9E54437-A0AD-48A3-82A7-EE8FEAA81F63`.
+Kontrakt jest w `tools/solidimport/solidlink_api_2025.json`.
+CLSID coclass zapisany w TYPELIB różni się od zarejestrowanego CLSID wersji;
+próba korzysta z rzeczywistej, sprawdzonej rejestracji użytkownika.
+
+| Metoda | DISPID | Parametry Automation i wynik |
+| --- | --- | --- |
+| TranslateSolid | 1 | BSTR input, BSTR output, BSTR application → I4 |
+| GetInteropResult | 10 | Bez parametrów → I4 |
+| GetFileType | 12 | BSTR input → I4 |
+| SetOutputLogFile | 8 | VARIANT_BOOL → void |
+
+Statyczne zależności serwera obejmują SLInterop.dll, PMFrustum.dll,
+PSKERNEL.dll, MFC i runtime MSVC. Dlatego test uruchamia zainstalowany
+serwer przez COM, z jego istniejącym otoczeniem.
+
+### Test 2
+
+[Instrukcja próby konwersji](../../tools/solidimport/README_TEST_2_PL.md).
+Python przygotowuje kopię wejścia i osobny proces PowerShell x64 STA,
+który wywołuje zwykłe metody Automation. Limit czasu i raport nadrzędny
+pozwalają odróżnić aktywację COM, zakończenie metody i utworzenie wyniku.
+Próba nie ustawia stanu licencji i nie wysyła ciągów autoryzacyjnych.
+
+Kod 0 z TranslateSolid jest traktowany jako powodzenie zgodnie z gałęzią
+SolidImport.dll 0x1095D. Raport dodatkowo wymaga niepustego pliku z pełnym
+nagłówkiem Parasolid i zachowania skrótów wejścia, kopii i serwera.
+To nadal nie zastępuje dalszego importu i porównania geometrii przez Feature.dll.
+Test 2 nie został jeszcze wykonany na Windows.
