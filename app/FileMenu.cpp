@@ -7,6 +7,7 @@
 #include "Shortcuts.h"
 #include "LayersPanel.h"
 #include "ArdPaths.h"
+#include "ArdSolidExport.h"
 #include "DxfExport.h"
 #include "ModelExport.h"
 #include "OccView.h"
@@ -241,9 +242,16 @@ void MainWindow::onSaveArd()
     buffer.open(QIODevice::WriteOnly);
     m_view->renderImage(800, 460).save(&buffer, "JPG", 90);
 
-    // Bez bryły: geometrie 2D (łuki jako odcinki), warstwy i miniatura (FORMAT-ARD.md).
-    const std::string ard = camcore::writeArd(m_layerList, camcore::ardPaths(m_geometries, m_layerList),
-                                              jpeg.toStdString());
+    std::string ard;
+    try {
+        const std::string solid = m_shown.shape.IsNull() ? std::string()
+                                                         : createArdSolidRecord(m_shown, this);
+        ard = camcore::writeArd(m_layerList, camcore::ardPaths(m_geometries, m_layerList),
+                               jpeg.toStdString(), solid);
+    } catch (const std::exception& ex) {
+        QMessageBox::critical(this, "Błąd zapisu ARD", QString::fromUtf8(ex.what()));
+        return;
+    }
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)
         || file.write(ard.data(), static_cast<qint64>(ard.size())) != static_cast<qint64>(ard.size())
@@ -251,7 +259,7 @@ void MainWindow::onSaveArd()
         QMessageBox::critical(this, "Błąd zapisu", "Nie udało się zapisać pliku " + QDir::toNativeSeparators(path));
         return;
     }
-    statusBar()->showMessage("Zapisano dla Alphacam (geometrie bez bryły): " + QDir::toNativeSeparators(path));
+    statusBar()->showMessage("Zapisano dla Alphacam: " + QDir::toNativeSeparators(path));
 }
 
 bool MainWindow::maybeSave()
@@ -322,3 +330,4 @@ void MainWindow::printTo(QPrinter* printer)
     painter.drawText(page.adjusted(0, page.height() - footer, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
                      kAppName + " – " + (m_fileName.isEmpty() ? QString("bez nazwy") : m_fileName));
 }
+
