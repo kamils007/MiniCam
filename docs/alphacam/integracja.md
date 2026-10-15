@@ -78,3 +78,6 @@ nie zostały potwierdzone testem 4.9. Sam brak działającego Acam.exe tego nie 
 
 Szczegóły: [COM i ABI](interfejsy_COM.md), [format rekordu i ARD](format_ARD.md),
 [uruchomienie wzorca](../../tools/alphacam_reference/README.md).
+
+Nowy etap: [analiza SolidImport.dll i komponentu SolidLink](solidimport.md)
+oraz diagnostyka rejestracji translatora STEP na Windows.

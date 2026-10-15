@@ -1,0 +1,6 @@
+__pycache__/
+solidlink_diag_*/
+*.dll
+*.po
+*.stp
+*.step
