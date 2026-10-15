@@ -80,6 +80,8 @@ qt_add_executable(minicam
     app/main.cpp
     app/MainWindow.cpp
     app/FileMenu.cpp
+    app/ArdSolidExport.cpp
+    app/ArdSolidExport.h
     app/MainWindow.h
     app/OccView.cpp
     app/OccView.h
@@ -160,3 +162,24 @@ if(_qt_core_type STREQUAL "SHARED_LIBRARY" AND TARGET Qt6::QWindowsIntegrationPl
         COMMENT "Kopiowanie wtyczki platformy Qt"
     )
 endif()
+
+# The native DLL host runs in a separate process, preserving CRT ownership and
+# containing unsupported callbacks or native failures outside the editor.
+if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    add_executable(minicam-feature-host tools/ard/FeatureHost.cpp)
+    target_link_libraries(minicam-feature-host PRIVATE Qt6::Core ole32 oleaut32)
+    if(MSVC)
+        target_compile_options(minicam-feature-host PRIVATE /utf-8 /permissive- /Zc:__cplusplus)
+    endif()
+    add_dependencies(minicam minicam-feature-host)
+    add_custom_command(TARGET minicam POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:minicam-feature-host>" "$<TARGET_FILE_DIR:minicam>/")
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(ard-record-test tools/ard/ArdRecordTest.cpp)
+    target_link_libraries(ard-record-test PRIVATE camcore)
+endif()
+

@@ -5,6 +5,8 @@
 #include <cstring>
 #include <iterator>
 #include <utility>
+#include <limits>
+#include <stdexcept>
 
 namespace camcore {
 
@@ -266,8 +268,14 @@ uint32_t ardLayerId(const LayerList& layers, const std::string& name)
 }
 
 std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
-                     const std::string& jpeg)
+                     const std::string& jpeg, const std::string& solidRecord)
 {
+    if (!solidRecord.empty() && (solidRecord.size() < 8
+        || static_cast<unsigned char>(solidRecord[0]) != 3
+        || solidRecord[1] != 0 || solidRecord[2] != 0 || solidRecord[3] != 0))
+        throw std::invalid_argument("Nieprawidlowy rekord bryly Feature.dll.");
+    if (solidRecord.size() > std::numeric_limits<uint32_t>::max())
+        throw std::length_error("Rekord bryly jest za duzy dla ARD.");
     Writer w;
     w.bytes("Licom-APS File V1.94\r\n\x1A");
 
@@ -317,8 +325,17 @@ std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
 
     w.u8(kTagDataStart);
     w.zeros(8);
-    // Tu Alphacam zapisuje bloki danych (0x22, np. bryła Parasolid) i zaszyfrowany
-    // Cache.xml (0x3E) – na razie ich nie mamy.
+    // Obwiednia 0x22 zgodna ze sprawdzonym plikiem TEST_6_ARD:
+    // nazwa w str16, liczba obiektow, dlugosc rekordu, pole zarezerwowane.
+    // Sam rekord pochodzi bez zmian z ObjectDoWrite2, lacznie z metadanymi bryly.
+    if (!solidRecord.empty()) {
+        w.u8(0x22);
+        w.str16("LicomUKRJMParaSolid");
+        w.u32(1);
+        w.u32(static_cast<uint32_t>(solidRecord.size()));
+        w.u32(0);
+        w.bytes(solidRecord);
+    }
 
     // Wskaźnik zwrotny: offset rekordu identyfikatora (pole długości), potem koniec.
     w.u8(kTagBackPointer);
@@ -328,3 +345,4 @@ std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
 }
 
 } // namespace camcore
+
