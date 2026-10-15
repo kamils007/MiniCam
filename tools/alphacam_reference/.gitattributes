@@ -1,0 +1,2 @@
+# Preserve the byte-for-byte Windows launchers from the verified package.
+*.cmd -text whitespace=cr-at-eol

@@ -1,0 +1,30 @@
+{
+  "reference": "Feature 2025 test 4.9",
+  "source_revision": "4.9-object-record-2025",
+  "files": {
+    "ODCZYTAJ_USTAWIENIA_2025.cmd": "5154e2bb0fdd6bee4e10a531e7a281437c860981c43f4a8dd9dc3abc632a77bb",
+    "URUCHOM_TEST_4_2025.cmd": "645421257b433de5956d81da39f554c791cb640cfbda267b7ab789138be190d7",
+    "com_host.py": "1861ac9cd6ddf46860cb18df3a3056608b0cb73643c06981c701b14d874615f6",
+    "com_typeinfo.py": "49120657a2079342108f8d62e496962c87c5166904087890a8aaabb0606795bc",
+    "feature_texts.py": "905aad7688ecd5a3614f78a1230bc8f3dad63f9722e8aba5fcd20e465264e29e",
+    "host_contract_common.json": "d1592c5e4c0d4be143457672306a1f99110ed94a7463e79b3a1bd9aee1ffddd8",
+    "host_environment.py": "f7857320a4b8a1164d6a5c0d66f0eae8818039875e08a40229621706ff13532f",
+    "layer_host.py": "2f70b8519c5f467a030d3cde0bc6d457222ead60155219f8b9a73a54d891b6d7",
+    "native_trace.py": "2321885a75e7b6513b7eb5d242d695cdd34adcf9035fd91e4b535c65bd11743b",
+    "object_serialization.py": "95dec7bc72c3a84719ff70883737d5816ea437b3c8e6dca42da2d95b65a7cea8",
+    "probe_feature_2025.py": "08d26898793796e8ecf71e97896dfac16a4a4328b14e14ab9d59fbd97a3dbea5",
+    "validate_feature_texts.py": "0b597770391a62984565c95262a8da09090441d2a85d08db62ad8aece7132db6",
+    "validate_host.py": "420485c7870ef52469bdf38f359d2a77271d90508e7cb0737807a2344962c0e8",
+    "validate_host_environment.py": "e946cd167531e538d2f2d5d05db318c8dc0c9b8101d1aefcb1945c2548610888",
+    "validate_layers.py": "32a2b4dda332e2c0117845bdcdc10297ca44f6a9354eaa6574ab157d09279c6b",
+    "validate_native_trace.py": "5d4f70baa1b2123105cf158ed556c1b4a196049e9b1ebea9e3f902eec681b236",
+    "validate_object_serialization.py": "1222f9ca940a784eee0cd1f76321d4b68b4173147e4fda21207d756e550c4c7f"
+  },
+  "excluded": [
+    "Feature.dll",
+    "PSKERNEL.dll",
+    "Feature.po",
+    "host_environment_2025.json",
+    "user model files and raw logs"
+  ]
+}
