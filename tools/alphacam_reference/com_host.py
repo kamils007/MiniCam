@@ -278,6 +278,8 @@ class HostObject:
         if self.name == "IAlphaCamApp":
             if spec["name"] == "SpecialKey":
                 return "SpecialKey" in self.host.app_values and spec["invkind"] == 2
+            if spec["name"] == "DisableUndo":
+                return spec["invkind"] in (2, 4)
             return spec["name"] in ("ActiveDrawing", "Frame", "ProgramLetter", "InAPICall") and spec["invkind"] == 2
         names = ("ScreenUpdating", "ThreeDViews") if self.name == "IDrawing" else ("ProjectBarUpdating",)
         return spec["name"] in names and spec["invkind"] in (2, 4)
@@ -312,6 +314,15 @@ class HostObject:
                 details["value"] = value
         else:
             value = arguments[0] != 0
+            if self.name == "IAlphaCamApp" and spec["name"] == "DisableUndo":
+                # This disposable batch host has no undo history. Disabling an
+                # already disabled service is valid; enabling it is unsupported.
+                if not value:
+                    self.host.emit("host_undo_enable_unsupported", requested_disable=False)
+                    return self.host.stop(self, spec)
+                details.update(value=True, policy="batch_host_has_no_undo_history")
+                self.host.emit("host_method", **details)
+                return S_OK
             self.host.states[spec["name"]] = value
             details["value"] = value
             self.host.emit("host_display_state", state=dict(self.host.states))
@@ -335,7 +346,8 @@ class MinimalHost:
         self.states = {"ScreenUpdating": True, "ProjectBarUpdating": True, "ThreeDViews": False}
         # The requested output is a Router drawing (.ard). This host performs
         # only API-driven operations, so InAPICall is true when the DLL asks.
-        self.app_values = {"ProgramLetter": ord("R"), "InAPICall": True}
+        self.app_values = {"ProgramLetter": ord("R"), "InAPICall": True,
+                           "DisableUndo": True}
         # Preserve the actual classification read from the user's running app.
         # Without a snapshot, leave the getter unimplemented; never guess 0.
         if special_key is not None:
@@ -389,10 +401,11 @@ class MinimalHost:
         assert first.value is None
         assert self.call("IDrawing", 0x168, HRESULT, [PTR], C.byref(count)) == S_OK
         assert count.value == 0
-        for offset, expected in [(0x110, ord("R")), (0x360, -1)]:
+        for offset, expected in [(0x110, ord("R")), (0x360, -1), (0x2B8, -1)]:
             value = SHORT(0)
             assert self.call("IAlphaCamApp", offset, HRESULT, [PTR], C.byref(value)) == S_OK
             assert value.value == expected
+        assert self.call("IAlphaCamApp", 0x210, HRESULT, [SHORT], -1) == S_OK
         if "SpecialKey" in self.app_values:
             # Canaries check both the output width and the value on Windows.
             words = (ULONG * 3)(0x12345678, 0xDEADBEEF, 0x87654321)

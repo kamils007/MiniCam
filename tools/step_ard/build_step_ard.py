@@ -57,6 +57,23 @@ def wrap_ard(base, fragment):
                     'identifier_offset_unchanged': True, 'fragment': parsed}
 
 
+def check_feature_stage(report):
+    stages = report.get('stages', [])
+    if len(stages) != 1:
+        raise ValueError('Feature report has no unique native stage')
+    summary = stages[0].get('summary', {})
+    missing = summary.get('first_unimplemented_host_method')
+    if missing:
+        raise RuntimeError('Brak obslugi hosta: %s.%s (invkind=%s, offset=%s)' %
+                           (missing.get('interface'), missing.get('method'),
+                            missing.get('invkind'), missing.get('vtable_offset_x64')))
+    if stages[0].get('process_exit_code') != 0 or summary.get('stop_reason') != 'completed':
+        raise ValueError('Feature stage incomplete: %s; exit=%s; detail=%s' %
+                         (summary.get('stop_reason'), stages[0].get('process_exit_code'),
+                          summary.get('native_error')))
+    return summary
+
+
 def require_native_success(report, record, expected_input):
     if report.get('input', {}).get('sha256') != expected_input:
         raise ValueError('Feature report refers to a different Parasolid input')
@@ -64,10 +81,7 @@ def require_native_success(report, record, expected_input):
         raise ValueError('Parasolid input was not preserved')
     if report.get('no_acam_process_observed_at_checkpoints') is not True:
         raise ValueError('ALPHACAM process was observed during the Feature test')
-    stages = report.get('stages', [])
-    if len(stages) != 1 or stages[0].get('process_exit_code') != 0:
-        raise ValueError('Feature child process did not finish normally')
-    summary = stages[0].get('summary', {})
+    summary = check_feature_stage(report)
     if (summary.get('stop_reason') != 'completed' or summary.get('native_error')
             or summary.get('bodies_after_count') != 1 or summary.get('saved_body_count') != 1
             or any(summary.get(key) is not True for key in
@@ -94,9 +108,9 @@ def main():
     args = parser.parse_args()
     if sys.platform != 'win32' or struct.calcsize('P') != 8:
         parser.error('Wymagany Windows i Python x64')
-    out = (args.out or HERE / ('step_ard_test_4_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f'))).resolve()
+    out = (args.out or HERE / ('step_ard_test_4_1_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f'))).resolve()
     out.mkdir(parents=True, exist_ok=False)
-    report = {'test': '4-step-derived-parasolid-to-ard', 'ard_created': False,
+    report = {'test': '4.1-step-derived-parasolid-to-ard', 'ard_created': False,
               'opened_in_alphacam': False, 'geometry_dimensions_validated': False,
               'step_conversion_stage': 'Test 3.2, captured with ALPHACAM 2025 open',
               'base_ard_source': 'Previously tested user 1_test.ard; existing records retained'}
@@ -116,7 +130,7 @@ def main():
         command = [sys.executable, str(REFERENCE / 'probe_feature_2025.py'), str(dll),
                    '--model', str(model.resolve()), '--host-environment', str(environment.resolve()),
                    '--timeout', '90', '--out', str(native_report)]
-        print('TEST 4: Parasolid z Twojego STEP-a -> Feature.dll -> ARD', flush=True)
+        print('TEST 4.1: Parasolid z Twojego STEP-a -> Feature.dll -> ARD', flush=True)
         print('ALPHACAM powinien pozostac zamkniety do konca testu.', flush=True)
         with (out / 'probe_stdout.txt').open('xb') as stdout, (out / 'probe_stderr.txt').open('xb') as stderr:
             process = subprocess.run(command, cwd=out, stdout=stdout, stderr=stderr,
@@ -124,6 +138,14 @@ def main():
         if process.returncode != 0 or not native_report.is_file():
             raise RuntimeError('Feature probe failed; see probe_stdout.txt / probe_stderr.txt')
         proof = json.loads(native_report.read_text(encoding='utf-8-sig'))
+        stages = proof.get('stages', [])
+        if len(stages) == 1:
+            summary = stages[0].get('summary', {})
+            report['feature_diagnostic'] = {'exit_code': stages[0].get('process_exit_code'),
+                'stop_reason': summary.get('stop_reason'),
+                'first_unimplemented_host_method': summary.get('first_unimplemented_host_method'),
+                'native_error': summary.get('native_error')}
+        check_feature_stage(proof)  # Inspect the cause before looking for a record.
         directories = list(out.glob('feature_test_4_9_2025_*'))
         if len(directories) != 1:
             raise ValueError('Expected one isolated Feature output directory')

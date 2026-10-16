@@ -106,6 +106,19 @@ class HostTests(unittest.TestCase):
         self.assertFalse(self.host.states["ScreenUpdating"])
         self.assertFalse(self.stops)
 
+    def test_batch_undo_is_disabled_and_cannot_be_enabled(self):
+        words = (C.c_uint16 * 3)(0xABCD, 0, 0xDCBA)
+        self.assertEqual(self.host.call('IAlphaCamApp', 0x2B8, H.HRESULT,
+                                       [H.PTR], C.byref(words, 2)), H.S_OK)
+        self.assertEqual(list(words), [0xABCD, 0xFFFF, 0xDCBA])
+        self.assertEqual(self.host.call('IAlphaCamApp', 0x210, H.HRESULT, [H.SHORT], -1), H.S_OK)
+        result = H.Variant()
+        self.assertEqual(self.invoke('IAlphaCamApp', 57, 2, H.DispParams(), result), H.S_OK)
+        self.assertEqual((result.vt, result.value.short), (11, -1))
+        self.assertEqual(self.host.call('IAlphaCamApp', 0x210, H.HRESULT, [H.SHORT], 0), H.E_NOTIMPL)
+        self.assertEqual(self.stops[-1]['method'], 'DisableUndo')
+        self.assertTrue(self.host.app_values['DisableUndo'])
+
     def test_three_d_views_native_dispatch_and_no_window_side_effect(self):
         self.assertFalse(self.host.states["ThreeDViews"])
         self.assertEqual(self.host.call("IDrawing",0x58,H.HRESULT,[H.SHORT],-1),H.S_OK)

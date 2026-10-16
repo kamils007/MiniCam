@@ -192,3 +192,20 @@ niezmienionego wzorca Feature 4.9 przy zamkniętym ALPHACAM-ie. Po potwierdzonym
 imporcie jednej bryły, zapisie i natywnym rekordzie tworzy diagnostyczny ARD
 na bazie użytkownika. Algorytm opakowania odtworzył poprzedni TEST_6 bajt w bajt.
 Nowy ARD i jego geometria wymagają dopiero wykonania i otwarcia na Windows.
+
+
+### Wynik próby ARD 4 i rozszerzenie hosta 4.1
+
+Przy zamkniętym ALPHACAM-ie Feature.dll weszła w import nowego X_T, ale proces
+zatrzymał się kontrolowanym kodem 80 na IAlphaCamApp.DisableUndo PROPERTYGET
+(DISPIDs 57, vtable 0x2B8, VARIANT_BOOL*). W logu poprzedza to etykieta
+Auto-Wyrównanie Części. Brak feature_object.bin był skutkiem niedokończonego
+importu. DLL i wejście niezmienione, bez natywnych wyjątków.
+
+Host Python i pomocnik C++ 4.1 zgłaszają brak historii Undo przez DisableUndo
+= true. Setter 0x210 przyjmuje tylko ponowne wyłączenie. Próba włączenia nadal
+jest nieobsługiwana. Kontrola importu/zapisu pozostaje wymagana. Raport etapu
+jest sprawdzany przed próbą odczytania pliku natywnego.
+
+Przeszło 16 przenośnych testów hosta i 4 testy raportowania/opakowania.
+Wykonanie 4.1 na Windows, kompilacja zmiany C++ i nowy ARD niepotwierdzone.

@@ -34,8 +34,9 @@ To potwierdzenie dla jednej próbnej bryły, nie dla wszystkich modeli i wersji 
 | `core/ArdExport.cpp` | Istniejący zapis dokumentu oraz opakowania rekordu bryły |
 | `tools/ard/ArdRecordTest.cpp` | Kontrola zachowania rekordu, geometrii 2D i wskaźnika końcowego |
 
-Skrypty referencyjne i ich pierwotne testy są skopiowane bez zmian;
-`source_manifest.json` pozwala sprawdzić ich tożsamość.
+Sekwencja probe’a Feature pozostaje wzorcem 4.9. W teście 4.1 rozszerzono
+com_host.py o DisableUndo i jego testy. `source_manifest.json` zachowuje
+pierwotne oraz bieżące skróty zmienionych plików i opisuje rozszerzenie.
 
 ## Granica obecnego portu C++
 

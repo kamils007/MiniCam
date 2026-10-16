@@ -28,6 +28,14 @@ def native_report(record):
 
 
 class StepArdChecks(unittest.TestCase):
+    def test_missing_host_method_is_reported_before_record_access(self):
+        report = {'stages': [{'process_exit_code': 80, 'summary': {
+            'stop_reason': 'unimplemented_host_method',
+            'first_unimplemented_host_method': {'interface': 'IAlphaCamApp',
+                'method': 'DisableUndo', 'invkind': 2, 'vtable_offset_x64': '0x2b8'}}}]}
+        with self.assertRaisesRegex(RuntimeError, 'IAlphaCamApp.DisableUndo'):
+            build.check_feature_stage(report)
+
     def test_native_failures_do_not_produce_a_verified_record(self):
         record = fragment()
         self.assertTrue(build.require_native_success(native_report(record), record, 'inputhash'))

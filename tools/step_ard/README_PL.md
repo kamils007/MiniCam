@@ -1,4 +1,4 @@
-# Test 4 — bryła z Twojego STEP-a do ARD
+# Test 4.1 — bryła z Twojego STEP-a do ARD
 
 **Konwersja STEP → Parasolid z testu 3.2 zakończyła się sukcesem.**
 Log Spatial InterOp podaje 1 bryłę stałą, bez brył powierzchniowych i krzywych.
@@ -9,10 +9,10 @@ sprawdzono skrótem SHA-256. Pełnych wymiarów po konwersji jeszcze nie sprawdz
 
 1. **Zamknij ALPHACAM** przed uruchomieniem tego testu.
 2. Rozpakuj całą paczkę do osobnego folderu.
-3. Uruchom **URUCHOM_TEST_4_ARD.cmd** z głównego folderu paczki.
+3. Uruchom **URUCHOM_TEST_4_1_ARD.cmd** z głównego folderu paczki.
 4. Jeśli powstanie `STEP_test.ard`, otwórz go w ALPHACAM **2025**.
 5. Sprawdź bryłę, wymiary i położenie; zapisz jako `STEP_test_po_otwarciu.ard`.
-6. Prześlij wygenerowany **step_ard_test_4_....zip** i zapisany przez ALPHACAM
+6. Prześlij wygenerowany **step_ard_test_4_1_....zip** i zapisany przez ALPHACAM
    plik `STEP_test_po_otwarciu.ard`.
 
 ZIP z raportem powstaje w folderze `step_ard` również przy błędzie.
@@ -26,7 +26,7 @@ katalog Feature.po i wcześniejszy rzeczywisty odczyt ustawień hosta 2025.
 Snapshot zawiera klasyfikację hosta SpecialKey; nie jest autoryzacją licencji.
 Każdy istotny plik i Feature.dll są sprawdzane skrótami.
 
-Używamy bez zmian probe'a Feature 4.9, który wcześniej zaimportował Parasolid,
+Używamy sekwencji probe'a Feature 4.9, który wcześniej zaimportował Parasolid,
 zapisał binarny Parasolid i fragment `feature_object.bin`. Tym razem wejściem
 jest `converted.x_t` z udanej konwersji STEP. Dopiero poprawny import 1 bryły,
 zapis i zgodny natywny fragment pozwalają utworzyć ARD.
@@ -49,5 +49,27 @@ Limit: 90 sekund dla procesu Feature, 150 dla jego uruchomienia i raportu.
 Jeżeli ścieżka Feature.dll jest inna, można ją wskazać:
 
 ```bat
-URUCHOM_TEST_4_ARD.cmd --dll "C:\Program Files\Hexagon\ALPHACAM 2025\Add-Ins\Feature\Feature.dll"
+URUCHOM_TEST_4_1_ARD.cmd --dll "C:\Program Files\Hexagon\ALPHACAM 2025\Add-Ins\Feature\Feature.dll"
 ```
+
+
+## Poprawka 4.1 po raporcie Windows
+
+W poprzednim teście proces Feature zatrzymał się kontrolowanym kodem **80**
+na **IAlphaCamApp.DisableUndo**, getter VARIANT_BOOL* pod offsetem **0x2B8**.
+Było to podczas automatycznego wyrównywania części. Import nie zakończył się,
+więc feature_object.bin jeszcze nie mógł powstać.
+
+Host wsadowy nie prowadzi historii cofania. Zgłasza teraz DisableUndo = true
+(-1 jako 16-bitowy VARIANT_BOOL), przyjmuje idempotentne wyłączenie przez
+setter **0x210** i odmawia włączenia historii, której nie implementuje.
+Nie implementujemy operacji Undo ani nie zgłaszamy fikcyjnego importu lub zapisu.
+
+Raportowanie sprawdza przyczynę zakończenia Feature przed odczytem pliku
+rekordu. Następna nieobsługiwana metoda będzie wymieniona bezpośrednio
+w step_ard_result.json oraz w komunikacie okna.
+
+Sprawdzenie przenośne: 16 testów hosta i 4 testy raportu/opakowania.
+Wykonanie Windows wersji 4.1 i wynikowy ARD nadal wymagają próby.
+W C++ dodano analogiczną politykę do pomocniczego FeatureHost; tej zmiany
+nie kompilowano ani nie wykonywano na Windows w tej sesji.
