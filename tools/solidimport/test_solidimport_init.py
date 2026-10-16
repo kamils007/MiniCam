@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test 3.1: MFC thread, original SolidImport init; stop before drawing import.
+"""Test 3.2: MFC thread, ANSI STEP argument; stop before drawing import.
 
 Windows x64 / Python stdlib only. Actual ALPHACAM must already be running.
 No drawing interface or frame mutation is forwarded to the running application.
@@ -31,6 +31,52 @@ def save_json(path, value):
         stream.write('\n')
 
 
+def encode_step_filename(path, encoding='mbcs'):
+    """StepInputFile's second argument is char*, not wchar_t* or BSTR."""
+    text = os.fspath(path)
+    if not isinstance(text, str) or not text or '\0' in text:
+        raise ValueError('Expected a nonempty filename without NUL characters')
+    raw = text.encode(encoding, errors='strict')
+    if b'\0' in raw or raw.decode(encoding, errors='strict') != text:
+        raise ValueError('STEP filename does not round-trip through the Windows code page')
+    return raw
+
+
+def verify_native_step_filename(module, raw, expected):
+    """Use the DLL's exact CString conversion imports before passing the path.
+
+    These are original CString operations, not a translator call. Layout: one
+    pointer-sized CString object, retained until its imported destructor runs.
+    The caller has already checked the SolidImport build hash and MFC thread.
+    """
+    ptr = C.c_void_p
+
+    def imported(rva, result, *types):
+        address = ptr.from_address(module + rva).value
+        if not address:
+            raise RuntimeError('Unresolved CString import: ' + hex(rva))
+        return C.WINFUNCTYPE(result, *types)(address)
+
+    construct = imported(0x183C8, ptr, ptr, C.c_char_p)  # MFC ordinal 290: ANSI -> CStringW
+    length = imported(0x18380, C.c_int32, ptr)           # ordinal 5674: GetLength
+    destroy = imported(0x18A68, None, ptr)              # ordinal 1033: destructor
+    value = ptr()
+    construct(C.byref(value), raw)
+    try:
+        count = length(C.byref(value))
+        if not value.value or not 0 < count <= 32767:
+            raise RuntimeError('Invalid native CString filename length')
+        actual = C.wstring_at(value.value, count)
+        expected = Path(expected).resolve()
+        if actual != str(expected) or not Path(actual).is_file():
+            raise RuntimeError('Native CString conversion did not produce the full input filename')
+        return {'argument_type': 'const char*', 'encoding': 'Windows ACP (mbcs)',
+                'byte_count': len(raw), 'native_unicode_path_matches': True,
+                'native_path_exists': True, 'native_input_sha256': digest(actual)}
+    finally:
+        destroy(C.byref(value))
+
+
 def inspect_candidates(directory):
     candidates = []
     # Only the disposable worker's dedicated temp directory, never user's TEMP.
@@ -59,6 +105,7 @@ def capture_at_boundary(temp, out):
 def captured_result(report):
     marker = report.get('capture', {})
     thread = report.get('mfc_thread', {})
+    filename = report.get('step_argument', {})
     return (not report.get('error') and not report.get('timeout')
             and report.get('worker_exit_code') == CAPTURE_EXIT
             and type(report.get('init_return_code')) is int
@@ -69,6 +116,11 @@ def captured_result(report):
             and type(thread.get('init_thread_id')) is int
             and thread.get('init_thread_id', 0) > 0
             and thread.get('init_thread_id') == thread.get('step_thread_id')
+            and filename.get('argument_type') == 'const char*'
+            and filename.get('native_unicode_path_matches') is True
+            and filename.get('native_path_exists') is True
+            and bool(report.get('input_sha256'))
+            and filename.get('native_input_sha256') == report['input_sha256']
             and marker.get('boundary') == 'IAlphaCamApp.ActiveDrawing'
             and marker.get('phase') == 'step'
             and marker.get('output', {}).get('sha256') == report.get('output', {}).get('sha256')
@@ -211,13 +263,18 @@ def worker(args, mfc, trace):
         save_json(out / 'mfc_thread_ready.json', thread_proof)
         if not thread_proof['before_step']:
             raise RuntimeError('MFC thread missing before STEP entry')
+        trace.phase = 'STEP filename preflight'
+        raw_filename = encode_step_filename(args.model.resolve())
+        filename_proof = verify_native_step_filename(module, raw_filename, args.model)
+        save_json(out / 'step_argument.json', filename_proof)
+        event('step_filename_preflight', **filename_proof)
         trace.phase = 'StepInputFile'
         event('before_StepInputFile')
-        code = exported('StepInputFile', LONG, C.POINTER(Variant), C.c_wchar_p)(
-            C.byref(context), str(args.model.resolve()))
-        # Return semantics are diagnostic only; success requires boundary capture.
-        event('after_StepInputFile', observed_return_value=code)
-        save_json(out / 'worker_result.json', {'step_returned': True, 'observed_return_value': code})
+        exported('StepInputFile', None, C.POINTER(Variant), C.c_char_p)(
+            C.byref(context), raw_filename)
+        # The export does not preserve the translator result in its epilogue.
+        event('after_StepInputFile')
+        save_json(out / 'worker_result.json', {'step_returned': True})
         return 1
     except Exception as error:
         event('worker_error', type=type(error).__name__, message=str(error))
@@ -297,11 +354,12 @@ def main():
     model = args.model.resolve()
     if not model.is_file() or model.suffix.lower() not in {'.stp', '.step'}:
         parser.error('Brak pliku STEP: ' + str(model))
-    out = (args.out or HERE / ('solidimport_test_3_1_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f'))).resolve()
+    out = (args.out or HERE / ('solidimport_test_3_2_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f'))).resolve()
     out.mkdir(parents=True, exist_ok=False)
     (out / 'temp').mkdir()
     before = digest(model)
-    report = {'schema': 'solidimport-init-test-3-v2', 'test_version': '3.1', 'parasolid_captured': False,
+    report = {'schema': 'solidimport-init-test-3-v3', 'test_version': '3.2', 'parasolid_captured': False,
+              'input_sha256': before,
               'complete_ard': False, 'geometry_validated': False,
               'normal_unload_validated': False, 'output_directory': str(out)}
     server = dll = None
@@ -327,7 +385,7 @@ def main():
         if args.dll:
             command += ['--dll', str(args.dll.resolve())]
         env = dict(os.environ, TEMP=str(out / 'temp'), TMP=str(out / 'temp'))
-        print('TEST 3.1: watek MFC + SolidImport + otwarty ALPHACAM Router 2025', flush=True)
+        print('TEST 3.2: sciezka ANSI + watek MFC + ALPHACAM Router 2025', flush=True)
         print('Limit: %d s. Wyniki: %s' % (args.timeout, out), flush=True)
         with (out / 'worker_stdout.txt').open('xb') as stdout, (out / 'worker_stderr.txt').open('xb') as stderr:
             try:
@@ -339,7 +397,8 @@ def main():
         for filename, key in [('native_setup.json', 'setup'), ('init_result.json', 'init'),
                               ('capture.json', 'capture'), ('worker_result.json', 'worker'),
                               ('mfc_bootstrap_result.json', 'mfc_bootstrap'),
-                              ('mfc_thread_ready.json', 'mfc_thread')]:
+                              ('mfc_thread_ready.json', 'mfc_thread'),
+                              ('step_argument.json', 'step_argument')]:
             path = out / filename
             if path.is_file():
                 report[key] = json.loads(path.read_text(encoding='utf-8'))

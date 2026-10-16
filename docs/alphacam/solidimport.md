@@ -30,7 +30,8 @@ Pliki producenta i model użytkownika nie są publikowane w repozytorium.
 
 Sam eksport StepInputFile nie jest prostą funkcją `STEP → plik X_B`.
 Kontrakt wywołania eksportów odtworzono z dostarczonej DLL; test 3 używa
-kontekstu VARIANT x64 i ścieżki UTF-16. Weryfikacja wykonania pozostaje otwarta.
+kontekstu VARIANT x64. Test 3.2 koryguje drugi argument na ścieżkę ANSI
+`const char*`; wcześniejsze użycie UTF-16 było błędem testu.
 
 Zależności statyczne SolidImport obejmują MFC, runtime MSVC i biblioteki
 systemowe. Feature.dll i PSKERNEL.dll nie występują w jej zwykłej tablicy
@@ -142,3 +143,29 @@ w nowym logu. Nie wpisujemy pól CWinThread, TLS ani flag translatora.
 Walidacja poprawki: **17 testów przenośnych**, odczyt eksportów rzeczywistej
 MFC z Microsoftu oraz zgodność wybranych ordinałów z dopasowanym PDB.
 Wykonania Windows 3.1 jeszcze nie potwierdzono.
+
+### Wynik testu 3.1 i poprawka argumentu w 3.2
+
+Raport z 16.10.2026: wątek MFC poprawny przed Init i STEP (ten sam identyfikator),
+Init = 0, brak natywnych wyjątków i brak Parasolidu. Eksport STEP wszedł do
+QueryInterface i wrócił bez dalszych wywołań hosta. Wartość odczytana z EAX
+po jego zakończeniu nie jest dowodem powodzenia tłumaczenia.
+
+Ponowna kontrola IAT i oficjalnego PDB MFC wykazała błąd wcześniejszego testu:
+StepInputFile używa konstruktora CStringW z **char*** (MFC ordinal 290,
+IAT RVA 0x183C8), a nie konstruktora wchar_t* (ordinal 286, RVA 0x18678).
+Przekazany wcześniej bufor UTF-16 dawał nazwę `C` zamiast `C:\...`.
+Procedura 0x9420 ma wczesne wyjście przy nieudanym otwarciu źródła, przed
+konfiguracją translatora i następnym wywołaniem hosta. To pasuje do logów;
+potwierdzenie pełnej ścieżki wykonania wymaga kolejnego uruchomienia.
+
+[Test 3.2](../../tools/solidimport/README_TEST_3_2_PL.md) przekazuje `c_char_p`
+z kodowaniem mbcs/Windows ACP i odrzuca stratną konwersję. Przed eksportem
+uruchamia ten sam konstruktor MFC, odczytuje długość i pełną nazwę Unicode,
+sprawdza plik i skrót, a następnie niszczy CString oryginalnym destruktorem.
+`step_argument.json` jest wymaganym dowodem w raporcie przechwycenia.
+Importy długości i destruktora: ordinale 5674 i 1033, IAT 0x18380 i 0x18A68.
+Publiczne sygnatury zapisano w mfc_thread_api_reference.json.
+
+Walidacja przygotowania: 19 testów przenośnych; natywne wykonanie 3.2 oraz
+konwersja STEP pozostają niepotwierdzone.

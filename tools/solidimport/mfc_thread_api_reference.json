@@ -37,5 +37,25 @@
     }
   ],
   "runtime_version": "14.44.35211.0",
-  "note": "Static public-symbol/PE export mapping only; this reference is not the user runtime and not a Windows execution test."
+  "note": "Static public-symbol/PE export mapping only; this reference is not the user runtime and not a Windows execution test.",
+  "solidimport_step_filename_imports": [
+    {
+      "iat_rva": "0x183c8",
+      "ordinal": 290,
+      "meaning": "CStringW constructor from narrow char pointer",
+      "public_symbol": "??0?$CStringT@_WV?$StrTraitMFC_DLL@_WV?$ChTraitsCRT@_W@ATL@@@@@ATL@@QEAA@PEBD@Z"
+    },
+    {
+      "iat_rva": "0x18380",
+      "ordinal": 5674,
+      "meaning": "CString length",
+      "public_symbol": "?GetLength@?$CSimpleStringT@_W$00@ATL@@QEBAHXZ"
+    },
+    {
+      "iat_rva": "0x18a68",
+      "ordinal": 1033,
+      "meaning": "CString destructor",
+      "public_symbol": "??1?$CStringT@_WV?$StrTraitMFC_DLL@_WV?$ChTraitsCRT@_W@ATL@@@@@ATL@@QEAA@XZ"
+    }
+  ]
 }

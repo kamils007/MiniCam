@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from test_solidimport_init import CAPTURE_EXIT, capture_at_boundary, captured_result
+from test_solidimport_init import CAPTURE_EXIT, capture_at_boundary, captured_result, encode_step_filename
 
 HEADER = b'**PARASOLID\nFORMAT=text;\n**END_OF_HEADER\nBODY'
 
@@ -12,6 +12,10 @@ HEADER = b'**PARASOLID\nFORMAT=text;\n**END_OF_HEADER\nBODY'
 class InitCaptureChecks(unittest.TestCase):
     def report(self):
         return {'worker_exit_code': CAPTURE_EXIT, 'init_return_code': 0,
+                'input_sha256': 'modelhash',
+                'step_argument': {'argument_type': 'const char*',
+                                  'native_unicode_path_matches': True, 'native_path_exists': True,
+                                  'native_input_sha256': 'modelhash'},
                 'mfc_thread': {'before_init': True, 'before_step': True,
                                'entry_import_matches_AfxGetThread': True,
                                'init_thread_id': 10, 'step_thread_id': 10},
@@ -50,6 +54,31 @@ class InitCaptureChecks(unittest.TestCase):
             else:
                 value['mfc_thread'].update(change)
             self.assertFalse(captured_result(value), change)
+
+    def test_unverified_truncated_or_wrong_input_filename_is_not_success(self):
+        for change in [{}, {'argument_type': 'wchar_t*'},
+                       {'native_unicode_path_matches': False}, {'native_path_exists': False},
+                       {'native_input_sha256': 'differentmodel'}]:
+            value = self.report()
+            if change:
+                value['step_argument'].update(change)
+            else:
+                value['step_argument'] = {}
+            self.assertFalse(captured_result(value), change)
+
+    def test_step_argument_is_narrow_bytes_and_preserves_polish_paths(self):
+        path = 'C:\\Użytkownicy\\Próba\\input.stp'
+        raw = encode_step_filename(path, 'cp1250')
+        self.assertEqual(raw.decode('cp1250'), path)
+        self.assertNotIn(b'\0', raw)
+        self.assertEqual(encode_step_filename('C:\\input.stp', 'ascii'), b'C:\\input.stp')
+        for value in ['', 'C:\\input\0.stp', b'C:\\input.stp']:
+            with self.assertRaises(ValueError):
+                encode_step_filename(value, 'cp1250')
+        with self.assertRaises(UnicodeEncodeError):
+            encode_step_filename(path, 'ascii')
+        with self.assertRaises(ValueError):
+            encode_step_filename(path, 'utf-16-le')
 
     def test_only_one_complete_intermediate_is_captured(self):
         with tempfile.TemporaryDirectory() as folder:
