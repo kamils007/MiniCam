@@ -1,5 +1,8 @@
 # Native ARD solid writer — port of Python test 4.9
 
+Polish handoff, exact COM contracts, ARD record layout and the unchanged Python
+reference with its tests: [docs/alphacam/integracja.md](alphacam/integracja.md).
+
 This branch ports the proven `Feature_2025_TEST_4_9_KOMPLET` path to C++.
 It is a draft integration: the known successful input is Parasolid, while the
 editor currently holds an Open CASCADE shape and exports it as STEP. Direct

@@ -1,5 +1,8 @@
 # cam&L
 
+Materiały integracji brył ALPHACAM/ARD, działający wzorzec i granice portu C++:
+[przekazanie integracji](docs/alphacam/integracja.md).
+
 (dawniej MiniCAM; plik programu nadal nazywa się `minicam.exe`)
 
 Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z kolorami
