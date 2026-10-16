@@ -110,3 +110,35 @@ zwolnienia DLL, zamkniętego ALPHACAM-u ani natywnego wykonania testu 3 tutaj.
 Walidacja przenośnej części: 11 testów odczytu konfiguracji, odrzucania
 fałszywego sukcesu oraz zachowania/przechwycenia plików. Próba Windows testu 3
 jest do wykonania na instalacji użytkownika.
+
+### Wynik testu 3 i poprawka 3.1
+
+Raport użytkownika z 16.10.2026 potwierdza połączenie z instalacją **2025**,
+zgodną SolidImport.dll i InitAlphacamAddIn = **0**. Następny etap kończy się
+`access violation reading 0x0000000000000080`, bez nowego QueryInterface
+w logu i bez pliku pośredniego. Skróty źródła, kopii i obu bibliotek zachowane.
+
+StepInputFile przed QueryInterface wywołuje import MFC z IAT RVA 0x18558,
+po czym bezwarunkowo czyta `[rax+0x80]` (RVA 0xC8CB). Ten import to ordinal
+2222, AfxGetThread. Adres 0x80 pasuje do pustego wskaźnika CWinThread, ale
+pierwszy raport nie ma RIP/stosu, więc jest to diagnoza do potwierdzenia.
+
+[Test 3.1](../../tools/solidimport/README_TEST_3_1_PL.md) tworzy wątek przez
+publiczne AfxBeginThread i sprawdza AfxGetThread przed oboma eksportami.
+Własny apartament STA i wszystkie interfejsy COM powstają na tym wątku.
+Odczyt ścieżek w wątku startowym korzysta z osobnego, zamykanego STA.
+Dodano sprawdzony wcześniej rejestrator pierwszego błędu natywnego; nie zmienia
+rejestrów ani obsługi wyjątku.
+
+Oficjalny runtime MFC 14.44.35211.0 z pakietu Microsoftu i publiczny PDB
+wskazują AfxGetThread = ordinal **2222**, worker AfxBeginThread = **2149**,
+a jego inne przeciążenie z CRuntimeClass = **2150**. Runtime ma 14 103
+niepuste eksporty i zero eksportów nazwanych. Wybieramy wariant z callbackiem
+UINT(void*), nie przeciążenie CRuntimeClass. Źródło symboli, tożsamość PDB,
+sygnatury i skróty są w `mfc_thread_api_reference.json`. Nie przypisujemy tej
+wersji runtime'u instalacji użytkownika; jego rzeczywisty moduł i skrót będą
+w nowym logu. Nie wpisujemy pól CWinThread, TLS ani flag translatora.
+
+Walidacja poprawki: **17 testów przenośnych**, odczyt eksportów rzeczywistej
+MFC z Microsoftu oraz zgodność wybranych ordinałów z dopasowanym PDB.
+Wykonania Windows 3.1 jeszcze nie potwierdzono.

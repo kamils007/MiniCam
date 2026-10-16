@@ -1,0 +1,41 @@
+{
+  "source": {
+    "url": "https://msdl.microsoft.com/download/symbols/mfc140u.amd64.pdb/0B34A86EA5B44CB674FEE9DF38D833931/mfc140u.amd64.pdb",
+    "pdb_name": "mfc140u.amd64.pdb",
+    "pdb_identity": "0B34A86EA5B44CB674FEE9DF38D833931"
+  },
+  "runtime_source": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+  "runtime_sha256": "643ce7fe6a203c53a96a00f272a1a5b42d5b0c320c84364a6fe866307a19bb65",
+  "pdb_sha256": "4090489ffd0721b5a9d16bd2c630532938a41beb9348cd6daf55c21ccf440c49",
+  "symbols": [
+    {
+      "name": "?AfxGetThread@@YAPEAVCWinThread@@XZ",
+      "section": 1,
+      "section_offset": 2618768,
+      "rva": "0x280590",
+      "ordinals": [
+        2222
+      ]
+    },
+    {
+      "name": "?AfxBeginThread@@YAPEAVCWinThread@@PEAUCRuntimeClass@@HIKPEAU_SECURITY_ATTRIBUTES@@@Z",
+      "section": 1,
+      "section_offset": 2619728,
+      "rva": "0x280950",
+      "ordinals": [
+        2150
+      ]
+    },
+    {
+      "name": "?AfxBeginThread@@YAPEAVCWinThread@@P6AIPEAX@Z0HIKPEAU_SECURITY_ATTRIBUTES@@@Z",
+      "section": 1,
+      "section_offset": 2619552,
+      "rva": "0x2808a0",
+      "ordinals": [
+        2149
+      ]
+    }
+  ],
+  "runtime_version": "14.44.35211.0",
+  "note": "Static public-symbol/PE export mapping only; this reference is not the user runtime and not a Windows execution test."
+}

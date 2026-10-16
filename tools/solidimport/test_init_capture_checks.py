@@ -12,6 +12,9 @@ HEADER = b'**PARASOLID\nFORMAT=text;\n**END_OF_HEADER\nBODY'
 class InitCaptureChecks(unittest.TestCase):
     def report(self):
         return {'worker_exit_code': CAPTURE_EXIT, 'init_return_code': 0,
+                'mfc_thread': {'before_init': True, 'before_step': True,
+                               'entry_import_matches_AfxGetThread': True,
+                               'init_thread_id': 10, 'step_thread_id': 10},
                 'capture': {'boundary': 'IAlphaCamApp.ActiveDrawing', 'phase': 'step',
                             'output': {'sha256': 'abc'}},
                 'output': {'recognized_parasolid': True, 'sha256': 'abc'},
@@ -35,6 +38,18 @@ class InitCaptureChecks(unittest.TestCase):
         value['capture']['output']['sha256'] = 'different'
         self.assertFalse(captured_result(value))
         self.assertFalse(captured_result({}))
+
+    def test_missing_or_different_mfc_thread_is_not_success(self):
+        for change in [{}, {'before_init': False}, {'before_step': False},
+                       {'entry_import_matches_AfxGetThread': False},
+                       {'init_thread_id': 0, 'step_thread_id': 0},
+                       {'init_thread_id': 10, 'step_thread_id': 11}]:
+            value = self.report()
+            if not change:
+                value['mfc_thread'] = {}
+            else:
+                value['mfc_thread'].update(change)
+            self.assertFalse(captured_result(value), change)
 
     def test_only_one_complete_intermediate_is_captured(self):
         with tempfile.TemporaryDirectory() as folder:

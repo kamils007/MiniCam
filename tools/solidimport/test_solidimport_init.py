@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test 3: original SolidImport initialization; stop before drawing import.
+"""Test 3.1: MFC thread, original SolidImport init; stop before drawing import.
 
 Windows x64 / Python stdlib only. Actual ALPHACAM must already be running.
 No drawing interface or frame mutation is forwarded to the running application.
@@ -58,10 +58,17 @@ def capture_at_boundary(temp, out):
 
 def captured_result(report):
     marker = report.get('capture', {})
+    thread = report.get('mfc_thread', {})
     return (not report.get('error') and not report.get('timeout')
             and report.get('worker_exit_code') == CAPTURE_EXIT
             and type(report.get('init_return_code')) is int
             and report['init_return_code'] == 0
+            and thread.get('before_init') is True
+            and thread.get('before_step') is True
+            and thread.get('entry_import_matches_AfxGetThread') is True
+            and type(thread.get('init_thread_id')) is int
+            and thread.get('init_thread_id', 0) > 0
+            and thread.get('init_thread_id') == thread.get('step_thread_id')
             and marker.get('boundary') == 'IAlphaCamApp.ActiveDrawing'
             and marker.get('phase') == 'step'
             and marker.get('output', {}).get('sha256') == report.get('output', {}).get('sha256')
@@ -70,7 +77,22 @@ def captured_result(report):
                     ('source_unchanged', 'input_copy_unchanged', 'server_unchanged', 'dll_unchanged')))
 
 
-def worker(args):
+def installed_dll(live, args):
+    root = Path(live.get('Path'))
+    if live.get('ProgramLetter') != ord('R'):
+        raise RuntimeError('Uruchom ALPHACAM Router 2025')
+    dll = args.dll.resolve() if args.dll else None
+    if dll is None:
+        matches = sorted((root / 'Add-Ins').rglob('SolidImport.dll'))
+        if len(matches) != 1:
+            raise RuntimeError('Nie znaleziono jednej SolidImport.dll; uzyj --dll PELNA_SCIEZKA')
+        dll = matches[0]
+    if digest(dll) != DLL_SHA256:
+        raise RuntimeError('SolidImport.dll ma inna wersje niz przeanalizowana')
+    return root, dll
+
+
+def worker(args, mfc, trace):
     from com_host import MinimalHost, PTR, HRESULT, ULONG, LONG, SHORT, Variant, argument_ctype
     from host_environment import RunningApp, checked
     from layer_host import BSTRs, output
@@ -88,17 +110,7 @@ def worker(args):
         live = RunningApp()
         NATIVE_PINS.append(live)
         live.__enter__()  # Kept alive until disposable process termination.
-        root = Path(live.get('Path'))
-        if live.get('ProgramLetter') != ord('R'):
-            raise RuntimeError('Uruchom ALPHACAM Router 2025')
-        dll = args.dll.resolve() if args.dll else None
-        if dll is None:
-            matches = sorted((root / 'Add-Ins').rglob('SolidImport.dll'))
-            if len(matches) != 1:
-                raise RuntimeError('Nie znaleziono jednej SolidImport.dll; uzyj --dll PELNA_SCIEZKA')
-            dll = matches[0]
-        if digest(dll) != DLL_SHA256:
-            raise RuntimeError('SolidImport.dll ma inna wersje niz przeanalizowana')
+        root, dll = installed_dll(live, args)
         save_json(out / 'native_setup.json', {'dll': str(dll), 'sha256': DLL_SHA256,
                   'application_path': str(root), 'actual_app_attached': True})
         frame = PTR()
@@ -110,6 +122,7 @@ def worker(args):
         bstrs = BSTRs()
         host = MinimalHost(HERE.parent / 'alphacam_reference' / 'host_contract_common.json', event,
                            bstrs=bstrs)
+        host.phase = 'init'
         NATIVE_PINS.extend([host, bstrs])
         registrations = []
         phase = ['init']
@@ -180,6 +193,12 @@ def worker(args):
         context.vt = 9
         context.value.pointer = host.app_pointer
         host.objects['IAlphaCamApp'].refs += 1
+        thread_proof = {'before_init': bool(mfc.get_thread()),
+                        'init_thread_id': mfc.k.GetCurrentThreadId(),
+                        'entry_import_matches_AfxGetThread': mfc.entry_import_matches_AfxGetThread}
+        if not thread_proof['before_init']:
+            raise RuntimeError('MFC thread missing before native initialization')
+        trace.phase = 'InitAlphacamAddIn'
         event('before_InitAlphacamAddIn')
         code = exported('InitAlphacamAddIn', LONG, C.POINTER(Variant))(C.byref(context))
         save_json(out / 'init_result.json', {'return_code': code, 'registrations': registrations})
@@ -187,6 +206,12 @@ def worker(args):
         if code != 0:
             raise RuntimeError('InitAlphacamAddIn returned ' + str(code))
         phase[0] = host.phase = 'step'
+        thread_proof.update(before_step=bool(mfc.get_thread()),
+                            step_thread_id=mfc.k.GetCurrentThreadId())
+        save_json(out / 'mfc_thread_ready.json', thread_proof)
+        if not thread_proof['before_step']:
+            raise RuntimeError('MFC thread missing before STEP entry')
+        trace.phase = 'StepInputFile'
         event('before_StepInputFile')
         code = exported('StepInputFile', LONG, C.POINTER(Variant), C.c_wchar_p)(
             C.byref(context), str(args.model.resolve()))
@@ -202,6 +227,55 @@ def worker(args):
     # ExitProcess. This diagnostic deliberately does not validate normal unload.
 
 
+def mfc_worker_process(args):
+    from host_environment import RunningApp
+    from mfc_thread import MFCWorker
+    from native_trace import NativeExceptionTrace
+
+    out = args.out.resolve()
+    log = (out / 'mfc_calls.jsonl').open('x', encoding='utf-8', buffering=1)
+
+    def event(name, **details):
+        log.write(json.dumps({'event': name, **details}, ensure_ascii=False) + '\n')
+        log.flush()
+
+    try:
+        trace = NativeExceptionTrace(out / 'native_exceptions.jsonl')
+        NATIVE_PINS.append(trace)
+        trace.phase = 'mfc_bootstrap'
+        trace.install()
+        # Resolve paths only in this STA. Close it before starting the MFC
+        # thread; obtain all live COM interfaces again in that thread's own STA.
+        with RunningApp() as live:
+            root, dll = installed_dll(live, args)
+        kernel = C.WinDLL('kernel32', use_last_error=True)
+        kernel.LoadLibraryExW.argtypes = [C.c_wchar_p, C.c_void_p, C.c_uint32]
+        kernel.LoadLibraryExW.restype = C.c_void_p
+        kernel.SetErrorMode.argtypes = [C.c_uint32]
+        kernel.SetErrorMode.restype = C.c_uint32
+        kernel.SetErrorMode(0x8003)
+        directories = [os.add_dll_directory(str(p)) for p in {root, dll.parent}]
+        NATIVE_PINS.extend([kernel, directories])
+        module = kernel.LoadLibraryExW(str(dll), None, 0x1100)
+        if not module:
+            raise C.WinError(C.get_last_error())
+        mfc = MFCWorker(module, event)
+        NATIVE_PINS.append(mfc)
+
+        def run():
+            code = worker(args, mfc, trace)
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(code)
+
+        mfc.run_terminal(run, args.timeout)
+    except BaseException as error:
+        event('mfc_bootstrap_error', type=type(error).__name__, message=str(error))
+        save_json(out / 'mfc_bootstrap_result.json',
+                  {'error': {'type': type(error).__name__, 'message': str(error)}})
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', type=Path, default=HERE / 'input_model.stp')
@@ -214,7 +288,7 @@ def main():
         parser.error('Wymagany Windows i Python x64')
     if args.worker:
         # No Python/COM finalizers can outlive the callback objects on shutdown.
-        code = worker(args)
+        code = mfc_worker_process(args)
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(code)
@@ -223,11 +297,11 @@ def main():
     model = args.model.resolve()
     if not model.is_file() or model.suffix.lower() not in {'.stp', '.step'}:
         parser.error('Brak pliku STEP: ' + str(model))
-    out = (args.out or HERE / ('solidimport_test_3_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f'))).resolve()
+    out = (args.out or HERE / ('solidimport_test_3_1_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f'))).resolve()
     out.mkdir(parents=True, exist_ok=False)
     (out / 'temp').mkdir()
     before = digest(model)
-    report = {'schema': 'solidimport-init-test-3-v1', 'parasolid_captured': False,
+    report = {'schema': 'solidimport-init-test-3-v2', 'test_version': '3.1', 'parasolid_captured': False,
               'complete_ard': False, 'geometry_validated': False,
               'normal_unload_validated': False, 'output_directory': str(out)}
     server = dll = None
@@ -248,11 +322,12 @@ def main():
             shutil.copyfileobj(src, dst)
         if digest(input_copy) != before:
             raise RuntimeError('Input changed while copying')
-        command = [sys.executable, str(Path(__file__).resolve()), '--worker', '--model', str(input_copy), '--out', str(out)]
+        command = [sys.executable, str(Path(__file__).resolve()), '--worker', '--model', str(input_copy),
+                   '--out', str(out), '--timeout', str(args.timeout)]
         if args.dll:
             command += ['--dll', str(args.dll.resolve())]
         env = dict(os.environ, TEMP=str(out / 'temp'), TMP=str(out / 'temp'))
-        print('TEST 3: oryginalny SolidImport + otwarty ALPHACAM Router 2025', flush=True)
+        print('TEST 3.1: watek MFC + SolidImport + otwarty ALPHACAM Router 2025', flush=True)
         print('Limit: %d s. Wyniki: %s' % (args.timeout, out), flush=True)
         with (out / 'worker_stdout.txt').open('xb') as stdout, (out / 'worker_stderr.txt').open('xb') as stderr:
             try:
@@ -262,7 +337,9 @@ def main():
             except subprocess.TimeoutExpired:
                 report['timeout'] = True
         for filename, key in [('native_setup.json', 'setup'), ('init_result.json', 'init'),
-                              ('capture.json', 'capture'), ('worker_result.json', 'worker')]:
+                              ('capture.json', 'capture'), ('worker_result.json', 'worker'),
+                              ('mfc_bootstrap_result.json', 'mfc_bootstrap'),
+                              ('mfc_thread_ready.json', 'mfc_thread')]:
             path = out / filename
             if path.is_file():
                 report[key] = json.loads(path.read_text(encoding='utf-8'))
