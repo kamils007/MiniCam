@@ -1,6 +1,6 @@
 # Przekazanie integracji bryły do ARD
 
-Stan odniesienia: 15.10.2026, Python test 4.9, Feature.dll 2025.3.0.200.
+Stan: 16.10.2026. Wzorzec Feature: Python test 4.9, Feature.dll 2025.3.0.200.
 Ten dokument pozwala kontynuować pracę bez historii rozmowy.
 
 ## Co zostało potwierdzone
@@ -58,9 +58,10 @@ za udany zapis bryły. Należy zachować położenie i wszystkie zmiany modelu.
    Oba powinny zaimportować jedną bryłę, wykonać ObjectDoWrite2 i poprawnie
    zamknąć plik. Porównywać geometrię i metadane, uwzględniając ścieżkę i datę,
    zamiast wymagać identyczności całego rekordu bajt w bajt.
-2. Rozwiązać przekazanie **bieżącej** bryły OCCT do ścieżki natywnej.
-   Ustalić przyczynę błędu STEP lub potwierdzić inną dostępną drogę konwersji.
-   Dotychczasowy test Parasolid sam tego nie rozwiązuje.
+2. Przenieść do C++ i sprawdzić przekazanie **bieżącej** bryły OCCT przez STEP
+   do SolidImport/SolidLink. Python test 3.2 potwierdził STEP → Parasolid
+   przy otwartym ALPHACAM 2025. Zamknięty program i pełny most GUI wymagają
+   dalszej weryfikacji. Najpierw wykonać test bryły z tego STEP-a do ARD.
 3. Wygenerowany przez C++ dokument otworzyć w ALPHACAM-ie, zaznaczyć bryłę,
    obrócić ją, zapisać ponownie i porównać geometrię.
 4. Dopiero potem rozszerzać próbę o zmiany położenia, wiele brył, inne modele,
@@ -79,5 +80,8 @@ nie zostały potwierdzone testem 4.9. Sam brak działającego Acam.exe tego nie 
 Szczegóły: [COM i ABI](interfejsy_COM.md), [format rekordu i ARD](format_ARD.md),
 [uruchomienie wzorca](../../tools/alphacam_reference/README.md).
 
-Nowy etap: [analiza SolidImport.dll i komponentu SolidLink](solidimport.md)
-oraz diagnostyka rejestracji translatora STEP na Windows.
+Nowy etap: [SolidImport/SolidLink — wyniki testów STEP](solidimport.md).
+Test 3.2 utworzył 99 728-bajtowy tekstowy Parasolid; log translatora potwierdza
+Success i 1 bryłę stałą. Konwersja korzystała z otwartego ALPHACAM-u.
+[Test 4 — ten Parasolid do ARD](../../tools/step_ard/README_PL.md) jest przygotowany;
+nowe wykonanie Feature i otwarcie wynikowego ARD pozostają do sprawdzenia.

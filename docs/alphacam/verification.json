@@ -51,5 +51,24 @@
     "returned_ard_sha256": "1c2f1009ca56eb1581e03cacd613e8570000cab43ad063ae57aa3a9db2034af0",
     "returned_ard_received": true
   },
-  "scope": "Sanitized evidence from the Python run and existing local files. No fresh Windows C++ execution during handoff."
+  "scope": "Sanitized evidence from the Python run and existing local files. No fresh Windows C++ execution during handoff.",
+  "step_conversion_3_2": {
+    "source_report_sha256": "fc9ca589dfe7da10e663e0eaae8cd7b52be18216fbaf69518858d673c219662e",
+    "input_step_sha256": "88541daf8ce0f68780ab615550c87a0417933083577ca2d63d6f40a1722735d7",
+    "solidimport_sha256": "b88bef3244cac2cc38bfe41df2089f0a1b6e7b62aea08ae443b95cd47dcd8860",
+    "parasolid_sha256": "ab2fdda5033b63c2097c243c970211b59cdcf3229e4392601a1ad644997017c1",
+    "parasolid_size_bytes": 99728,
+    "parasolid_format": "text",
+    "translation_log_sha256": "590a9d6b61aaf7216a9ca144904a0f19205167da835534c3cf56c9086fc2b1d0",
+    "translation_log_result": "Success",
+    "solid_bodies_reported_by_translator": 1,
+    "controlled_worker_exit_code": 83,
+    "init_return_code": 0,
+    "mfc_thread_verified": true,
+    "actual_input_path_verified": true,
+    "original_files_unchanged": true,
+    "alphacam_open_during_translation": true,
+    "independent_geometry_validation": false,
+    "new_ard_from_this_step_verified": false
+  }
 }

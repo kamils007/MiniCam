@@ -1,6 +1,6 @@
 # Rozpoznanie importu STEP — SolidImport 2025
 
-Analiza i próby 15.10.2026. Test 2 wykonano na Windows; nie utworzył Parasolidu.
+Stan 16.10.2026: test 3.2 potwierdził STEP → Parasolid przy otwartym ALPHACAM 2025.
 
 ## Dostarczone pliki
 
@@ -169,3 +169,26 @@ Publiczne sygnatury zapisano w mfc_thread_api_reference.json.
 
 Walidacja przygotowania: 19 testów przenośnych; natywne wykonanie 3.2 oraz
 konwersja STEP pozostają niepotwierdzone.
+
+
+### Wynik testu 3.2 — potwierdzona konwersja STEP
+
+Raport z Windows i rzeczywiste pliki sprawdzono 16.10.2026. Init = 0,
+wątek MFC i ścieżka poprawne, brak natywnych wyjątków. Przechwycenie nastąpiło
+przy ActiveDrawing, kod kontrolowanego zakończenia 83. `converted.x_t`
+ma 99 728 bajtów, SHA-256
+`ab2fdda5033b63c2097c243c970211b59cdcf3229e4392601a1ad644997017c1`.
+Jest identyczny z pośrednim FE STEP0001.x_t. Nagłówek: FORMAT=text,
+Parasolid 37.0.185. Log Spatial InterOp Connect 2025 1.0.0 zawiera:
+Translation Result = Success, BRep Conversion Result = Success,
+No. of Solid Bodies = 1, pozostałe rodzaje brył = 0.
+
+Zgodność raportu, skrótów wejścia/wyjścia i zachowanie źródłowych DLL/EXE
+potwierdzono ponownie. To dowód wykonania konwersji, nie pełny pomiar geometrii.
+ALPHACAM pozostawał otwarty dla rzeczywistych odczytów hosta w inicjalizacji.
+
+[Test 4](../../tools/step_ard/README_PL.md) używa nowego Parasolidu jako wejścia
+niezmienionego wzorca Feature 4.9 przy zamkniętym ALPHACAM-ie. Po potwierdzonym
+imporcie jednej bryły, zapisie i natywnym rekordzie tworzy diagnostyczny ARD
+na bazie użytkownika. Algorytm opakowania odtworzył poprzedni TEST_6 bajt w bajt.
+Nowy ARD i jego geometria wymagają dopiero wykonania i otwarcia na Windows.
