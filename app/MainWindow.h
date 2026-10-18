@@ -59,7 +59,9 @@ private:
     bool onSaveAs();
     bool saveTo(const QString& path);
     void onOutputCad(); // Narzędzia główne → CAD → Zapisz CAD (DXF)
-    void onSaveArd();   // Plik → Zapisz dla Alphacam (.ard): geometrie i warstwy, bez bryły
+#ifdef MINICAM_WITH_ALPHACAM_EXPORT
+    void onSaveArd();   // Optional module: current solid, 2D geometry and layers.
+#endif
     bool maybeSave(); // pyta o zapis zmian; false = użytkownik anulował
     void onPrint(bool preview);
     void printTo(QPrinter* printer);

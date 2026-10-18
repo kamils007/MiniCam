@@ -1,0 +1,189 @@
+{
+  "source": "User-supplied LicManaged.dll static CLR metadata and user-supplied Windows diagnostic results",
+  "source_sha256": "0b30282755e72feefdc3b43e50c0628749e49a5bd97fa06dabc002a0851a4827",
+  "assembly_name": "LicManaged",
+  "assembly_version": "2025.1.0.0",
+  "pointer_size": 8,
+  "public_type": "PlanitCls.License",
+  "methods": [
+    {
+      "name": "OpenVersionedLicenseConnection",
+      "managed_rva": "0x2eec",
+      "signature_blob_hex": "00061193400e20691193382069119334206908206908206908",
+      "public": true,
+      "static": true,
+      "parameter_names": [
+        "applicationName",
+        "displayError",
+        "product",
+        "nSessionId",
+        "versionMajor",
+        "versionMinor"
+      ]
+    },
+    {
+      "name": "ValidLicenseConnection",
+      "managed_rva": "0x2a8c",
+      "signature_blob_hex": "00011193442069119338",
+      "public": true,
+      "static": true,
+      "parameter_names": [
+        "displayError"
+      ]
+    },
+    {
+      "name": "CloseLicenseConnection",
+      "managed_rva": "0x28e8",
+      "signature_blob_hex": "000001",
+      "public": true,
+      "static": true,
+      "parameter_names": []
+    },
+    {
+      "name": "GetClsProduct",
+      "managed_rva": "0x2ac8",
+      "signature_blob_hex": "0000119334",
+      "public": true,
+      "static": true,
+      "parameter_names": []
+    },
+    {
+      "name": "GetCurrentSessionId",
+      "managed_rva": "0x2b7c",
+      "signature_blob_hex": "000008",
+      "public": true,
+      "static": true,
+      "parameter_names": []
+    },
+    {
+      "name": "SetClsPath",
+      "managed_rva": "0x3384",
+      "signature_blob_hex": "0001020e",
+      "public": true,
+      "static": true,
+      "parameter_names": [
+        "clsPath"
+      ]
+    },
+    {
+      "name": "OpenLicenseConnection",
+      "managed_rva": "0x2e30",
+      "signature_blob_hex": "00051193400e20691193382069119334206908206908",
+      "public": true,
+      "static": true,
+      "parameter_names": [
+        "applicationName",
+        "displayError",
+        "forProduct",
+        "checkMonth",
+        "checkYear"
+      ]
+    }
+  ],
+  "enums": {
+    "Product": {
+      "Alphacam": 2
+    },
+    "ShowError": {
+      "Silent": 2
+    },
+    "OpenLicenseConnectionResult": {
+      "Ok": 1
+    },
+    "ValidLicenseConnectionResult": {
+      "Ok": 101
+    }
+  },
+  "native_version_wrapper_rva": "0x4bfb0",
+  "windows_execution_verified": true,
+  "scope": "Public CLS session API only; not Core:Solids or STEP conversion",
+  "provided_pdb_matches_cls_licmanaged_or_clsinit": false,
+  "enum_full_names": {
+    "Product": "PlanitCls.License+Product",
+    "ShowError": "PlanitCls.License+ShowError",
+    "OpenLicenseConnectionResult": "PlanitCls.License+OpenLicenseConnectionResult",
+    "ValidLicenseConnectionResult": "PlanitCls.License+ValidLicenseConnectionResult"
+  },
+  "enum_visibility": "NestedPublic; enclosed by PlanitCls.License (NestedClass metadata table)",
+  "test_6_windows_result": "TypeLoadException before opening CLS: unqualified enum type Product could not be found. No license outcome.",
+  "revision": "6.2 public OpenLicenseConnection with original built-in defaults confirmed on Windows; no release/Core:Solids/STEP entitlement claimed",
+  "test_6_1_windows_result": {
+    "api_contract_verified": true,
+    "set_cls_path": true,
+    "open_return_code": 10,
+    "open_return_name": "UpdateExpiry",
+    "close_completed": true,
+    "acam_observed": false,
+    "step_conversion_attempted": false
+  },
+  "test_6_1_requested_product_version": [
+    2025,
+    3
+  ],
+  "current_request": {
+    "method": "OpenLicenseConnection",
+    "checkMonth": -1,
+    "checkYear": -1,
+    "release_version_verified": false
+  },
+  "default_check_evidence": {
+    "LicManaged.dll": {
+      "default_month_rva": "0xf570",
+      "default_month": 4,
+      "default_year_rva": "0xf580",
+      "default_year": 125,
+      "default_resolution_rva": "0x4aede"
+    },
+    "Acam.exe": {
+      "initialization_rva": "0x629840",
+      "check_month": -1,
+      "check_year": -1,
+      "default_month_rva": "0x247b90",
+      "default_month": 4,
+      "default_year_rva": "0x7a9380",
+      "default_year": 125,
+      "original_type_library_source_sha256": "2d11c21b884be255163a8367fa53b624151a6794527c757cd8eae4112f8f5f38",
+      "local_analysis_copy_sha256": "1a54de3c87e7f3bd94afe8241b8947e0c708e121bb0dfbc16e90d277d5f7e728",
+      "local_analysis_copy_size_bytes": 22225408,
+      "note": "Native instruction evidence is from the current local analysis copy. Its full-file hash differs from the previously recorded original TYPELIB source; no claim of byte-identical complete executables."
+    },
+    "versioned_wrapper": {
+      "rva": "0x4bfb0",
+      "first_check": "versionMinor + 1",
+      "second_check": "versionMajor + 500",
+      "test_6_1_values": [
+        4,
+        2525
+      ]
+    },
+    "interpretation": "Raw default values match both supplied builds. No claim that a successful default connection grants export or release 2025.3 entitlement."
+  },
+  "test_6_2_windows_result": {
+    "source_report_sha256": "59fe5f588cb83c5d9875914d3c3e1594b1ec15f6c9d0bec7893c9f2126d536b5",
+    "windows_execution_verified": true,
+    "cls_session_confirmed": true,
+    "open_method": "OpenLicenseConnection",
+    "request_profile": "installed_cls_defaults",
+    "check_month": -1,
+    "check_year": -1,
+    "open_return_code": 1,
+    "open_return_name": "Ok",
+    "validation_return_code": 101,
+    "validation_return_name": "Ok",
+    "reported_product": 2,
+    "worker_exit_code": 0,
+    "acam_processes_before_count": 0,
+    "acam_processes_after_count": 0,
+    "acam_observed_during_worker": false,
+    "acam_monitor_samples": 37,
+    "source_modules_unchanged": true,
+    "close_attempted": true,
+    "close_completed": true,
+    "release_version_verified": false,
+    "core_solids_verified": false,
+    "step_conversion_attempted": false,
+    "parasolid_created": false,
+    "ard_created": false,
+    "scope": "Public CLS connection opened, validated and closed without an observed Acam.exe. Does not verify release 2025.3, Core:Solids, exporter access or STEP conversion."
+  }
+}

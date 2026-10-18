@@ -8,6 +8,7 @@ import ctypes as C
 import hashlib
 from pathlib import Path
 import struct
+from feature_builds import OLD_SHA256, profile
 
 PTR = C.c_void_p
 LONG = C.c_int32
@@ -71,11 +72,12 @@ def parse_fragment(data):
 
 
 class NativeObjectWriter:
-    def __init__(self, module, get_export, callback_factory=None):
+    def __init__(self, module, get_export, callback_factory=None, build_sha256=OLD_SHA256):
         self.factory = callback_factory or getattr(C, "WINFUNCTYPE", None)
         if self.factory is None or C.sizeof(PTR) != 8:
             raise RuntimeError("Windows x64 is required")
         self.module = int(module)
+        self.iat_rvas = profile(build_sha256)['crt_iat']
         self.get_export = get_export
         self.open_file = self.imported("_wfopen_s", LONG, C.POINTER(PTR), C.c_wchar_p, C.c_wchar_p)
         self.flush_file = self.imported("fflush", LONG, PTR)
@@ -83,7 +85,7 @@ class NativeObjectWriter:
         self.fwrite_address = self.import_address("fwrite")
 
     def import_address(self, name):
-        pointer = PTR.from_address(self.module + IAT_RVAS[name]).value
+        pointer = PTR.from_address(self.module + self.iat_rvas[name]).value
         if not pointer:
             raise RuntimeError("Unbound CRT import: " + name)
         return pointer
@@ -97,7 +99,7 @@ class NativeObjectWriter:
             raise RuntimeError("Missing native export: " + name)
         return self.factory(result, *arguments)(address)
 
-    def write(self, context, destination, emit):
+    def write(self, context, destination, emit, error_reader=None):
         destination = Path(destination)
         if destination.exists():
             raise FileExistsError("Refusing to overwrite " + str(destination))
@@ -130,8 +132,14 @@ class NativeObjectWriter:
         try:
             write = self.exported("ObjectDoWrite2", LONG, PTR, PTR, PTR)
             emit("before_object_do_write", output=str(destination),
-                 crt_imports=list(IAT_RVAS), callback="Feature.dll IAT fwrite")
+                 crt_imports=list(self.iat_rvas), callback="Feature.dll IAT fwrite")
+            if error_reader:
+                result['kernel_error_before_write'] = error_reader()
+                emit('kernel_error_before_object_write', result=result['kernel_error_before_write'])
             result["write_return_code"] = int(write(C.byref(context), stream, self.fwrite_address))
+            if error_reader:
+                result['kernel_error_after_write'] = error_reader()
+                emit('kernel_error_after_object_write', result=result['kernel_error_after_write'])
             # ObjectDoWrite2 returns 0 for success and 1 for failure; not HRESULT.
             result["flush_return_code"] = int(self.flush_file(stream))
         finally:

@@ -1,6 +1,31 @@
 # Rozpoznanie importu STEP — SolidImport 2025
 
-Stan 16.10.2026: test 3.2 potwierdził STEP → Parasolid przy otwartym ALPHACAM 2025.
+Stan 17.10.2026: test 13 potwierdził powstanie świeżego pliku Parasolid z STEP
+przez oryginalny importer 2025.4 bez zaobserwowanego procesu Acam.exe.
+Plik przechwycono przed oddaniem rysunku; sprawdzono rzeczywisty nagłówek
+i hash kopii, geometrii jeszcze nie zweryfikowano. Wcześniejszy test 4.1
+potwierdził Parasolid → ARD przy zamkniętej aplikacji, na innym pliku pośrednim.
+Pełny bieżący przebieg STEP → ARD bez procesu ALPHACAM nadal wymaga sprawdzenia.
+
+Test 14.2 potwierdził odczyt konkretnego Parasolidu testu 13 przez aktualną
+Feature.dll: jedna bryła, 1200 × 2300 × 10 mm, 63 ściany, 158 krawędzi,
+100 wierzchołków, poprawna sesja CLS i jej zamknięcie, brak Acam.exe w 38
+próbkach. Pomocniczy roundtrip.x_b nie powstał mimo Save=1. Natywnego rekordu
+ARD jeszcze nie zapisano; [test 14.3](feature_test_14_3.md) sprawdza bezpośrednio
+oryginalny writer rekordu i jego rzeczywiste bajty. Pełny kształt nadal wymaga
+nałożenia nowego ARD na STEP; zgodność wymiarów nie jest takim dowodem.
+
+Przygotowano [test 14](feature_test_14.md): konkretny Parasolid z testu 13 →
+Feature.dll, rzeczywisty pomiar obwiedni i liczników, zapis natywnego rekordu
+i ARD. Używa bieżącego odczytu CLS dla jedynego sprawdzanego bitu konsumenta
+Save, bez historycznego SpecialKey. Pakiet sprawdzono przenośnie; nowy ARD
+i wykonanie Windows pozostają niepotwierdzone do otrzymania wyniku.
+
+Test 14 zatrzymał się na kontroli wersji Feature.dll przed wywołaniem natywnym.
+Po otrzymaniu aktualnej biblioteki 2025.4.1.200 przygotowano
+[test 14.1](feature_test_14_1.md) z osobno sprawdzonymi adresami, importami
+i nową tabelą 585 CString. Przeszło 59 testów przenośnych; wykonanie Windows
+nowego profilu i zapis ARD nadal oczekują na wynik użytkownika.
 
 ## Dostarczone pliki
 
@@ -209,3 +234,99 @@ jest sprawdzany przed próbą odczytania pliku natywnego.
 
 Przeszło 16 przenośnych testów hosta i 4 testy raportowania/opakowania.
 Wykonanie 4.1 na Windows, kompilacja zmiany C++ i nowy ARD niepotwierdzone.
+
+### Wynik 4.1 — ARD zapisany i ponownie otwarty
+
+Raport z 17.10.2026 i pliki z ZIP sprawdzono: proces Feature zakończył się
+kodem 0, import oraz zapis jednej bryły zakończone, bez natywnych wyjątków.
+Wejście X_T ma skrót z testu 3.2. Nowy rekord ma 67 544 bajty, a ARD
+130 486 bajtów, SHA-256
+`8885e4955c5abdae5dfa95dfda5291674bd8f96cc7298f4b62e6f6c4ce178186`.
+Niezależnie odtworzono cały ARD bajt w bajt z wejściowej bazy i rekordu.
+W kontrolowanych punktach tego etapu nie obserwowano procesu Acam.exe.
+
+Użytkownik otworzył i ponownie zapisał ARD. Otrzymany plik ma 358 634 bajty,
+SHA-256 `96832774525d8aad010ed61ea2a67ca0fbc7a530da4ae3bf3506122d4128dcc7`.
+Zawiera natywny rekord jednej bryły ze zgodnym odniesieniem do wejściowego X_T.
+ALPHACAM ponownie serializował Parasolid i dodał atrybuty; binarne dane geometrii
+nie są identyczne. Użytkownik podał, że po wstawieniu dokumentów do siebie
+bryły pokrywają się w 100%. To potwierdzenie porównania użytkownika, bez
+niezależnego pomiaru wymiarów lub objętości w nowym ARD.
+
+### Test 5 — rozpoznanie zależności bez procesu ALPHACAM
+
+W logu udanego 3.2 Init wywołuje ProgramLevel, a następnie License.
+Oryginalny kod robi to drugie wyłącznie dla poziomu 14 i sprawdza
+ILicense.IsFeatureLicensed dla `Core:Solids`. Nie zastępujemy tej odpowiedzi
+stałą ani nie zmieniamy poziomu, aby ominąć tę gałąź.
+
+TYPELIB z dostarczonego Acam.exe 2025 opisuje klasę License,
+CLSID `28AA001D-94E1-44AB-9571-E5E4E3BDB103`, oraz ILicense,
+IID `214DE706-D211-4A06-84C3-6CB3044A4685`. Brakuje danych z Windows,
+czy klasa ma samodzielny serwer DLL. [Test 5](../../tools/solidimport/README_TEST_5_PL.md)
+czyta tę rejestrację i metadane zależności bez aktywacji COM lub ładowania DLL.
+Nie jest próbą konwersji. Wynik z Windows potrzebny do wyboru następnej ścieżki
+inicjalizacji. Nie dowodzi jeszcze, że niezależna aktywacja jest dostępna.
+
+### Wynik testu 5 i analiza dostarczonych bibliotek
+
+Raport z 17.10.2026: odczyt zakończony, brak procesu Acam.exe w punktach
+kontrolnych, brak rejestracji serwera klasy License w widoku x64 i x86.
+Router jest zarejestrowany przez Acam.exe /R /Auto; SolidLink przez własny EXE.
+Skan folderów osiągnął limit, więc nie jest kompletnym spisem instalacji.
+
+Dostarczone następnie CLS2005Interface.dll i SWLicense.dll są natywne x86;
+CLS.dll jest x64 C++/CLI, wersja 2025.1.2507.3. Ta ostatnia udostępnia
+ClsCommand, ale nie fabrykę ILicense. Odtworzono prototyp eksportu i wskazano
+konkretną implementację Core:Solids w Acam.exe. Nie ustalono jeszcze kontraktu
+komunikatów CLS/EPA i niezależnego tworzenia stanu funkcji produktu.
+[Szczegóły analizy](cls_initialization.md).
+
+### Wynik testu CLS 6.2 — bez procesu ALPHACAM
+
+Publiczne OpenLicenseConnection z domyślną kontrolą producenta zwróciło
+Ok (1), ValidLicenseConnection zwróciło Ok (101), produkt Alphacam (2).
+Proces próby zakończył się 0, zamknięcie własnego połączenia bez wyjątku.
+Nie zaobserwowano Acam.exe w 37 próbkach ani przed i po; trzy biblioteki
+pozostały niezmienione. Warunki potwierdzenia sprawdzono niezależnie z ZIP.
+
+Ten wynik potwierdza jedynie rzeczywistą sesję CLS. Nadal nie potwierdza
+wydania 2025.3, Core:Solids, inicjalizacji importera ani STEP → Parasolid
+bez Acam.exe. Dane zapisano w verification.json / cls_connection_6_2.
+
+### Przygotowany test 7
+
+[Instrukcja próby STEP → Parasolid przy otwartej sesji CLS](../../tools/solidimport/README_TEST_7_PL.md).
+Publiczny COM SolidLink jest wywoływany w czasie między dwiema walidacjami
+rzeczywistej sesji CLS. Nie jest to jeszcze niezależny host SolidImport.dll.
+Bezpośrednie wywołanie ma sprawdzić, czy istniejąca sesja pozwoli na zwykłą
+translację. Wykonanie tej próby na Windows nie jest jeszcze potwierdzone.
+
+### Wynik 7.2 — CLS prawidłowe, bezpośrednia translacja nieudana
+
+SolidLink 2025.4.2616.108 uruchomił się przez COM i potwierdził kontrakt
+czterech używanych metod. STEP rozpoznany jako typ 11, TranslateSolid=1,
+GetInteropResult=0, brak wyjściowego pliku. CLS pozostało ważne przed i po
+translacji, połączenia zamknięte bez błędu. Nie zaobserwowano Acam.exe.
+Późniejsza analiza zgodnego EXE wyjaśnia kod 1 jako wczesny powrót przy
+niezainicjalizowanej autoryzacji SolidLink; nie jest to dowód odmowy CLS.
+Szczegóły w cls_initialization.md i verification.json / cls_solidlink_7_2.
+
+### Aktualny importer 2025.4
+
+Dostarczony SolidImport(1).dll ma wersję 2025.4.1.100. Jego oryginalna ścieżka
+STEP wykonuje SendLicenseString przed TranslateSolid oraz oddzielne
+ConfirmParasolidLicensed. Init zachowuje kontrolę Core:Solids przez License
+hosta przy rzeczywistym ProgramLevel=14. Odtworzenie tej sekwencji wymaga
+poprawnego kontekstu hosta; sama sesja CLS z 6.2 go nie zastępuje.
+Nie potwierdzono nowej konwersji. Szczegóły i zakres dowodów w
+cls_initialization.md oraz solidimport_2025_4_initialization_reference.json.
+
+### Wynik adaptera CLS → COM, test 9
+
+Na Windows potwierdzono natywne wywołanie IsFeatureLicensed ze slotu 0x48
+naszego lokalnego interfejsu ILicense. Rzeczywiste CLS przyznało 390,
+adapter zwrócił HRESULT=0 i VARIANT_BOOL=-1; nieobsługiwane nazwy odrzucone.
+Sesja CLS została zamknięta bez wyjątku, bez zaobserwowanego Acam.exe.
+To weryfikacja adaptera, jeszcze bez wywołania oryginalnego SolidImport.
+Pełny host, STEP i ARD pozostają niepotwierdzone dla tej ścieżki.

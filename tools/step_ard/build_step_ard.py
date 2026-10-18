@@ -57,7 +57,7 @@ def wrap_ard(base, fragment):
                     'identifier_offset_unchanged': True, 'fragment': parsed}
 
 
-def check_feature_stage(report):
+def check_feature_stage(report, record_only=False):
     stages = report.get('stages', [])
     if len(stages) != 1:
         raise ValueError('Feature report has no unique native stage')
@@ -67,26 +67,32 @@ def check_feature_stage(report):
         raise RuntimeError('Brak obslugi hosta: %s.%s (invkind=%s, offset=%s)' %
                            (missing.get('interface'), missing.get('method'),
                             missing.get('invkind'), missing.get('vtable_offset_x64')))
-    if stages[0].get('process_exit_code') != 0 or summary.get('stop_reason') != 'completed':
+    expected_stop = 'completed_native_record' if record_only else 'completed'
+    if stages[0].get('process_exit_code') != 0 or summary.get('stop_reason') != expected_stop:
         raise ValueError('Feature stage incomplete: %s; exit=%s; detail=%s' %
                          (summary.get('stop_reason'), stages[0].get('process_exit_code'),
                           summary.get('native_error')))
     return summary
 
 
-def require_native_success(report, record, expected_input):
+def require_native_success(report, record, expected_input, record_only=False):
     if report.get('input', {}).get('sha256') != expected_input:
         raise ValueError('Feature report refers to a different Parasolid input')
     if report.get('original_input_unchanged') is not True:
         raise ValueError('Parasolid input was not preserved')
     if report.get('no_acam_process_observed_at_checkpoints') is not True:
         raise ValueError('ALPHACAM process was observed during the Feature test')
-    summary = check_feature_stage(report)
-    if (summary.get('stop_reason') != 'completed' or summary.get('native_error')
+    summary = check_feature_stage(report, record_only=record_only)
+    required = ['import_succeeded_with_bodies', 'object_record_written_and_prefix_recognized']
+    if record_only:
+        if summary.get('save_status', {}).get('ok') is not True:
+            raise ValueError('Original Bodies.Save did not accept the call')
+        required += ['host_selftest_ok', 'host_context_bound', 'text_table_initialized']
+    else:
+        required.append('save_succeeded_with_file')
+    if (summary.get('native_error')
             or summary.get('bodies_after_count') != 1 or summary.get('saved_body_count') != 1
-            or any(summary.get(key) is not True for key in
-                   ['import_succeeded_with_bodies', 'save_succeeded_with_file',
-                    'object_record_written_and_prefix_recognized'])):
+            or any(summary.get(key) is not True for key in required)):
         raise ValueError('Feature import, one-body save or native record was not confirmed')
     if report.get('native_exceptions') or report.get('trace_read_errors'):
         raise ValueError('Native exception diagnostics are not clean')

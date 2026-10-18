@@ -28,6 +28,24 @@ def native_report(record):
 
 
 class StepArdChecks(unittest.TestCase):
+    def test_direct_record_scope_preserves_missing_roundtrip_and_requires_original_save_acceptance(self):
+        record = fragment()
+        report = native_report(record)
+        summary = report['stages'][0]['summary']
+        summary.update(stop_reason='completed_native_record', save_succeeded_with_file=False,
+                       save_status={'ok': True}, host_selftest_ok=True, host_context_bound=True,
+                       text_table_initialized=True)
+        self.assertTrue(build.require_native_success(report, record, 'inputhash', record_only=True))
+        self.assertFalse(summary['save_succeeded_with_file'])
+        with self.assertRaises(ValueError):
+            build.require_native_success(report, record, 'inputhash')
+        for change in [{'save_status': {'ok': False}}, {'object_record_written_and_prefix_recognized': False},
+                       {'saved_body_count': 0}, {'host_context_bound': False}, {'native_error': 'fault'}]:
+            changed = deepcopy(report)
+            changed['stages'][0]['summary'].update(change)
+            with self.assertRaises(ValueError):
+                build.require_native_success(changed, record, 'inputhash', record_only=True)
+
     def test_missing_host_method_is_reported_before_record_access(self):
         report = {'stages': [{'process_exit_code': 80, 'summary': {
             'stop_reason': 'unimplemented_host_method',

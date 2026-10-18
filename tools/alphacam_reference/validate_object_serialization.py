@@ -7,6 +7,7 @@ import unittest
 
 from com_host import Variant
 import object_serialization as S
+from feature_builds import OLD_SHA256, CURRENT_SHA256, profile
 
 
 def fragment():
@@ -21,7 +22,8 @@ def fragment():
 
 class FakeNative:
     """Real local callback pointers and an actual temporary Python-owned file."""
-    def __init__(self, write_code=0, flush_code=0, close_code=0, query_code=1):
+    def __init__(self, write_code=0, flush_code=0, close_code=0, query_code=1, build_sha256=OLD_SHA256):
+        self.build_sha256 = build_sha256
         self.memory = (C.c_ubyte * 0x140000)()
         self.module = C.addressof(self.memory)
         self.callbacks, self.events, self.errors = [], [], []
@@ -71,7 +73,7 @@ class FakeNative:
             "fflush": install(flush, S.LONG, [S.PTR]),
             "fclose": install(close, S.LONG, [S.PTR])}
         for name, address in addresses.items():
-            S.PTR.from_address(self.module + S.IAT_RVAS[name]).value = address
+            S.PTR.from_address(self.module + profile(build_sha256)['crt_iat'][name]).value = address
 
         def query(context, name, version):
             self.events.append("query")
@@ -94,14 +96,38 @@ class FakeNative:
             "ObjectQueryWrite2": install(query, S.LONG, [S.PTR, S.PTR, S.LONG]),
             "ObjectDoWrite2": install(write, S.LONG, [S.PTR, S.PTR, S.PTR])}
 
-    def run(self, target):
+    def run(self, target, error_reader=None):
         context = Variant()
         context.vt, context.value.pointer = 9, 0x1234
-        writer = S.NativeObjectWriter(self.module, self.exports.get, C.CFUNCTYPE)
-        return writer.write(context, target, lambda *a, **kw: None)
+        writer = S.NativeObjectWriter(self.module, self.exports.get, C.CFUNCTYPE, build_sha256=self.build_sha256)
+        return writer.write(context, target, lambda *a, **kw: None, error_reader=error_reader)
 
 
 class ObjectTests(unittest.TestCase):
+    def test_optional_error_reader_observes_before_and_after_write_without_changing_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            native = FakeNative()
+            def observe():
+                return {'events_seen': len(native.events)}
+            result = native.run(Path(directory) / 'observed.bin', error_reader=observe)
+            self.assertTrue(result['ok'])
+            self.assertEqual(result['write_return_code'], 0)
+            self.assertEqual(result['kernel_error_before_write'], {'events_seen': 2})
+            self.assertEqual(result['kernel_error_after_write'], {'events_seen': 3})
+            self.assertEqual(native.events, ['query', 'open', 'write', 'flush', 'close'])
+
+    def test_current_build_uses_its_crt_imports_for_the_entire_file_lifetime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            native = FakeNative(build_sha256=CURRENT_SHA256)
+            for rva in S.IAT_RVAS.values():
+                self.assertIsNone(S.PTR.from_address(native.module + rva).value)
+            target = Path(directory) / 'current.bin'
+            result = native.run(target)
+            self.assertTrue(result['ok'])
+            self.assertEqual(target.read_bytes(), fragment()[0])
+            self.assertEqual(native.events, ['query', 'open', 'write', 'flush', 'close'])
+            self.assertFalse(native.errors)
+
     def test_parser_extracts_exact_geometry_and_preserves_ansi_source_bytes(self):
         data, geometry = fragment()
         parsed = S.parse_fragment(data)

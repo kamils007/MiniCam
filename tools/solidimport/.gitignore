@@ -10,3 +10,26 @@ solidlink_test_*/
 
 solidimport_test_3_*/
 solidimport_test_3_*.zip
+standalone_test_5_*/
+standalone_test_5_*.zip
+host_environment_2025.json
+cls_test_6_*/
+cls_test_6_*.zip
+
+cls_solidlink_test_7_*/
+cls_solidlink_test_7_*.zip
+
+cls_solids_test_8_*/
+cls_solids_test_8_*.zip
+
+cls_adapter_test_9_*/
+cls_adapter_test_9_*.zip
+
+solidimport_bridge_test_10_*/
+solidimport_bridge_test_10_*.zip
+solidimport_special_key_test_11_*/
+solidimport_special_key_test_11_*.zip
+solidimport_text_catalog_test_12_*/
+solidimport_text_catalog_test_12_*.zip
+solidimport_step_capture_test_13_*/
+solidimport_step_capture_test_13_*.zip

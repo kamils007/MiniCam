@@ -256,6 +256,21 @@ raise RuntimeError('unimplemented call returned unexpectedly')
         model["save"]["ok"] = False
         self.assertFalse(summarize_stage(stage)["save_succeeded_with_file"])
 
+    def test_direct_record_status_never_claims_the_missing_external_save_file(self):
+        model = {'import': {'ok': True}, 'bodies_after': {'count': 1},
+                 'save': {'ok': True, 'numeric_result': 1},
+                 'object_serialization': {'ok': True, 'fragment': {'recognized_prefix': True}}}
+        stage = {'process_exit_code': 0, 'direct_record': True, 'result': {'model_probe': model}}
+        result = summarize_stage(stage)
+        self.assertEqual(result['stop_reason'], 'completed_native_record')
+        self.assertFalse(result['save_succeeded_with_file'])
+        self.assertIsNone(result['output'])
+        model['save']['ok'] = False
+        self.assertEqual(summarize_stage(stage)['stop_reason'], 'native_record_not_successful')
+        model['save']['ok'] = True
+        model['object_serialization']['ok'] = False
+        self.assertEqual(summarize_stage(stage)['stop_reason'], 'native_record_not_successful')
+
     def test_object_record_status_preserves_independent_parasolid_success(self):
         model = {"import": {"ok": True}, "bodies_after": {"count": 1},
                  "save": {"ok": True, "numeric_result": 1},

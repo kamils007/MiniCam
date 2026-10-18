@@ -1,0 +1,135 @@
+{
+  "source_importer_sha256": "b143da4e3f8771e04aebb7d20334244900866148dc83d242a3e0ad6938c5f82c",
+  "source_acam_sha256": "02997d0f6c15d0e6c807d1be19621e128bdbf3a55ae1846e0196872766bf205d",
+  "init_export_rva": "0x78c0",
+  "step_export_rva": "0xcf90",
+  "step_argument": "const char*; no reliable translator status return from export",
+  "step_core_call_rva": "0xd078",
+  "step_core_rva": "0x92b0",
+  "translation_wrapper_rva": "0x10ef0",
+  "post_translation_drawing_helper_call_rva": "0x9c2e",
+  "drawing_helper_rva": "0x8f00",
+  "active_drawing_call_rva": "0x8f41",
+  "active_drawing_slot": "0x48",
+  "active_drawing_call_bytes_hex": "ff5048",
+  "cstring_imports": {
+    "construct_ordinal_290": "0x183c0",
+    "length_ordinal_5674": "0x18378",
+    "destroy_ordinal_1033": "0x18660"
+  },
+  "supported_host_additions": [
+    {
+      "index": 101,
+      "name": "InAPICall",
+      "dispid": 97,
+      "invkind": 2,
+      "operation": "PROPERTYGET",
+      "vtable_offset_stored": 864,
+      "vtable_offset_x64": 864,
+      "return_native": {
+        "vt": 25,
+        "name": "HRESULT"
+      },
+      "parameters_native": [
+        {
+          "name": "pVal",
+          "flags": 10,
+          "type": {
+            "vt": 26,
+            "name": "PTR",
+            "element": {
+              "vt": 11,
+              "name": "VARIANT_BOOL"
+            }
+          }
+        }
+      ],
+      "optional_parameter_count": 0,
+      "doc": "True if currently in an API call"
+    },
+    {
+      "index": 2,
+      "name": "ShowProgressBox",
+      "dispid": 3,
+      "invkind": 1,
+      "operation": "METHOD",
+      "vtable_offset_stored": 72,
+      "vtable_offset_x64": 72,
+      "return_native": {
+        "vt": 25,
+        "name": "HRESULT"
+      },
+      "parameters_native": [
+        {
+          "name": "Title",
+          "flags": 1,
+          "type": {
+            "vt": 8,
+            "name": "BSTR"
+          }
+        },
+        {
+          "name": "Text",
+          "flags": 1,
+          "type": {
+            "vt": 8,
+            "name": "BSTR"
+          }
+        }
+      ],
+      "optional_parameter_count": 0,
+      "doc": ""
+    },
+    {
+      "index": 3,
+      "name": "SetProgressText",
+      "dispid": 4,
+      "invkind": 1,
+      "operation": "METHOD",
+      "vtable_offset_stored": 80,
+      "vtable_offset_x64": 80,
+      "return_native": {
+        "vt": 25,
+        "name": "HRESULT"
+      },
+      "parameters_native": [
+        {
+          "name": "Text",
+          "flags": 1,
+          "type": {
+            "vt": 8,
+            "name": "BSTR"
+          }
+        }
+      ],
+      "optional_parameter_count": 0,
+      "doc": ""
+    },
+    {
+      "index": 4,
+      "name": "CloseProgressBox",
+      "dispid": 5,
+      "invkind": 1,
+      "operation": "METHOD",
+      "vtable_offset_stored": 88,
+      "vtable_offset_x64": 88,
+      "return_native": {
+        "vt": 25,
+        "name": "HRESULT"
+      },
+      "parameters_native": [],
+      "optional_parameter_count": 0,
+      "doc": ""
+    }
+  ],
+  "app_guarded_slots": 128,
+  "frame_guarded_slots": 78,
+  "capture_exit_code": 83,
+  "drawing_pointer_returned": false,
+  "windows_execution_verified": false,
+  "geometry_verified": false,
+  "authorization_material_extracted": false,
+  "authorization_material_replayed": false,
+  "vendor_code_modified": false,
+  "scope": "Original exports only; snapshot output before drawing import. Structural capture proof, not topology/geometry verification."
+}

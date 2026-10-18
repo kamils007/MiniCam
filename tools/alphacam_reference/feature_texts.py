@@ -1,4 +1,4 @@
-"""UI text table adapter for the exact Feature.dll 2025.3.0.200 sample.
+"""UI text table adapter for the two reviewed Feature.dll 2025 x64 builds.
 
 Reproduces only the CString table layout observed at InitAlphacamAddIn+0x903.
 It does not execute an initializer fragment, change code, or supply other DLL
@@ -13,6 +13,7 @@ import ctypes as C
 import hashlib
 from pathlib import Path
 import re
+from feature_builds import profile, OLD_SHA256, BASE_TEXT_COUNTS
 
 DLL_SHA256 = "4bd2cbb8606a8a5c9dc5c44b9fb0de1e34ecfb01438b6a1b13898873f6878fec"
 PO_SHA256 = "5ebfd4fedec46583fa72fd2e95862a0b3fbe7eb41b6a9e49ae12895176130776"
@@ -20,8 +21,7 @@ TABLE_POINTER_RVA = 0x186548
 # InitAlphacamAddIn: 25 groups read from Feature.po, followed by seven
 # additional strings from acam.po/acam.ctx. Array headers contain uint64 counts;
 # each CString object is one pointer (eight bytes), not a wchar_t buffer.
-COUNTS = (25, 6, 8, 31, 36, 34, 162, 19, 83, 10, 7, 29, 5,
-          7, 17, 19, 9, 6, 7, 2, 11, 10, 25, 2, 6, 7)
+COUNTS = BASE_TEXT_COUNTS
 IAT_RVAS = {"construct": 0x13D068, "assign": 0x13D8B0,
             "get": 0x13D060, "destroy": 0x13D070}
 
@@ -66,7 +66,8 @@ def parse_po(text):
 
 
 class Catalog:
-    def __init__(self, path):
+    def __init__(self, path, build_sha256=OLD_SHA256):
+        self.counts = profile(build_sha256)['text_counts']
         path = Path(path)
         data = path.read_bytes()
         if hashlib.sha256(data).hexdigest() != PO_SHA256:
@@ -76,7 +77,7 @@ class Catalog:
         self.missing_feature_ids = []
         # The last seven strings belong to other catalogs, which have not been
         # supplied. Keep them valid empty CString objects and report that limit.
-        for group, count in enumerate(COUNTS):
+        for group, count in enumerate(self.counts):
             values = []
             for index in range(1, count + 1):
                 ident = "%d-%d" % ((group + 1) * 10, index)
@@ -88,21 +89,21 @@ class Catalog:
         if not self.groups[7][5]:
             raise ValueError("Required progress text Feature.po 80-6 is missing")
         self.info = {"filename": path.name, "sha256": PO_SHA256,
-                     "language": "pl-PL", "table_count": len(COUNTS),
-                     "cstring_count": sum(COUNTS),
+                     "language": "pl-PL", "table_count": len(self.counts),
+                     "cstring_count": sum(self.counts),
                      "missing_feature_ids": self.missing_feature_ids,
                      "external_context_strings_empty": 7,
                      "progress_text_id": "80-6", "progress_text": self.groups[7][5]}
 
 
 class MFCStrings:
-    def __init__(self, module_base):
+    def __init__(self, module_base, iat_rvas=None):
         factory = C.WINFUNCTYPE
         specifications = {"construct": (None, C.c_void_p),
                           "assign": (C.c_void_p, C.c_void_p, C.c_wchar_p),
                           "get": (C.c_void_p, C.c_void_p),
                           "destroy": (None, C.c_void_p)}
-        for name, rva in IAT_RVAS.items():
+        for name, rva in (iat_rvas or IAT_RVAS).items():
             address = C.c_void_p.from_address(module_base + rva).value
             if not address:
                 raise RuntimeError("Unresolved MFC string import: " + name)
@@ -117,20 +118,25 @@ class MFCStrings:
 
 class NativeTextTable:
     def __init__(self, module_base, catalog, verified_dll_sha256, functions=None):
-        if verified_dll_sha256 != DLL_SHA256 or C.sizeof(C.c_void_p) != 8:
+        build = profile(verified_dll_sha256)
+        if C.sizeof(C.c_void_p) != 8:
             raise ValueError("Text table adapter requires the verified x64 DLL build")
         self.catalog = catalog
-        self.functions = functions if functions is not None else MFCStrings(module_base)
-        self.cell = C.c_void_p.from_address(module_base + TABLE_POINTER_RVA)
+        self.counts = build['text_counts']
+        if self.catalog.counts != self.counts:
+            raise ValueError('Catalog group sizes do not match the selected DLL build')
+        self.functions = functions if functions is not None else MFCStrings(module_base, build['mfc_iat'])
+        self.table_pointer_rva = build['text_pointer']
+        self.cell = C.c_void_p.from_address(module_base + self.table_pointer_rva)
         self.previous_pointer = self.cell.value
-        self.pointers = (C.c_void_p * len(COUNTS))()
+        self.pointers = (C.c_void_p * len(self.counts))()
         self.buffers = []
         self.constructed = []
         self.installed = False
         self.closed = False
 
     def address(self, group, index):
-        if not 0 <= group < len(COUNTS) or not 0 <= index < COUNTS[group]:
+        if not 0 <= group < len(self.counts) or not 0 <= index < self.counts[group]:
             raise IndexError("String index is outside the verified table")
         return int(self.pointers[group]) + index * 8
 
@@ -153,14 +159,14 @@ class NativeTextTable:
                     if self.functions.read(address) != text:
                         raise RuntimeError("Native CString verification failed at %d-%d" %
                                            ((group + 1) * 10, index + 1))
-            # Publish only after all 583 objects and their contents are verified.
+            # Publish only after every object and its contents are verified.
             if self.cell.value != self.previous_pointer:
                 raise RuntimeError("Feature text table changed during construction")
             self.cell.value = C.addressof(self.pointers)
             self.installed = True
             return {**self.catalog.info, "ok": True,
                     "all_native_strings_verified": True,
-                    "table_pointer_rva": hex(TABLE_POINTER_RVA),
+                    "table_pointer_rva": hex(self.table_pointer_rva),
                     "original_pointer_saved": True,
                     "full_addin_initializer_called": False}
         except BaseException:
