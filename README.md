@@ -1,5 +1,7 @@
 # cam&L
 
+Kompilacja na stacjach Windows: [przygotowanie i budowanie](docs/kompilacja_windows.md).
+
 Materiały integracji brył ALPHACAM/ARD, działający wzorzec i granice portu C++:
 [przekazanie integracji](docs/alphacam/integracja.md).
 

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(MiniCam LANGUAGES CXX)
+include(cmake/CheckStationCompiler.cmake)
 
 option(MINICAM_WITH_ALPHACAM_EXPORT "Build the optional ALPHACAM export module" ON)
 option(MINICAM_BUILD_LEGACY_FEATURE_HOST "Build the historical native Feature host (not used by the editor)" OFF)
@@ -13,6 +14,8 @@ set(CMAKE_AUTOMOC ON)
 # Triplet x64-windows (preset "DLL"): biblioteki jako DLL, runtime /MD.
 # Runtime programu MUSI zgadzać się z bibliotekami, inaczej linker zgłosi LNK2038.
 if(MSVC)
+    # Source and string literals must not depend on the station's Windows locale.
+    add_compile_options(/utf-8)
     if(VCPKG_TARGET_TRIPLET MATCHES "-static$")
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     else()
@@ -144,10 +147,6 @@ target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
     TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów
 )
-if(MSVC)
-    target_compile_options(minicam PRIVATE /utf-8)
-endif()
-
 if(MINICAM_WITH_ALPHACAM_EXPORT)
     add_subdirectory(modules/alphacam)
     target_sources(minicam PRIVATE app/ArdSolidExport.cpp app/ArdSolidExport.h)
