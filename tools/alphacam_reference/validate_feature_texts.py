@@ -10,6 +10,7 @@ import unittest
 
 from feature_texts import (Catalog, COUNTS, DLL_SHA256, NativeTextTable,
                            TABLE_POINTER_RVA, parse_po)
+from feature_builds import CURRENT_SHA256, profile
 
 HERE = Path(__file__).resolve().parent
 
@@ -90,6 +91,27 @@ class TextTests(unittest.TestCase):
     def test_rejects_different_dll_build_before_touching_native_state(self):
         with self.assertRaisesRegex(ValueError, "verified x64 DLL"):
             NativeTextTable(0, self.catalog, "wrong hash", self.strings)
+
+    def test_current_build_uses_its_own_cell_and_restores_it_without_touching_old_cell(self):
+        current_rva = profile(CURRENT_SHA256)['text_pointer']
+        memory = C.create_string_buffer(current_rva + 8)
+        base = C.addressof(memory)
+        old = C.c_void_p.from_address(base + TABLE_POINTER_RVA)
+        current = C.c_void_p.from_address(base + current_rva)
+        old.value, current.value = 0x1234, 0x5678
+        strings = StringDouble()
+        catalog = Catalog(HERE / 'Feature.po', CURRENT_SHA256)
+        adapter = NativeTextTable(base, catalog, CURRENT_SHA256, strings)
+        adapter.install()
+        self.assertEqual(old.value, 0x1234)
+        self.assertEqual(current.value, C.addressof(adapter.pointers))
+        self.assertEqual(strings.read(adapter.address(7, 5)), catalog.groups[7][5])
+        self.assertEqual(strings.read(adapter.address(3, 32)), '')
+        self.assertIn('40-33', catalog.info['missing_feature_ids'])
+        self.assertEqual(len(strings.values), 585)
+        adapter.close()
+        self.assertEqual((old.value, current.value), (0x1234, 0x5678))
+        self.assertFalse(strings.values)
 
     def test_catalog_is_guarded_and_parsing_preserves_unicode(self):
         with tempfile.TemporaryDirectory() as directory:

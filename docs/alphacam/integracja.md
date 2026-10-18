@@ -1,6 +1,14 @@
 # Przekazanie integracji bryły do ARD
 
-Stan: 16.10.2026. Wzorzec Feature: Python test 4.9, Feature.dll 2025.3.0.200.
+Stan integracji GUI: 18.10.2026. Aktualna ścieżka to opcjonalny
+[moduł ALPHACAM](../../modules/alphacam/README.md), który uruchamia test 15
+w osobnym procesie, zwraca zweryfikowany rekord i zachowuje writer 2D MiniCam.
+[Test 15](feature_test_15.md) potwierdził jeden przebieg STEP → Parasolid → ARD
+bez wykrytego Acam.exe na instalacji 2025.4. Nowe wywołanie z GUI wymaga
+jeszcze próby na Windows. Starszy host C++ nie jest używany przez edytor.
+
+Poniżej historyczny stan przekazania z 16.10.2026: Python test 4.9,
+Feature.dll 2025.3.0.200. Nie jest to instrukcja konfiguracji obecnego modułu.
 Ten dokument pozwala kontynuować pracę bez historii rozmowy.
 
 ## Co zostało potwierdzone

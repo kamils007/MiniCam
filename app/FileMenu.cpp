@@ -7,7 +7,10 @@
 #include "Shortcuts.h"
 #include "LayersPanel.h"
 #include "ArdPaths.h"
+#ifdef MINICAM_WITH_ALPHACAM_EXPORT
 #include "ArdSolidExport.h"
+#include "AlphacamExport.h"
+#endif
 #include "DxfExport.h"
 #include "ModelExport.h"
 #include "OccView.h"
@@ -64,8 +67,12 @@ void MainWindow::createFileMenu(QMenu* menu, QAction* quitAct)
             this, &MainWindow::onSave);
     connect(add(QStyle::SP_DialogSaveButton, "Zapisz jako…", shortcuts::kSaveAs),
             &QAction::triggered, this, &MainWindow::onSaveAs);
-    connect(add(QStyle::SP_DialogSaveButton, "Zapisz dla Alphacam (.ard)…"), &QAction::triggered,
+#ifdef MINICAM_WITH_ALPHACAM_EXPORT
+    connect(add(QStyle::SP_DialogSaveButton, "Zapisz do ALPHACAM (.ard)…"), &QAction::triggered,
             this, &MainWindow::onSaveArd);
+    connect(add(QStyle::SP_FileDialogDetailedView, "Ustawienia eksportu ALPHACAM…"), &QAction::triggered,
+            this, [this] { alphacam::configure(this); });
+#endif
     menu->addSeparator();
     connect(add(QStyle::SP_ComputerIcon, "Drukarka/Ploter…", shortcuts::kPrint),
             &QAction::triggered, this, [this] { onPrint(false); });
@@ -225,8 +232,10 @@ void MainWindow::onOutputCad()
     statusBar()->showMessage("Zapisano DXF: " + QDir::toNativeSeparators(path));
 }
 
+#ifdef MINICAM_WITH_ALPHACAM_EXPORT
 void MainWindow::onSaveArd()
 {
+    cancelCommand();
     QString start = m_savePath.isEmpty() ? QString() : QFileInfo(m_savePath).path();
     if (!m_fileName.isEmpty())
         start = QDir(start).filePath(QFileInfo(m_fileName).completeBaseName() + ".ard");
@@ -261,6 +270,7 @@ void MainWindow::onSaveArd()
     }
     statusBar()->showMessage("Zapisano dla Alphacam: " + QDir::toNativeSeparators(path));
 }
+#endif
 
 bool MainWindow::maybeSave()
 {

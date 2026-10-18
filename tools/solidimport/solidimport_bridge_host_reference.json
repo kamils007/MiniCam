@@ -1,0 +1,699 @@
+{
+  "source_acam_sha256": "02997d0f6c15d0e6c807d1be19621e128bdbf3a55ae1846e0196872766bf205d",
+  "host_profile": {
+    "name": "acamLevelCORE",
+    "value": 14,
+    "scope": "Explicit CORE host profile; does not assert current application classification or release entitlement."
+  },
+  "interfaces": [
+    {
+      "name": "IAlphaCamApp",
+      "guid": "88a2ff74-4309-11d2-9861-00104b4af281",
+      "last_offset": "0x2f0",
+      "slots": [
+        {
+          "offset": "0x38",
+          "original_name": "Visible",
+          "supported": false
+        },
+        {
+          "offset": "0x40",
+          "original_name": "Visible",
+          "supported": false
+        },
+        {
+          "offset": "0x48",
+          "original_name": "ActiveDrawing",
+          "supported": false
+        },
+        {
+          "offset": "0x50",
+          "original_name": "Application",
+          "supported": false
+        },
+        {
+          "offset": "0x58",
+          "original_name": "LicomdatPath",
+          "supported": false
+        },
+        {
+          "offset": "0x60",
+          "original_name": "LicomdirPath",
+          "supported": false
+        },
+        {
+          "offset": "0x68",
+          "original_name": "CadInputSettings",
+          "supported": false
+        },
+        {
+          "offset": "0x70",
+          "original_name": "Frame",
+          "supported": true
+        },
+        {
+          "offset": "0x78",
+          "original_name": "New",
+          "supported": false
+        },
+        {
+          "offset": "0x80",
+          "original_name": "OpenDrawing",
+          "supported": false
+        },
+        {
+          "offset": "0x88",
+          "original_name": "OpenIgesFile",
+          "supported": false
+        },
+        {
+          "offset": "0x90",
+          "original_name": "OpenDxfFile",
+          "supported": false
+        },
+        {
+          "offset": "0x98",
+          "original_name": "OpenCadlFile",
+          "supported": false
+        },
+        {
+          "offset": "0xa0",
+          "original_name": "OpenVdaFile",
+          "supported": false
+        },
+        {
+          "offset": "0xa8",
+          "original_name": "OpenAnvilFile",
+          "supported": false
+        },
+        {
+          "offset": "0xb0",
+          "original_name": "OpenStlFile",
+          "supported": false
+        },
+        {
+          "offset": "0xb8",
+          "original_name": "SelectPost",
+          "supported": false
+        },
+        {
+          "offset": "0xc0",
+          "original_name": "InputNcFile",
+          "supported": false
+        },
+        {
+          "offset": "0xc8",
+          "original_name": "CreateMillData",
+          "supported": false
+        },
+        {
+          "offset": "0xd0",
+          "original_name": "CreateTool",
+          "supported": false
+        },
+        {
+          "offset": "0xd8",
+          "original_name": "SelectTool",
+          "supported": false
+        },
+        {
+          "offset": "0xe0",
+          "original_name": "OpenTool",
+          "supported": false
+        },
+        {
+          "offset": "0xe8",
+          "original_name": "SetPostUserVariable",
+          "supported": false
+        },
+        {
+          "offset": "0xf0",
+          "original_name": "ShellAndWait",
+          "supported": false
+        },
+        {
+          "offset": "0xf8",
+          "original_name": "CreateWireData",
+          "supported": false
+        },
+        {
+          "offset": "0x100",
+          "original_name": "OpenTempDrawing",
+          "supported": false
+        },
+        {
+          "offset": "0x108",
+          "original_name": "OpenTempDxfFile",
+          "supported": false
+        },
+        {
+          "offset": "0x110",
+          "original_name": "ProgramLetter",
+          "supported": true
+        },
+        {
+          "offset": "0x118",
+          "original_name": "PostFileName",
+          "supported": false
+        },
+        {
+          "offset": "0x120",
+          "original_name": "GetCurrentTool",
+          "supported": false
+        },
+        {
+          "offset": "0x128",
+          "original_name": "GetAlphaCamFileName",
+          "supported": false
+        },
+        {
+          "offset": "0x130",
+          "original_name": "VBE",
+          "supported": false
+        },
+        {
+          "offset": "0x138",
+          "original_name": "Quit",
+          "supported": false
+        },
+        {
+          "offset": "0x140",
+          "original_name": "Name",
+          "supported": false
+        },
+        {
+          "offset": "0x148",
+          "original_name": "Path",
+          "supported": true
+        },
+        {
+          "offset": "0x150",
+          "original_name": "FullName",
+          "supported": false
+        },
+        {
+          "offset": "0x158",
+          "original_name": "CreateTurnData",
+          "supported": false
+        },
+        {
+          "offset": "0x160",
+          "original_name": "CreateLaserData",
+          "supported": false
+        },
+        {
+          "offset": "0x168",
+          "original_name": "ProgramLevel",
+          "supported": true
+        },
+        {
+          "offset": "0x170",
+          "original_name": "OpenStepFile",
+          "supported": false
+        },
+        {
+          "offset": "0x178",
+          "original_name": "ApiVersion",
+          "supported": false
+        },
+        {
+          "offset": "0x180",
+          "original_name": "Run",
+          "supported": false
+        },
+        {
+          "offset": "0x188",
+          "original_name": "Authorise",
+          "supported": false
+        },
+        {
+          "offset": "0x190",
+          "original_name": "RunParametricMacro",
+          "supported": false
+        },
+        {
+          "offset": "0x198",
+          "original_name": "WindowState",
+          "supported": false
+        },
+        {
+          "offset": "0x1a0",
+          "original_name": "WindowState",
+          "supported": false
+        },
+        {
+          "offset": "0x1a8",
+          "original_name": "CommandNumber",
+          "supported": false
+        },
+        {
+          "offset": "0x1b0",
+          "original_name": "ChangeNumber",
+          "supported": false
+        },
+        {
+          "offset": "0x1b8",
+          "original_name": "InAParametricMacro",
+          "supported": false
+        },
+        {
+          "offset": "0x1c0",
+          "original_name": "AuthoriseModeless",
+          "supported": false
+        },
+        {
+          "offset": "0x1c8",
+          "original_name": "SpecialKey",
+          "supported": false
+        },
+        {
+          "offset": "0x1d0",
+          "original_name": "OpenExternalFile",
+          "supported": false
+        },
+        {
+          "offset": "0x1d8",
+          "original_name": "MachiningDefaults",
+          "supported": false
+        },
+        {
+          "offset": "0x1e0",
+          "original_name": "Online",
+          "supported": false
+        },
+        {
+          "offset": "0x1e8",
+          "original_name": "SelectToolInLatheTurret",
+          "supported": false
+        },
+        {
+          "offset": "0x1f0",
+          "original_name": "GetPostUserVariable",
+          "supported": false
+        },
+        {
+          "offset": "0x1f8",
+          "original_name": "MaxNumberOfUndos",
+          "supported": false
+        },
+        {
+          "offset": "0x200",
+          "original_name": "MaxNumberOfUndos",
+          "supported": false
+        },
+        {
+          "offset": "0x208",
+          "original_name": "SetUndoPoint",
+          "supported": false
+        },
+        {
+          "offset": "0x210",
+          "original_name": "DisableUndo",
+          "supported": false
+        },
+        {
+          "offset": "0x218",
+          "original_name": "SetUndoCommandName",
+          "supported": false
+        },
+        {
+          "offset": "0x220",
+          "original_name": "CreateThreadDefinition",
+          "supported": false
+        },
+        {
+          "offset": "0x228",
+          "original_name": "CreateTempDrawing",
+          "supported": false
+        },
+        {
+          "offset": "0x230",
+          "original_name": "Nesting",
+          "supported": false
+        },
+        {
+          "offset": "0x238",
+          "original_name": "GetPostAttributeCount",
+          "supported": false
+        },
+        {
+          "offset": "0x240",
+          "original_name": "GetPostAttributeName",
+          "supported": false
+        },
+        {
+          "offset": "0x248",
+          "original_name": "GetPostAttributeNumber",
+          "supported": false
+        },
+        {
+          "offset": "0x250",
+          "original_name": "PreviewFlag",
+          "supported": false
+        },
+        {
+          "offset": "0x258",
+          "original_name": "PreviewFlag",
+          "supported": false
+        },
+        {
+          "offset": "0x260",
+          "original_name": "IsAlphaNest",
+          "supported": false
+        },
+        {
+          "offset": "0x268",
+          "original_name": "IsAlphaCad",
+          "supported": false
+        },
+        {
+          "offset": "0x270",
+          "original_name": "EnableAddIn",
+          "supported": false
+        },
+        {
+          "offset": "0x278",
+          "original_name": "LoadAddIn",
+          "supported": false
+        },
+        {
+          "offset": "0x280",
+          "original_name": "MillMachiningStyles",
+          "supported": false
+        },
+        {
+          "offset": "0x288",
+          "original_name": "CreateLeadData",
+          "supported": false
+        },
+        {
+          "offset": "0x290",
+          "original_name": "CreateMillStyle",
+          "supported": false
+        },
+        {
+          "offset": "0x298",
+          "original_name": "OpenGeometryMacro",
+          "supported": false
+        },
+        {
+          "offset": "0x2a0",
+          "original_name": "SetGeometryMacroVariable",
+          "supported": false
+        },
+        {
+          "offset": "0x2a8",
+          "original_name": "RunGeometryMacro",
+          "supported": false
+        },
+        {
+          "offset": "0x2b0",
+          "original_name": "CloseGeometryMacro",
+          "supported": false
+        },
+        {
+          "offset": "0x2b8",
+          "original_name": "DisableUndo",
+          "supported": false
+        },
+        {
+          "offset": "0x2c0",
+          "original_name": "PostConfigure",
+          "supported": false
+        },
+        {
+          "offset": "0x2c8",
+          "original_name": "OpenVBAProject",
+          "supported": false
+        },
+        {
+          "offset": "0x2d0",
+          "original_name": "OpenVBAPost",
+          "supported": false
+        },
+        {
+          "offset": "0x2d8",
+          "original_name": "AlphacamVersion",
+          "supported": false
+        },
+        {
+          "offset": "0x2e0",
+          "original_name": "FileVersion",
+          "supported": false
+        },
+        {
+          "offset": "0x2e8",
+          "original_name": "GetCurrentToolInLatheTurret",
+          "supported": false
+        },
+        {
+          "offset": "0x2f0",
+          "original_name": "License",
+          "supported": true
+        }
+      ]
+    },
+    {
+      "name": "IFrame",
+      "guid": "0691d8c8-4ae8-11d2-9876-00104b4af281",
+      "last_offset": "0x1a8",
+      "slots": [
+        {
+          "offset": "0x38",
+          "original_name": "AddMenuItem",
+          "supported": false
+        },
+        {
+          "offset": "0x40",
+          "original_name": "ReadTextFile",
+          "supported": false
+        },
+        {
+          "offset": "0x48",
+          "original_name": "ShowProgressBox",
+          "supported": false
+        },
+        {
+          "offset": "0x50",
+          "original_name": "SetProgressText",
+          "supported": false
+        },
+        {
+          "offset": "0x58",
+          "original_name": "CloseProgressBox",
+          "supported": false
+        },
+        {
+          "offset": "0x60",
+          "original_name": "AddMenuItem2",
+          "supported": false
+        },
+        {
+          "offset": "0x68",
+          "original_name": "InputFloatDialog",
+          "supported": false
+        },
+        {
+          "offset": "0x70",
+          "original_name": "InputIntegerDialog",
+          "supported": false
+        },
+        {
+          "offset": "0x78",
+          "original_name": "AddMenuItem3",
+          "supported": false
+        },
+        {
+          "offset": "0x80",
+          "original_name": "Evaluate",
+          "supported": false
+        },
+        {
+          "offset": "0x88",
+          "original_name": "PathOfThisAddin",
+          "supported": true
+        },
+        {
+          "offset": "0x90",
+          "original_name": "RegisterImportFunction",
+          "supported": true
+        },
+        {
+          "offset": "0x98",
+          "original_name": "RegisterObjectHandler",
+          "supported": false
+        },
+        {
+          "offset": "0xa0",
+          "original_name": "AddTitleText",
+          "supported": false
+        },
+        {
+          "offset": "0xa8",
+          "original_name": "RemoveTitleText",
+          "supported": false
+        },
+        {
+          "offset": "0xb0",
+          "original_name": "RemoveCommand",
+          "supported": false
+        },
+        {
+          "offset": "0xb8",
+          "original_name": "RemoveMenu",
+          "supported": false
+        },
+        {
+          "offset": "0xc0",
+          "original_name": "RunCommand",
+          "supported": false
+        },
+        {
+          "offset": "0xc8",
+          "original_name": "AddMenuItem4",
+          "supported": false
+        },
+        {
+          "offset": "0xd0",
+          "original_name": "AddButton",
+          "supported": false
+        },
+        {
+          "offset": "0xd8",
+          "original_name": "LastMenuCommandID",
+          "supported": false
+        },
+        {
+          "offset": "0xe0",
+          "original_name": "CreateButtonBar",
+          "supported": false
+        },
+        {
+          "offset": "0xe8",
+          "original_name": "AddProjectBarPage",
+          "supported": false
+        },
+        {
+          "offset": "0xf0",
+          "original_name": "RemoveProjectBarPage",
+          "supported": false
+        },
+        {
+          "offset": "0xf8",
+          "original_name": "ShowProjectBarPage",
+          "supported": false
+        },
+        {
+          "offset": "0x100",
+          "original_name": "ProjectBarVisible",
+          "supported": false
+        },
+        {
+          "offset": "0x108",
+          "original_name": "ProjectBarVisible",
+          "supported": false
+        },
+        {
+          "offset": "0x110",
+          "original_name": "ProjectBarUpdating",
+          "supported": false
+        },
+        {
+          "offset": "0x118",
+          "original_name": "WindowHandle",
+          "supported": false
+        },
+        {
+          "offset": "0x120",
+          "original_name": "ViewWindowHandle",
+          "supported": false
+        },
+        {
+          "offset": "0x128",
+          "original_name": "ClearBeforeCadInput",
+          "supported": false
+        },
+        {
+          "offset": "0x130",
+          "original_name": "OutputNcVisibleOnly",
+          "supported": false
+        },
+        {
+          "offset": "0x138",
+          "original_name": "ExitNewMessageLoop",
+          "supported": false
+        },
+        {
+          "offset": "0x140",
+          "original_name": "InNewMessageLoop",
+          "supported": false
+        },
+        {
+          "offset": "0x148",
+          "original_name": "PostCommand",
+          "supported": false
+        },
+        {
+          "offset": "0x150",
+          "original_name": "AddCommand",
+          "supported": false
+        },
+        {
+          "offset": "0x158",
+          "original_name": "ProjectBarUpdating",
+          "supported": false
+        },
+        {
+          "offset": "0x160",
+          "original_name": "GetMenuItemID",
+          "supported": false
+        },
+        {
+          "offset": "0x168",
+          "original_name": "SetEvaluateParameter",
+          "supported": false
+        },
+        {
+          "offset": "0x170",
+          "original_name": "ClearEvaluateParameters",
+          "supported": false
+        },
+        {
+          "offset": "0x178",
+          "original_name": "SaveWindowLayout",
+          "supported": false
+        },
+        {
+          "offset": "0x180",
+          "original_name": "LoadWindowLayout",
+          "supported": false
+        },
+        {
+          "offset": "0x188",
+          "original_name": "CallEventFunction",
+          "supported": false
+        },
+        {
+          "offset": "0x190",
+          "original_name": "PathOfThisAddin2",
+          "supported": true
+        },
+        {
+          "offset": "0x198",
+          "original_name": "RegisterImportFunction2",
+          "supported": true
+        },
+        {
+          "offset": "0x1a0",
+          "original_name": "GetProjectBarPage",
+          "supported": false
+        },
+        {
+          "offset": "0x1a8",
+          "original_name": "RegisterExportFunction",
+          "supported": true
+        }
+      ]
+    }
+  ]
+}

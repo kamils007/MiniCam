@@ -1,0 +1,88 @@
+{
+  "source_acam_sha256": "02997d0f6c15d0e6c807d1be19621e128bdbf3a55ae1846e0196872766bf205d",
+  "source_importer_sha256": "b143da4e3f8771e04aebb7d20334244900866148dc83d242a3e0ad6938c5f82c",
+  "acam_special_key_getter_rva": "0x33d330",
+  "cls_provider_vtable_rva": "0x9a5a78",
+  "bit_16": {
+    "virtual_slot": "0x98",
+    "implementation_rva": "0x20e770",
+    "access_code": 348
+  },
+  "bit_2": {
+    "virtual_slot": "0x50",
+    "implementation_rva": "0x20e590",
+    "access_codes_short_circuit_or": [
+      347,
+      349
+    ]
+  },
+  "provider_get_access_slot": "0x10",
+  "provider_get_access_rva": "0x63f6a0",
+  "provider_get_access_native_cls_rva": "0x7b53f0",
+  "public_method": "PlanitCls.License.GetAccessCode(Int32) -> Boolean",
+  "original_init_rva": "0x78c0",
+  "original_init_unwind_end_rva": "0x8ca1",
+  "special_key_getter_call_count_in_init": 1,
+  "consumer_call_rva": "0x7b63",
+  "consumer_mask_test_rva": "0x7b83",
+  "consumer_mask_test_bytes_hex": "f6453012",
+  "supported_mask": 18,
+  "consumer_mask": 18,
+  "full_special_key_value_verified": false,
+  "other_bits": "unknown; no claim of the complete current application SpecialKey",
+  "scope": "Only this hash-matched Init consumer. No StepInputFile or generic SpecialKey compatibility.",
+  "read_text_file_contract": {
+    "index": 1,
+    "name": "ReadTextFile",
+    "dispid": 2,
+    "invkind": 1,
+    "operation": "METHOD",
+    "vtable_offset_stored": 64,
+    "vtable_offset_x64": 64,
+    "return_native": {
+      "vt": 25,
+      "name": "HRESULT"
+    },
+    "parameters_native": [
+      {
+        "name": "FileName",
+        "flags": 1,
+        "type": {
+          "vt": 8,
+          "name": "BSTR"
+        }
+      },
+      {
+        "name": "DollarNumber",
+        "flags": 1,
+        "type": {
+          "vt": 3,
+          "name": "I4"
+        }
+      },
+      {
+        "name": "Index",
+        "flags": 1,
+        "type": {
+          "vt": 2,
+          "name": "I2"
+        }
+      },
+      {
+        "name": "pVal",
+        "flags": 10,
+        "type": {
+          "vt": 26,
+          "name": "PTR",
+          "element": {
+            "vt": 8,
+            "name": "BSTR"
+          }
+        }
+      }
+    ],
+    "optional_parameter_count": 0,
+    "doc": ""
+  },
+  "windows_test_11_execution_verified": false
+}

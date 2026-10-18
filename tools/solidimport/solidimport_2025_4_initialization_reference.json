@@ -1,0 +1,52 @@
+{
+  "source": "User-supplied SolidImport(1).dll",
+  "source_sha256": "b143da4e3f8771e04aebb7d20334244900866148dc83d242a3e0ad6938c5f82c",
+  "source_size_bytes": 156824,
+  "file_version": "2025.4.1.100",
+  "architecture": "native x64, MFC140 Unicode",
+  "exports": {
+    "InitAlphacamAddIn": "0x78c0",
+    "StepInputFile": "0xcf90"
+  },
+  "host_license_check": {
+    "application_iid": "88a2ff74-4309-11d2-9861-00104b4af281",
+    "program_level_getter_call_rva": "0x7947",
+    "program_level_vtable_offset": "0x168",
+    "license_check_program_level": 14,
+    "license_getter_call_rva": "0x797a",
+    "license_getter_vtable_offset": "0x2f0",
+    "license_iid": "214de706-d211-4a06-84c3-6cb3044a4685",
+    "feature": "Core:Solids",
+    "is_feature_licensed_call_rva": "0x7a03",
+    "is_feature_licensed_vtable_offset": "0x48",
+    "negative_feature_result_returns_failure": true
+  },
+  "step_translation_path": {
+    "step_core_rva": "0x92b0",
+    "step_core_call_rva": "0xd078",
+    "translation_wrapper_rva": "0x10ef0",
+    "step_core_wrapper_call_rvas": ["0x97ed", "0x980f"],
+    "com_creation_helper_rva": "0x12760",
+    "authorization_helper_rva": "0x12b20",
+    "authorization_helper_call_rva": "0x10fca",
+    "send_license_string_dispid": 16,
+    "send_license_string_call_rvas": ["0x12c3c", "0x12d55"],
+    "authorization_success_required_before_translation": true,
+    "confirm_parasolid_licensed_dispid": 21,
+    "confirm_parasolid_licensed_call_rva": "0x111b4",
+    "translate_solid_dispid": 1,
+    "translate_solid_call_rva": "0x112eb",
+    "get_interop_result_dispid": 10,
+    "get_interop_result_call_rva": "0x1138c"
+  },
+  "limits": [
+    "Static control-flow analysis; no new Windows execution or conversion",
+    "The older 2025.3 private offsets and hash checks must not be applied to this build",
+    "A valid CLS connection does not supply the host COM ILicense or prove Core:Solids",
+    "No supported standalone host initialization contract established"
+  ],
+  "authorization_material_extracted": false,
+  "authorization_material_replayed": false,
+  "vendor_code_modified": false,
+  "licensed_flags_forced": false
+}

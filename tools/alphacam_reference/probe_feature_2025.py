@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Isolated Windows x64 Feature.dll 2025.3 probe with a minimal COM host.
+"""Isolated Windows x64 Feature.dll 2025 probe with a minimal COM host.
+
+The original CLI defaults to the reviewed 2025.3 build. Test 14.1 explicitly
+selects the separately reviewed 2025.4 profile for every native adapter.
 
 Supplies application, drawing and frame objects using the existing ObjectNumberOf
 context argument. Logs every host callback and stops at an unimplemented method.
@@ -20,6 +23,7 @@ import struct
 import subprocess
 import sys
 from datetime import datetime
+from feature_builds import profile
 
 
 EXPECTED_SHA256 = "4bd2cbb8606a8a5c9dc5c44b9fb0de1e34ecfb01438b6a1b13898873f6878fec"
@@ -29,7 +33,8 @@ EXPECTED_EXPORT_RVAS = {"GetUIVersion": 0x38A10, "GetSolidFeatures": 0x389C0,
                         "ObjectNumberOf": 0x40CE0}
 
 
-def inspect_pe(path):
+def inspect_pe(path, expected_sha256=EXPECTED_SHA256):
+    expected_exports = profile(expected_sha256)['exports']
     data = path.read_bytes()
     if len(data) < 64 or data[:2] != b"MZ":
         raise ValueError("This is not a PE file.")
@@ -66,10 +71,10 @@ def inspect_pe(path):
     result = {"filename": path.name, "size_bytes": len(data),
               "sha256": hashlib.sha256(data).hexdigest(),
               "machine": "AMD64", "export_count": len(exports),
-              "selected_exports": {k: hex(exports[k]) for k in EXPECTED_EXPORT_RVAS if k in exports}}
+              "selected_exports": {k: hex(exports[k]) for k in expected_exports if k in exports}}
     result["matches_analyzed_build"] = (
-        result["sha256"] == EXPECTED_SHA256
-        and all(exports.get(k) == v for k, v in EXPECTED_EXPORT_RVAS.items())
+        result["sha256"] == expected_sha256
+        and all(exports.get(k) == v for k, v in expected_exports.items())
     )
     return result
 
@@ -110,9 +115,13 @@ def acam_processes():
     return found
 
 
-def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_environment=None):
+def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_environment=None, batch_profile=None,
+           build_sha256=EXPECTED_SHA256):
     """All native interaction is contained here, in a child process."""
     import uuid
+    build = profile(build_sha256)
+    if not inspect_pe(path, build_sha256)['matches_analyzed_build']:
+        raise ValueError('Feature.dll does not match the selected reviewed layout')
     HRESULT = C.c_int32
     ULONG = C.c_uint32
     UINT = C.c_uint32
@@ -260,14 +269,15 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
         # Values are reported as presence flags, never called as functions.
         def present(rva):
             return bool(PTR.from_address(int(module) + rva).value)
-        app = PTR.from_address(int(module) + 0x186658).value
-        return {"context_manager_present": present(0x1865B0),
+        offsets = build['state']
+        app = PTR.from_address(int(module) + offsets['application']).value
+        return {"context_manager_present": present(offsets['context_manager']),
                 "fallback_application_pointer_present": bool(app),
                 "fallback_application_matches_host": bool(host and app == host.app_pointer),
-                "context_stack_depth": C.c_uint32.from_address(int(module) + 0x180360).value,
-                "internal_backend_present": present(0x180140),
-                "progress_dialog_object_present": present(0x186640),
-                "progress_parent_window_present": present(0x186648),
+                "context_stack_depth": C.c_uint32.from_address(int(module) + offsets['depth']).value,
+                "internal_backend_present": present(offsets['backend']),
+                "progress_dialog_object_present": present(offsets['progress']),
+                "progress_parent_window_present": present(offsets['progress_parent']),
                 "text_table_adapter_installed": bool(text_table and text_table.installed),
                 "pskernel_loaded": bool(kernel.GetModuleHandleW("PSKERNEL.dll"))}
 
@@ -282,10 +292,11 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             checkpoint(event, **details)
 
         host = MinimalHost(Path(__file__).with_name("host_contract_common.json"), host_event,
-                           special_key=host_environment["application"]["SpecialKey"])
+                           special_key=None if batch_profile else host_environment["application"]["SpecialKey"])
         checkpoint("host_environment_applied", source=host_environment["source"],
                    captured_utc=host_environment.get("captured_utc"),
-                   special_key=host.app_values["SpecialKey"])
+                   special_key=host.app_values.get("SpecialKey"),
+                   special_key_scope="Save mask 0x10 only" if batch_profile else "historical snapshot")
         result["host_selftest"] = host.self_test()
         checkpoint("host_selftest_complete", result=result["host_selftest"])
         host.phase = "bind"
@@ -393,6 +404,69 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             for value in values:
                 automation.VariantClear(C.byref(value))
 
+    def property_set_bool(obj, name, enabled):
+        dispid=LONG();names=(W.LPWSTR*1)(name)
+        hr=method(obj,5,HRESULT,C.POINTER(GUID),C.POINTER(W.LPWSTR),UINT,ULONG,C.POINTER(LONG))(
+            obj,C.byref(null_iid),names,1,0,C.byref(dispid))
+        if hr<0:raise RuntimeError("Unknown alignment property: "+name)
+        value=VARIANT();value.vt=11;value.value.short=-1 if enabled else 0
+        named=LONG(-3)
+        params=DISPPARAMS(C.cast(C.pointer(value),PTR),C.cast(C.pointer(named),PTR),1,1)
+        answer=VARIANT();exception=EXCEPINFO();argument_error=UINT()
+        hr=method(obj,6,HRESULT,LONG,C.POINTER(GUID),ULONG,WORD,C.POINTER(DISPPARAMS),
+                  C.POINTER(VARIANT),C.POINTER(EXCEPINFO),C.POINTER(UINT))(
+            obj,dispid.value,C.byref(null_iid),0,4,C.byref(params),C.byref(answer),C.byref(exception),C.byref(argument_error))
+        exception_details(exception,hr);automation.VariantClear(C.byref(answer))
+        if hr<0:raise RuntimeError("Cannot configure alignment: "+name)
+        status,actual=property_get(obj,name)
+        try:
+            if not status.get("ok") or actual is None or actual.vt!=11 or bool(actual.value.short)!=enabled:
+                raise RuntimeError("Alignment property did not retain requested value: "+name)
+        finally:
+            if actual is not None:automation.VariantClear(C.byref(actual))
+        return {"property":name,"enabled":enabled,"readback_matches":True}
+
+    def measure_single_body(bodies):
+        dispid=LONG();names=(W.LPWSTR*1)("Item")
+        hr=method(bodies,5,HRESULT,C.POINTER(GUID),C.POINTER(W.LPWSTR),UINT,ULONG,C.POINTER(LONG))(
+            bodies,C.byref(null_iid),names,1,0,C.byref(dispid))
+        if hr<0:raise RuntimeError("Bodies.Item unavailable")
+        argument=VARIANT();argument.vt=3;argument.value.integer=1
+        params=DISPPARAMS(C.cast(C.pointer(argument),PTR),None,1,0)
+        body=VARIANT();exception=EXCEPINFO();argument_error=UINT()
+        hr=method(bodies,6,HRESULT,LONG,C.POINTER(GUID),ULONG,WORD,C.POINTER(DISPPARAMS),
+                  C.POINTER(VARIANT),C.POINTER(EXCEPINFO),C.POINTER(UINT))(
+            bodies,dispid.value,C.byref(null_iid),0,1,C.byref(params),C.byref(body),C.byref(exception),C.byref(argument_error))
+        exception_details(exception,hr)
+        try:
+            if hr<0 or body.vt!=9 or not body.value.pointer:raise RuntimeError("Bodies.Item did not return a body")
+            bounds={};counts={}
+            for name in ("MinX","MaxX","MinY","MaxY","MinZ","MaxZ"):
+                status,value=property_get(body.value.pointer,name)
+                try:
+                    if not status.get("ok") or value is None or value.vt!=5:raise RuntimeError("Cannot measure "+name)
+                    bounds[name]=value.value.number
+                finally:
+                    if value is not None:automation.VariantClear(C.byref(value))
+            for name in ("Faces","Edges","Vertices"):
+                status,collection=property_get(body.value.pointer,name)
+                try:
+                    if not status.get("ok") or collection is None or collection.vt!=9:raise RuntimeError("Cannot inspect "+name)
+                    status,count=property_get(collection.value.pointer,"Count")
+                    try:
+                        from com_typeinfo import numeric_variant
+                        number=numeric_variant(count) if count is not None else None
+                        if not status.get("ok") or type(number) is not int or number<1:raise RuntimeError("Invalid "+name+" count")
+                        counts[name]=number
+                    finally:
+                        if count is not None:automation.VariantClear(C.byref(count))
+                finally:
+                    if collection is not None:automation.VariantClear(C.byref(collection))
+            dimensions=[bounds["Max"+axis]-bounds["Min"+axis] for axis in ("X","Y","Z")]
+            return {"bounds":bounds,"dimensions_api_units":dimensions,"topology_counts":counts,
+                    "alignment_disabled":True,"full_topology_validity_verified":False,"volume_verified":False}
+        finally:automation.VariantClear(C.byref(body))
+
     def count_bodies(obj):
         from com_typeinfo import numeric_variant
         status, bodies = property_get(obj, "Bodies")
@@ -422,13 +496,14 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
         checkpoint("before_object_serialization", native_state=native_state())
         try:
             writer = NativeObjectWriter(module,
-                lambda name: kernel.GetProcAddress(module, name.encode("ascii")))
-            return writer.write(context, output_dir / "feature_object.bin", checkpoint)
+                lambda name: kernel.GetProcAddress(module, name.encode("ascii")), build_sha256=build_sha256)
+            return writer.write(context, output_dir / "feature_object.bin", checkpoint,
+                                error_reader=kernel_errors.read if kernel_errors else None)
         finally:
             automation.VariantClear(C.byref(context))
 
     def model_probe(obj):
-        nonlocal exception_trace, text_table
+        nonlocal exception_trace, text_table, kernel_errors, schema_path
         from com_typeinfo import Inspector, resolve_import_contract, valid_save_contract
         inspector = Inspector(method, release, automation, VARIANT)
         result = {}
@@ -440,6 +515,10 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
         if contract is None:
             result["skipped"] = "Import signature or enum was not recognized; no import was attempted."
             return result
+        if batch_profile:
+            result["alignment_configuration"]=[property_set_bool(obj,name,False) for name in
+                ("AlignOnImport","AlignTopWithOrigin","AlignLongestEdgeWithXAxis","UseLatheAlign","UsePanelAlignment","UseMinBoundingBoxAlignment")]
+            checkpoint("batch_alignment_configured",settings=result["alignment_configuration"])
         result["bodies_before"] = count_bodies(obj)
         result["native_state_before_import"] = native_state()
         from native_trace import NativeExceptionTrace
@@ -456,10 +535,20 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
         exception_trace.phase = "text_init"
         host.phase = "text_init"
         checkpoint("before_text_table_init")
-        text_table = NativeTextTable(int(module), Catalog(Path(__file__).with_name("Feature.po")),
-                                    EXPECTED_SHA256)
+        text_table = NativeTextTable(int(module), Catalog(Path(__file__).with_name("Feature.po"), build_sha256),
+                                    build_sha256)
         result["text_table"] = text_table.install()
         checkpoint("text_table_ready", result=result["text_table"])
+        if batch_profile and batch_profile.get('kernel_errors'):
+            from parasolid_errors import ParasolidErrors
+            kernel_errors = ParasolidErrors(module, build_sha256)
+            result['parasolid_error_api'] = kernel_errors.info
+            checkpoint('parasolid_error_api_ready', identity=kernel_errors.info)
+        if batch_profile and batch_profile.get('schema_path'):
+            from feature_schema_path import NativeSchemaPath
+            schema_path = NativeSchemaPath(int(module), path.parent, build_sha256)
+            result['schema_path'] = schema_path.install()
+            checkpoint('schema_path_ready', result=result['schema_path'])
         result["native_state_before_import"] = native_state()
         exception_trace.phase = "import"
         host.phase = "import"
@@ -496,13 +585,28 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             if not valid_save_contract(result["bodies_interface"]):
                 result["save_skipped"] = "Save signature was not recognized."
                 return result
+            if batch_profile:
+                result["body_measurement"]=measure_single_body(bodies.value.pointer)
+                checkpoint("batch_body_measured",measurement=result["body_measurement"])
             target = output_dir / "roundtrip.x_b"
             if target.exists():
                 raise FileExistsError("Refusing to overwrite " + str(target))
             checkpoint("before_parasolid_save", output=str(target))
+            if kernel_errors:
+                result['kernel_error_before_save'] = kernel_errors.read()
+                checkpoint('kernel_error_before_save', result=result['kernel_error_before_save'])
             host.phase = "save"
             exception_trace.phase = "save"
-            result["save"], saved = invoke_method(bodies.value.pointer, "Save", [str(target)])
+            if batch_profile:
+                host.app_values["SpecialKey"]=batch_profile["special_key_projection"]
+                checkpoint("live_save_projection",mask=16,value=host.app_values["SpecialKey"],source="current_CLS_GetAccessCode_348")
+            try:
+                result["save"], saved = invoke_method(bodies.value.pointer, "Save", [str(target)])
+            finally:
+                if batch_profile:host.app_values.pop("SpecialKey",None)
+            if kernel_errors:
+                result['kernel_error_after_save'] = kernel_errors.read()
+                checkpoint('kernel_error_after_save', result=result['kernel_error_after_save'])
             if target.is_file():
                 data = target.read_bytes()
                 result["output"] = {"filename": target.name, "size_bytes": len(data),
@@ -510,8 +614,11 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                                     "has_parasolid_header": b"FORMAT=binary" in data[:4096]}
             checkpoint("after_parasolid_save", result=result.get("save"),
                        saved_body_count=saved, output=result.get("output"))
+            direct_record = bool(batch_profile and batch_profile.get('direct_record'))
             if (result["save"].get("ok") and isinstance(saved, int) and saved > 0
-                    and result.get("output", {}).get("has_parasolid_header")):
+                    and (result.get("output", {}).get("has_parasolid_header") or direct_record)):
+                if direct_record:
+                    checkpoint('direct_object_record_requested', standalone_save_file_confirmed=bool(result.get('output')))
                 try:
                     result["object_serialization"] = object_record_probe()
                 except Exception as error:
@@ -529,6 +636,8 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
     host_log = None
     exception_trace = None
     text_table = None
+    kernel_errors = None
+    schema_path = None
     native_object = PTR()
     dispatch = PTR()
     typeinfo = PTR()
@@ -640,6 +749,13 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
         release(typeinfo)
         release(dispatch)
         release(native_object)
+        if schema_path is not None:
+            try:
+                result['schema_path_cleanup'] = schema_path.close()
+                checkpoint('schema_path_closed', result=result['schema_path_cleanup'])
+            except Exception as error:
+                result['schema_path_cleanup_error'] = {'type': type(error).__name__, 'message': str(error)}
+                checkpoint('schema_path_cleanup_error', error=result['schema_path_cleanup_error'])
         if text_table is not None:
             try:
                 text_table.close()
@@ -649,6 +765,13 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                 result["text_table_cleanup_error"] = {"type": type(error).__name__,
                                                        "message": str(error)}
                 checkpoint("text_table_cleanup_error", error=result["text_table_cleanup_error"])
+        if kernel_errors:
+            try:
+                result['pskernel_file_unchanged'] = kernel_errors.unchanged()
+            except OSError as error:
+                result['pskernel_file_unchanged'] = False
+                result['pskernel_file_check_error'] = str(error)
+            checkpoint('pskernel_file_check', unchanged=result['pskernel_file_unchanged'])
         if module:
             kernel.FreeLibrary(module)
         for handle in reversed(handles):
@@ -789,6 +912,9 @@ def summarize_stage(stage):
         summary["stop_reason"] = "child_process_exit"
     elif not summary["import_succeeded_with_bodies"]:
         summary["stop_reason"] = "import_not_successful"
+    elif stage.get('direct_record'):
+        summary['stop_reason'] = ('completed_native_record' if object_ok and saved.get('ok') and saved_count == 1
+                                  else 'native_record_not_successful')
     elif not save_ok:
         summary["stop_reason"] = "save_not_successful"
     elif object_record is not None and not object_ok:

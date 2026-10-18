@@ -1,0 +1,45 @@
+{
+  "source": "User-supplied SolidLink.exe, matching the executable fingerprint from Windows test 7.2",
+  "source_sha256": "71d48d786a76aa16031be28c9ebbe4c9b95555643fd79f475b5a6e76587ce83c",
+  "source_size_bytes": 1254040,
+  "file_version": "2025.4.2616.108",
+  "com_dispatch": {
+    "TranslateSolid": {
+      "map_entry_rva": "0x50f90",
+      "handler_rva": "0x29850",
+      "translation_rva": "0x32c40"
+    },
+    "SendLicenseString": {
+      "map_entry_rva": "0x51350",
+      "handler_rva": "0x29160",
+      "validation_wrapper_rva": "0x32bc0"
+    },
+    "ConfirmParasolidLicensed": {
+      "map_entry_rva": "0x51490",
+      "handler_rva": "0x28ed0",
+      "distinct_from_initial_authorization": true
+    }
+  },
+  "initial_authorization_gate": {
+    "internal_translation_object_offset": "0x164",
+    "constructor_rva": "0x32720",
+    "zero_initialization_rva": "0x3292b",
+    "check_rva": "0x32c6e",
+    "not_ready_return_rva": "0x32c94",
+    "not_ready_return_code": 1,
+    "validated_state_assignment_rva": "0x32c0f",
+    "assigned_from": "Original validation result reached through SendLicenseString"
+  },
+  "test_7_2_interpretation": "Reported sequence creates the object and calls GetFileType, SetOutputLogFile, TranslateSolid without SendLicenseString. Default authorization state remains unset, explaining the early return 1 before translation.",
+  "evidence_limit": "Static code plus reported public call sequence; no new Windows debugger trace.",
+  "not_established": [
+    "Source and supported provisioning of the authorization string",
+    "Genuine standalone Core:Solids adapter",
+    "Successful STEP conversion without Acam.exe"
+  ],
+  "authorization_material_extracted": false,
+  "authorization_material_replayed": false,
+  "vendor_code_modified": false,
+  "licensed_flags_forced": false,
+  "next_dependency": "Current installed SolidImport.dll to examine the original initialization sequence; do not infer a CLS validation result is a SolidLink authorization string."
+}

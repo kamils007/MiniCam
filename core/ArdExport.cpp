@@ -145,7 +145,9 @@ void writePath(Writer& w, const ArdPath& path, uint32_t number, bool hasNext)
         }
     }
 
-    w.u32(path.layerId);
+    // The first word identifies this geometry, not its layer. ALPHACAM
+    // renumbers it on save; the layer reference lives at byte offset 221.
+    w.u32(number);
     w.u32(0x08000002);
     w.zeros(12);
     w.f64(xmin); // obrys geometrii
@@ -155,7 +157,7 @@ void writePath(Writer& w, const ArdPath& path, uint32_t number, bool hasNext)
     w.u32(hasNext ? 1 : 0); // po tej geometrii jest następna
     w.u32(1);
     w.zeros(161);
-    w.u32(number); // numer geometrii (od 1)
+    w.u32(path.layerId); // odniesienie do ID rekordu warstwy 0x10
     w.zeros(12);
     for (const auto& [id, z] : {std::pair{kAttrZBottom, path.zBottom}, std::pair{kAttrZTop, path.zTop},
                                 std::pair{kAttrPickZ, path.zTop}}) {
@@ -294,9 +296,14 @@ std::string writeArd(const LayerList& layers, const std::vector<ArdPath>& paths,
     // Lista geometrii: znacznik 0x02 raz, potem geometrie jedna po drugiej;
     // każda mówi, czy po niej jest następna.
     std::vector<const ArdPath*> written;
-    for (const ArdPath& path : paths)
-        if (!path.segments.empty())
+    const uint32_t maxLayerId = userLayerCount(layers) + static_cast<uint32_t>(std::size(kDefaultLayers));
+    for (const ArdPath& path : paths) {
+        if (!path.segments.empty()) {
+            if (path.layerId == 0 || path.layerId > maxLayerId)
+                throw std::invalid_argument("Geometria ARD wskazuje nieistniejaca warstwe.");
             written.push_back(&path);
+        }
+    }
     if (!written.empty()) {
         w.u8(kTagPath);
         for (size_t i = 0; i < written.size(); ++i)

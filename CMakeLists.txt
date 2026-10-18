@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.21)
 project(MiniCam LANGUAGES CXX)
 
+option(MINICAM_WITH_ALPHACAM_EXPORT "Build the optional ALPHACAM export module" ON)
+option(MINICAM_BUILD_LEGACY_FEATURE_HOST "Build the historical native Feature host (not used by the editor)" OFF)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -80,8 +83,6 @@ qt_add_executable(minicam
     app/main.cpp
     app/MainWindow.cpp
     app/FileMenu.cpp
-    app/ArdSolidExport.cpp
-    app/ArdSolidExport.h
     app/MainWindow.h
     app/OccView.cpp
     app/OccView.h
@@ -143,6 +144,22 @@ target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
     TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów
 )
+if(MSVC)
+    target_compile_options(minicam PRIVATE /utf-8)
+endif()
+
+if(MINICAM_WITH_ALPHACAM_EXPORT)
+    add_subdirectory(modules/alphacam)
+    target_sources(minicam PRIVATE app/ArdSolidExport.cpp app/ArdSolidExport.h)
+    target_link_libraries(minicam PRIVATE minicam-alphacam-export)
+    target_compile_definitions(minicam PRIVATE MINICAM_WITH_ALPHACAM_EXPORT=1)
+    if(MINICAM_ALPHACAM_RUNTIME)
+        add_custom_command(TARGET minicam POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${MINICAM_ALPHACAM_RUNTIME}"
+                "$<TARGET_FILE_DIR:minicam>/alphacam-export"
+            COMMENT "Copying optional ALPHACAM export runtime" VERBATIM)
+    endif()
+endif()
 
 if(WIN32)
     set_target_properties(minicam PROPERTIES WIN32_EXECUTABLE ON)
@@ -165,7 +182,7 @@ endif()
 
 # The native DLL host runs in a separate process, preserving CRT ownership and
 # containing unsupported callbacks or native failures outside the editor.
-if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+if(MINICAM_BUILD_LEGACY_FEATURE_HOST AND WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_executable(minicam-feature-host tools/ard/FeatureHost.cpp)
     target_link_libraries(minicam-feature-host PRIVATE Qt6::Core ole32 oleaut32)
     if(MSVC)
@@ -181,5 +198,14 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(ard-record-test tools/ard/ArdRecordTest.cpp)
     target_link_libraries(ard-record-test PRIVATE camcore)
+    add_executable(ard-layers-test tools/ard/ArdLayersTest.cpp)
+    target_link_libraries(ard-layers-test PRIVATE camcore)
+    add_test(NAME ard-geometry-layer-references COMMAND ard-layers-test)
+    if(MINICAM_WITH_ALPHACAM_EXPORT)
+        add_executable(alphacam-snapshot-test tools/ard/AlphacamSnapshotTest.cpp)
+        target_link_libraries(alphacam-snapshot-test PRIVATE camcore TKPrim)
+        add_test(NAME alphacam-current-model-snapshot
+                 COMMAND alphacam-snapshot-test "${CMAKE_CURRENT_BINARY_DIR}/alphacam-current-model.step")
+    endif()
 endif()
 
