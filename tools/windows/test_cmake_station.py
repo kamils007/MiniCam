@@ -103,15 +103,19 @@ class StationToolchainTests(unittest.TestCase):
         self.assertIn("does not match the lock", self.include_toolchain(False))
 
     def test_overlay_triplets_pin_both_linkages(self):
-        (self.vcpkg / "triplets").mkdir()
         for name, linkage in (("x64-windows", "dynamic"), ("x64-windows-static", "static")):
             with self.subTest(name=name):
-                (self.vcpkg / f"triplets/{name}.cmake").write_text(f"set(VCPKG_LIBRARY_LINKAGE {linkage})\n")
-                script = f'''set(VCPKG_ROOT "{self.vcpkg.as_posix()}")
+                # vcpkg_dep_info defines VCPKG_ROOT_DIR, not VCPKG_ROOT.
+                # No builtin triplet fixture: overlays must stand on their own.
+                script = f'''set(VCPKG_ROOT_DIR "{self.vcpkg.as_posix()}")
+unset(VCPKG_ROOT)
 include("{self.root.as_posix()}/tools/windows/triplets/{name}.cmake")
 if(NOT VCPKG_PLATFORM_TOOLSET STREQUAL "v143" OR
    NOT VCPKG_PLATFORM_TOOLSET_VERSION STREQUAL "14.44" OR
    NOT VCPKG_CMAKE_SYSTEM_VERSION STREQUAL "10.0.26100.0" OR
+   NOT VCPKG_TARGET_ARCHITECTURE STREQUAL "x64" OR
+   NOT VCPKG_CRT_LINKAGE STREQUAL "{linkage}" OR
+   NOT VCPKG_PROVIDED_FORTRAN OR
    NOT VCPKG_LIBRARY_LINKAGE STREQUAL "{linkage}")
   message(FATAL_ERROR "triplet lost the common compiler, SDK or linkage")
 endif()
