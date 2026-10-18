@@ -1,5 +1,9 @@
 # cam&L
 
+Nowy wątek pracy: [stan projektu i ustalenia z 18.10.2026](docs/stan_prac_2026-10-18.md).
+
+Kompilacja na stacjach Windows: [przygotowanie i budowanie](docs/kompilacja_windows.md).
+
 Materiały integracji brył ALPHACAM/ARD, działający wzorzec i granice portu C++:
 [przekazanie integracji](docs/alphacam/integracja.md).
 

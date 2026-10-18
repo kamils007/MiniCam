@@ -1,0 +1,76 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '**.cpp'
+      - '**.h'
+      - '**CMakeLists.txt'
+      - 'cmake/**'
+      - 'CMakePresets.json'
+      - 'vcpkg.json'
+      - '.vsconfig'
+      - 'tools/windows/**'
+      - '*.cmd'
+      - '.github/workflows/windows-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test workstation scripts
+        run: |
+          ./tools/windows/Test-Build.ps1
+          python ./tools/windows/test_cmake_station.py
+          if ($LASTEXITCODE -ne 0) { throw 'CMake workstation checks failed.' }
+
+      - name: Ensure common Visual Studio components
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer"
+          $vswhere = Join-Path $installer 'vswhere.exe'
+          $instance = & $vswhere -latest -products '*' -version '[17.14,18.0)' -property installationPath
+          if (-not $instance) { throw 'VS 2022 17.14+ missing on the runner.' }
+          $complete = & $vswhere -latest -products '*' -version '[17.14,18.0)' -requires Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64 Microsoft.VisualStudio.Component.Windows11SDK.26100 Microsoft.VisualStudio.Component.VC.CMake.Project -property installationPath
+          if (-not $complete) {
+            $arguments = 'modify --installPath "' + $instance + '" --config "' + $env:GITHUB_WORKSPACE + '\.vsconfig" --quiet --norestart'
+            $process = Start-Process -FilePath (Join-Path $installer 'setup.exe') -ArgumentList $arguments -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "VS component installation returned $($process.ExitCode)." }
+          }
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/MiniCamTools/cache
+          key: windows-2022-${{ hashFiles('tools/windows/toolchain.lock.json', 'tools/windows/triplets/**', 'vcpkg.json') }}-${{ github.run_id }}
+          restore-keys: |
+            windows-2022-${{ hashFiles('tools/windows/toolchain.lock.json', 'tools/windows/triplets/**', 'vcpkg.json') }}-
+
+      - name: Build and test Release
+        run: ./tools/windows/Build.ps1 -Configuration Release -Jobs 2
+
+      - name: Keep executable and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiniCam-Windows-Release
+          if-no-files-found: warn
+          path: |
+            out/build/station-release/minicam.exe
+            out/build/station-release/CMakeFiles/CMakeConfigureLog.yaml
+            out/build/station-release/Testing/Temporary/*.log
+            out/station/environment.json
+            ~/AppData/Local/MiniCamTools/vcpkg/*/buildtrees/*/*.log

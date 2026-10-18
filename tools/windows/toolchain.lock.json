@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "vcpkgCommit": "bf19794383e8fb95eba5aa553235bc8ec2271688",
+  "visualStudioRange": "[17.14,18.0)",
+  "msvcVersion": "14.44",
+  "compilerVersionPrefix": "19.44.",
+  "windowsSdk": "10.0.26100.0",
+  "cmakeMinimum": "3.28",
+  "ninjaMinimum": "1.11"
+}

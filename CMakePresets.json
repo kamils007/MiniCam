@@ -11,20 +11,31 @@
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-windows-static"
       },
-      "architecture": { "value": "x64", "strategy": "external" },
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
     {
       "name": "x64-debug",
       "displayName": "x64 Debug",
       "inherits": "windows-base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
     },
     {
       "name": "x64-release",
       "displayName": "x64 Release",
       "inherits": "windows-base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     },
     {
       "name": "x64-debug-dll",
@@ -34,6 +45,91 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "station-base",
+      "hidden": true,
+      "inherits": "windows-base",
+      "toolset": {
+        "value": "v143,version=14.44,host=x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/StationVcpkg.cmake",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/out/station-installed/${presetName}",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "station-debug",
+      "displayName": "Stacja: Debug (wspolne narzedzia)",
+      "inherits": "station-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "station-release",
+      "displayName": "Stacja: Release (wspolne narzedzia)",
+      "inherits": "station-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "station-debug-dll",
+      "displayName": "Stacja: Debug DLL (wspolne narzedzia)",
+      "inherits": "station-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "station-debug",
+      "configurePreset": "station-debug"
+    },
+    {
+      "name": "station-release",
+      "configurePreset": "station-release"
+    },
+    {
+      "name": "station-debug-dll",
+      "configurePreset": "station-debug-dll"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "station-debug",
+      "configurePreset": "station-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "station-release",
+      "configurePreset": "station-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "station-debug-dll",
+      "configurePreset": "station-debug-dll",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
     }
   ]

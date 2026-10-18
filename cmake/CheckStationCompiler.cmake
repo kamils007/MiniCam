@@ -1,0 +1,8 @@
+if(MINICAM_STATION_BUILD)
+    file(READ "${CMAKE_CURRENT_LIST_DIR}/../tools/windows/toolchain.lock.json" _minicam_lock)
+    string(JSON _minicam_compiler_prefix GET "${_minicam_lock}" compilerVersionPrefix)
+    string(FIND "${CMAKE_CXX_COMPILER_VERSION}" "${_minicam_compiler_prefix}" _minicam_prefix_at)
+    if(NOT MSVC OR NOT _minicam_prefix_at EQUAL 0 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+        message(FATAL_ERROR "Station presets require MSVC ${_minicam_compiler_prefix}x x64. Use KOMPILUJ.cmd or select the 14.44 x64 toolset in Visual Studio.")
+    endif()
+endif()
