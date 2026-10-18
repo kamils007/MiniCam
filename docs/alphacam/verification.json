@@ -1,4 +1,37 @@
 {
+  "ard_geometry_layer_reference_fix": {
+    "status": "writer_fixed_cpp_tests_passed_alphacam_visibility_pending",
+    "source_ard_sha256": "af25d699784f4277973043a35cd096e435692dfbd3b73c09dd54269243fa8e8c",
+    "alphacam_resaved_ard_sha256": "de70b6c03ef5755fed7edd12a20d34ca2e69903c5cc0ff31f5add00c7c77c176",
+    "geometries": 21,
+    "line_segments": 1410,
+    "bounds_Z_attributes_and_segment_bytes_identical_between_samples": true,
+    "geometry_id_offset": 0,
+    "geometry_layer_id_offset": 221,
+    "layer_ids_are_record_ids_not_display_ordinals": true,
+    "bug": "Geometry identifier and layer reference were written into each others fields",
+    "source_nonexistent_layer_references": 11,
+    "source_geometry_9_layer": "TEXT",
+    "source_geometry_10_layer": "unnamed default layer",
+    "corrected_layer_counts": {
+      "userKonturZew": 1,
+      "GEOMETRIE APS": 14,
+      "userOtwory": 6
+    },
+    "writer_rejects_nonexistent_layer_ids": true,
+    "regression_test_rejects_original_writer": true,
+    "cpp_sample_rebuild_matches_minimal_patch_byte_identically": true,
+    "patched_ard_sha256": "4a4ea58faa43fa8ebdb2864faf146ffab73fa6775413c6ac5d75ed14e746d061",
+    "patched_ard_bytes": 281974,
+    "patched_byte_count": 38,
+    "original_solid_record_and_tail_unchanged": true,
+    "linux_build_passed": true,
+    "ctest_passed": 2,
+    "two_geometries_visible_after_all_layers_hidden_reported_by_user": true,
+    "visibility_cause_of_those_two_independently_confirmed": false,
+    "patched_ard_opened_in_alphacam_verified": false,
+    "details": "docs/alphacam/geometry_layers.md"
+  },
   "minicam_alphacam_export_module": {
     "status": "implemented_linux_builds_verified_windows_gui_pending",
     "optional_cmake_module": "MINICAM_WITH_ALPHACAM_EXPORT",

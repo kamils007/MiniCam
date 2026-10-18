@@ -4,6 +4,10 @@ Zakres: zaobserwowany `Licom-APS File V1.94`, jeden rekord dodatku
 `LicomUKRJMParaSolid`, wersja fragmentu 3. Nie jest to pełna specyfikacja ARD.
 Wszystkie poniższe liczby wielobajtowe są little endian.
 
+Geometrie 2D i ich odniesienia do warstw opisuje
+[porównanie z ponownym zapisem ALPHACAM](geometry_layers.md). W rekordzie
+geometrii pierwszy uint32 jest ID geometrii, a pole uint32 +221 jest ID warstwy.
+
 ## Zapis przez DLL
 
 `LONG ObjectQueryWrite2(VARIANT* context, char* name, LONG version)`:
