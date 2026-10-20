@@ -442,7 +442,7 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
         details=exception_details(exception,hr)
         return {"ok":hr>=0,"hresult":hresult(hr),"details":details},answer
 
-    def measure_single_body(bodies):
+    def measure_single_body(bodies, inspector):
         dispid=LONG();names=(W.LPWSTR*1)("Item")
         hr=method(bodies,5,HRESULT,C.POINTER(GUID),C.POINTER(W.LPWSTR),UINT,ULONG,C.POINTER(LONG))(
             bodies,C.byref(null_iid),names,1,0,C.byref(dispid))
@@ -620,7 +620,7 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                 result["save_skipped"] = "Save signature was not recognized."
                 return result
             if batch_profile:
-                result["body_measurement"]=measure_single_body(bodies.value.pointer)
+                result["body_measurement"]=measure_single_body(bodies.value.pointer, inspector)
                 checkpoint("batch_body_measured",measurement=result["body_measurement"])
             if batch_profile and batch_profile.get('measure_only'):
                 result['measurement_only_completed'] = True
