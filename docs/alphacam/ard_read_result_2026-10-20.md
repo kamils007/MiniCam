@@ -45,3 +45,18 @@ Item i IsSame oraz checkpoint pomiarów przed geometrią. To diagnostyka przyczy
 nie implementacja Options i nie potwierdzona naprawa. Dziennik zostaje włączony
 do raportu nawet przy natychmiastowym zakończeniu procesu przez host.
 Sprawdzono 13 testów Python, pyflakes i integralność ZIP. Natywny test wymaga Windows.
+
+## Raport v5 i zmiana v6
+
+Dziennik geometry_calls.jsonl kończy się na operacji 32539: get Color.
+Host zgłasza wtedy IDrawing.Options i kończy proces kodem 80. Przed tym
+wykonano pętle odczytu wierzchołków i krawędzi oraz rozpoczęto ściany.
+Nie powstał kompletny feature_geometry.json; brak potwierdzonej konwersji.
+
+W v6 nie wywołujemy Color. Pole color ma null, a property_errors zawiera
+jawny powód host_dependency_not_implemented. Nie zgadujemy koloru ani ustawień
+rysunku. Pozostały odczyt geometrii i zapis dziennika pozostają aktywne.
+Testowa atrapa Color kończy proces przez SystemExit, co sprawdza pominięcie
+niebezpiecznego gettera także poza zwykłym przechwytywaniem Exception.
+13 testów Python i pyflakes przeszły; ZIP zweryfikowany. Dalszy odczyt wymaga
+potwierdzenia na Windows, kolory nadal pozostają nieodczytane.

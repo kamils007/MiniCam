@@ -24,6 +24,8 @@ class FakeObject:
 
     def get(self, name):
         if self.closed: raise RuntimeError('Read after close')
+        if name == 'Color':
+            raise SystemExit('Native Color getter must not be called without drawing options')
         value = len(self.node) if isinstance(self.node, list) and name == 'Count' else self.node[name]
         return FakeObject(value, self.tracker) if isinstance(value, (dict, list)) else value
 
@@ -65,6 +67,9 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(data['vertices'][2]['point'], [0.,4.,2.])
         self.assertEqual(data['faces'][0]['loops'][0]['edges'], [20,21,22])
         self.assertEqual(data['faces'][0]['area'], 6.)
+        self.assertIsNone(data['faces'][0]['color'])
+        self.assertTrue(any(e.get('reason') == 'host_dependency_not_implemented'
+                            and e['property'] == 'Color' for e in data['property_errors']))
         self.assertEqual(data['faces'][0]['plane']['point'], [0.,0.,2.])
         self.assertEqual(data['edges'][0]['type']['names'], ['SyntheticLine'])
         self.assertTrue(data['property_errors'])

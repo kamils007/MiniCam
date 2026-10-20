@@ -128,8 +128,15 @@ def extract_geometry(body):
                 entry = {'id': face_id, 'type': describe_type(face), 'loops': [],
                          'vertices': references(face, 'Vertices'), 'edges': references(face, 'Edges')}
                 for name, convert in [('Area', number), ('Normal', vector), ('Plane', pv),
-                                      ('Color', integer), ('IsPlanar', boolean)]:
+                                      ('IsPlanar', boolean)]:
                     entry[name.lower()] = optional(face, name, convert, 'face:' + str(face_id))
+                # On the verified 2025 Feature build Color calls the host's
+                # IDrawing.Options and terminates this isolated reader. Color
+                # is display metadata; do not invent drawing options to get it.
+                entry['color'] = None
+                result['property_errors'].append({'owner': 'face:' + str(face_id),
+                    'property': 'Color', 'error': 'Not requested: requires unsupported IDrawing.Options',
+                    'reason': 'host_dependency_not_implemented'})
 
                 def conic(obj):
                     data = {}
