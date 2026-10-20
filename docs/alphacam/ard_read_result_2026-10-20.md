@@ -60,3 +60,29 @@ Testowa atrapa Color kończy proces przez SystemExit, co sprawdza pominięcie
 niebezpiecznego gettera także poza zwykłym przechwytywaniem Exception.
 13 testów Python i pyflakes przeszły; ZIP zweryfikowany. Dalszy odczyt wymaga
 potwierdzenia na Windows, kolory nadal pozostają nieodczytane.
+
+## Raport v6 — odczyt geometrii i odtworzenie w OCCT potwierdzone
+
+Raport v6 ma read_confirmed=true i geometry_snapshot_available=true. Proces
+Feature i CLS zakończyły się kodem 0, stop_reason=completed_measurement_only,
+CloseLicenseConnection potwierdzone, źródło i runtime bez zmian.
+SHA-256 feature_geometry.json:
+`d64e38c69a3350f80cb283137ea89679c3fee08cb39f1347f28e287806f8b9d4`.
+Hash sprawdzono niezależnie, ponownie uruchomiono validate_geometry i porównano
+liczniki z pomiarem. 80 wierzchołków, 126 krawędzi, 48 ścian. 60 jawnych
+braków właściwości: 48 pominiętych Color i 12 pustych XAxis stożków.
+
+Na podstawie rzeczywistych danych zbudowano narzędzie offline
+[occt/README.md](../../tools/ard_import/occt/README.md). Odtworzyło ono poprawną
+zamkniętą bryłę OCCT z 30 płaszczyzn, 6 cylindrów i 12 stożków, bez aproksymacji
+siatką. Zachowano liczniki topologii i pola ścian. Wymiary 400×600×18 mm,
+objętość rekonstrukcji 3662437,657201545 mm³. Ponowny odczyt STEP potwierdził
+poprawność, liczniki i objętość (różnica ok. 0,000000049 mm³). Wynik otwarto
+w istniejącym GUI MiniCam na Linux/Xvfb i sprawdzono widok z otworami,
+zaokrągleniami i fazami. Prywatny model oraz zrzut ekranu pozostają poza repo.
+
+Nie zmieniamy flag oryginalnego raportu: sam odczyt Feature nie wykonywał
+konwersji. Powyższe potwierdzenie OCCT dotyczy osobnego, późniejszego testu.
+Nie porównano objętości z niezależnym wynikiem oryginalnego Parasolid.
+Bezpośrednie otwieranie ARD z tą konwersją w GUI nie jest jeszcze podłączone;
+nie potwierdzono obsługi wszystkich innych typów brył i plików ARD.
