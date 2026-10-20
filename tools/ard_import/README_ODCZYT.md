@@ -1,7 +1,7 @@
 # Test rzeczywistego wczytania bryły z ARD
 
 1. Zamknij ALPHACAM na stacji, na której działa zapis ARD z MiniCam.
-2. Uruchom `TEST_ODCZYTU_BRYLY.cmd` i wybierz oryginalny `testFAz.ard`.
+2. Uruchom `TEST_ODCZYTU_BRYLY.cmd` i wybierz plik ARD z jedną bryłą.
 3. Prześlij `raport_odczytu.zip` ze wskazanego folderu `odczyt_...`.
 
 Folder instalacji, Python i runtime są odczytywane z ustawień eksportu MiniCam.
@@ -10,8 +10,11 @@ Wymaga dotychczasowego działającego runtime eksportu i normalnej licencji CLS.
 Nie zmienia instalacji, rejestru, ustawień eksportu ani polityki PowerShell
 na stałe. Zezwolenie PowerShell dotyczy wyłącznie procesu testu.
 
-Test jest przypięty do konkretnego pliku testFAz.ard i wersji Feature
-2025.4.1.200 potwierdzonej w raporcie użytkownika. Wydziela oryginalne bajty
+Test obsługuje rozpoznane rekordy ARD V1.94 z jednym obiektem Feature v3;
+wersja Feature 2025.4.1.200 pozostaje przypięta do potwierdzonego skrótu DLL.
+Nie jest wymagany niezmieniony testFAz.ard. Czytnik sprawdza strukturę i granice
+rekordów oraz końcówkę pliku, bez wyszukiwania znacznika w surowych danych.
+Wydziela oryginalne bajty
 Parasolid, kopiuje runtime do nowego katalogu i uruchamia istniejącą ścieżkę
 inicjalizacji Feature/CLS z dodatkowym trybem tylko do pomiaru. Wyłącza
 automatyczne wyrównanie, wymaga jednej bryły, mierzy granice XYZ i odczytuje

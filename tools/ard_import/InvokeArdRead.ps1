@@ -24,7 +24,7 @@ try {
         Add-Type -AssemblyName System.Windows.Forms
         $pick = New-Object System.Windows.Forms.OpenFileDialog
         try {
-            $pick.Title = 'Wybierz oryginalny testFAz.ard'
+            $pick.Title = 'Wybierz plik ARD z bryla'
             $pick.Filter = 'Pliki ARD (*.ard)|*.ard'
             if ($pick.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { throw 'Anulowano wybor ARD.' }
             $Ard = $pick.FileName

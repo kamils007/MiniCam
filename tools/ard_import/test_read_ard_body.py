@@ -13,11 +13,13 @@ from test_step_ard_14_checks import session, model
 from probe_feature_2025 import summarize_stage
 
 
-def fixture():
-    payload = b'**PARASOLID FORMAT=binary; synthetic test payload'
+def fixture(payload=None):
+    payload = payload or b'**PARASOLID FORMAT=binary; synthetic test payload'
     fragment = struct.pack('<III', 3, 0, len(payload)) + payload + struct.pack('<III', 1, 0, 0)
     wrapper = b'\x22\x14\x00LicomUKRJMParaSolid\0' + struct.pack('<III', 1, len(fragment), 0) + fragment
-    return b'Licom-APS File V1.94\r\n\x1a\x30' + struct.pack('<I', 0) + wrapper + b'\x2f\0\0\0\0\0', payload
+    prefix = b'Licom-APS File V1.94\r\n\x1a\x30' + struct.pack('<I', 0)
+    identifier = b'\x2e\x02\x00i\x00'
+    return prefix + identifier + wrapper + b'\x2f' + struct.pack('<I', len(prefix) + 1) + b'\0', payload
 
 
 def proof():
@@ -45,6 +47,24 @@ def validate(value):
 
 
 class ReadArdTests(unittest.TestCase):
+    def test_changed_valid_document_is_accepted_and_actual_hash_reported(self):
+        data, expected = fixture()
+        changed = data[:31] + b'j' + data[32:]
+        self.assertNotEqual(digest(data), digest(changed))
+        payload, report = extract_sample(changed)
+        self.assertEqual(payload, expected)
+        self.assertEqual(report['source_ard_sha256'], digest(changed))
+
+    def test_marker_bytes_inside_thumbnail_and_payload_are_not_records(self):
+        marker = b'\x22\x14\x00LicomUKRJMParaSolid\0'
+        data, payload = fixture(b'**PARASOLID FORMAT=binary; opaque ' + marker)
+        thumbnail = b'opaque thumbnail ' + marker
+        changed = data[:24] + struct.pack('<I',len(thumbnail)) + thumbnail + data[28:-6]
+        changed += b'\x2f' + struct.pack('<I',29+len(thumbnail)) + b'\0'
+        self.assertEqual(extract_sample(changed)[0], payload)
+        bad = changed[:-5] + struct.pack('<I',29) + b'\0'
+        with self.assertRaises(ValueError): extract_sample(bad)
+
     def test_exact_payload_and_changed_source_rejection(self):
         data, expected = fixture()
         payload, report = extract_sample(data, expected_sha256=digest(data))

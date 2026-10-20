@@ -25,26 +25,113 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def extract_sample(data, expected_sha256=SAMPLE_SHA256):
-    # Diagnostic for this exact supplied sample, not a general ARD parser.
-    # Pinning avoids treating marker scanning as a production format reader.
-    if len(data) > 128 * 1024 * 1024 or digest(data) != expected_sha256:
-        raise ValueError('Wybierz oryginalny testFAz.ard przeslany w tej rozmowie.')
+def feature_record(data):
+    """Walk recognized V1.94 records; never search arbitrary payloads for tags."""
+    if len(data) < 34 or len(data) > 128 * 1024 * 1024:
+        raise ValueError('Nieprawidlowa wielkosc ARD (limit 128 MiB).')
     if not data.startswith(b'Licom-APS File V1.94\r\n\x1a\x30'):
         raise ValueError('Nieobslugiwany naglowek ARD.')
-    start = 28 + struct.unpack_from('<I', data, 24)[0]
-    if start > len(data) - 6 or data[-6] != 0x2f or data[-1] != 0:
-        raise ValueError('Nieprawidlowa koncowka ARD.')
-    marker = b'\x22\x14\x00LicomUKRJMParaSolid\x00'
-    pos = data.find(marker, start)
-    if pos < 0 or data.find(marker, pos + 1) >= 0:
-        raise ValueError('Nie znaleziono jednoznacznego rekordu Feature.')
-    pos += len(marker)
-    count, length, reserved = struct.unpack_from('<III', data, pos)
-    pos += 12
-    if count != 1 or reserved != 0 or length > len(data) - 6 - pos:
-        raise ValueError('Nieprawidlowa obwiednia bryly ARD.')
-    record = data[pos:pos + length]
+    position = 24
+
+    def take(n):
+        nonlocal position
+        if n < 0 or n > len(data) - position:
+            raise ValueError('Niepelny ARD przy bajcie ' + str(position))
+        result = data[position:position + n]
+        position += n
+        return result
+
+    def u32(): return struct.unpack('<I', take(4))[0]
+    def u8(): return take(1)[0]
+    def flag():
+        value = u32()
+        if value not in (0, 1): raise ValueError('Nieznany znacznik listy ARD.')
+        return value
+    def string16():
+        n = struct.unpack('<H', take(2))[0]
+        if n < 1: raise ValueError('Nieprawidlowa dlugosc nazwy ARD.')
+        text = take(n)
+        if text[-1:] != b'\0' or b'\0' in text[:-1]: raise ValueError('Nieprawidlowa nazwa ARD.')
+        return text[:-1]
+    def attributes():
+        seen = set()
+        while True:
+            key = u32()
+            if not key: return
+            if key in seen or len(seen) >= 4096: raise ValueError('Nieprawidlowa lista atrybutow ARD.')
+            seen.add(key)
+            kind = u32()
+            if kind not in (3, 5): raise ValueError('Nieobslugiwany typ atrybutu ARD: ' + str(kind))
+            take(4 if kind == 3 else 8)
+
+    take(u32())  # bounded thumbnail, even if it contains fake record markers
+    records = []
+    identifier = None
+    ended = False
+    seen = set()
+    while position < len(data):
+        tag = u8()
+        if tag not in (0x10, 0x22):
+            if tag in seen: raise ValueError('Powtorzony rekord ARD.')
+            seen.add(tag)
+        if tag == 0x1d:
+            for count in range(4097):
+                n = u32()
+                if not n: break
+                if n > 4096 or count == 4096: raise ValueError('Za duzo nazw atrybutow ARD.')
+                take(n * 2 + 4)
+        elif tag == 0x01:
+            take(44); flag(); attributes()
+            for count in range(100000):
+                if u32() not in (0x31, 0x431): raise ValueError('Nieznany rekord pomocniczy ARD.')
+                take(76); more = flag(); take(8)
+                if not more: break
+            else: raise ValueError('Za duzo rekordow pomocniczych ARD.')
+        elif tag == 0x02:
+            for count in range(100000):
+                take(52); more = flag(); take(181); attributes(); take(48)
+                for _ in range(1000000):
+                    kind = u8()
+                    if not kind: break
+                    if kind not in (1, 2): raise ValueError('Nieobslugiwany element geometrii ARD: ' + str(kind))
+                    take(44 if kind == 1 else 108); attributes()
+                else: raise ValueError('Za duzo elementow ARD.')
+                if not more: break
+            else: raise ValueError('Za duzo geometrii ARD.')
+        elif tag == 0x2e:
+            identifier = position
+            string16()
+        elif tag == 0x10:
+            take(8); string16(); take(20); attributes(); take(92)
+        elif tag == 0x15: take(68)
+        elif tag == 0x21: take(8)
+        elif tag == 0x22:
+            name = string16()
+            count = u32()
+            if count > 10000: raise ValueError('Za duzo obiektow dodatku ARD.')
+            for _ in range(count):
+                length, reserved = u32(), u32()
+                record = take(length)
+                if name == b'LicomUKRJMParaSolid':
+                    if reserved or count != 1: raise ValueError('Nieobslugiwana obwiednia Feature w ARD.')
+                    records.append(record)
+        elif tag == 0x3e: take(u32())
+        elif tag == 0x2f:
+            if identifier is None or u32() != identifier or u8() != 0 or position != len(data):
+                raise ValueError('Nieprawidlowa koncowka ARD.')
+            ended = True
+        else: raise ValueError('Nieobslugiwany rekord ARD: ' + hex(tag))
+    if not ended or len(records) != 1:
+        raise ValueError('Brak jednoznacznego rekordu bryly Feature w ARD.')
+    return records[0]
+
+
+def extract_sample(data, expected_sha256=None):
+    # Accept changed/new documents only after structural validation. Native
+    # module fingerprints and payload correlation remain mandatory below.
+    if expected_sha256 is not None and digest(data) != expected_sha256:
+        raise ValueError('ARD nie odpowiada oczekiwanej wersji pliku.')
+    record = feature_record(data)
     cursor = 0
 
     def take(n):
@@ -126,6 +213,7 @@ def run(ard, runtime, root, out, geometry_snapshot=False):
             raise ValueError('Plik ARD jest za duzy.')
         source = ard.read_bytes()
         original_ard_hash = digest(source)
+        report['input'] = {'filename': ard.name, 'size_bytes': len(source), 'sha256': original_ard_hash}
         payload, report['extraction'] = extract_sample(source)
         model = out / 'extracted.x_b'
         model.write_bytes(payload)
