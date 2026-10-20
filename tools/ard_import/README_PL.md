@@ -2,8 +2,10 @@
 
 1. Rozpakuj ZIP na stacji Windows, na ktorej dziala zapis ARD z MiniCam.
 2. Uruchom `SPRAWDZ_ODCZYT_3D.cmd` (bez uprawnien administratora).
-3. Wskaz folder instalacji ALPHACAM uzywany przy zapisie. Jesli skrypt zapyta
-   o SolidLink.exe, wskaz ten sam plik co w ustawieniach eksportu MiniCam.
+3. Sciezki ALPHACAM i SolidLink zostana odczytane z zapisanych ustawien
+   MiniCam, na tym samym koncie Windows. Nie trzeba ponownie wybierac folderow.
+   Gdy zapisanych ustawien brakuje albo wskazane pliki nie istnieja, raport
+   poda konkretny blad; skrypt nie zgaduje innej instalacji.
 4. Przeslij plik `translator_metadata.json` z nowego folderu `wynik_...`.
 
 To diagnostyka **przed implementacja konwersji odwrotnej**, nie gotowy importer

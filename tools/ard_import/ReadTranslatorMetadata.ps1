@@ -7,6 +7,7 @@ $report = [ordered]@{
     conversion_verified = $false
     vendor_objects_activated = $false
     license_configuration_modified = $false
+    configuration_source = @{}
     files = @()
     error = $null
 }
@@ -17,26 +18,41 @@ try {
     if ([IntPtr]::Size -ne 8 -or [Environment]::Version.Major -ne 4) {
         throw 'Wymagany Windows PowerShell 5.1 x64.'
     }
-    Add-Type -AssemblyName System.Windows.Forms
-    if (-not $Root) {
-        $pick = New-Object System.Windows.Forms.FolderBrowserDialog
+    # Match QSettings("MiniCAM", "MiniCAM") in AlphacamExport.cpp.
+    # Read only the two non-secret path values, without enumerating the key.
+    $settings = @{}
+    foreach ($hive in @([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryHive]::LocalMachine)) {
+        $base = $null
+        $key = $null
         try {
-            $pick.Description = 'Wskaz folder instalacji ALPHACAM uzywany przy zapisie ARD'
-            if ($pick.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { throw 'Anulowano wybor instalacji.' }
-            $Root = $pick.SelectedPath
-        } finally { $pick.Dispose() }
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, [Microsoft.Win32.RegistryView]::Registry64)
+            $key = $base.OpenSubKey('Software\MiniCAM\MiniCAM\alphacam', $false)
+            if ($null -ne $key) {
+                foreach ($name in @('root', 'solidlink')) {
+                    if (-not $settings.ContainsKey($name)) {
+                        $value = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+                        if ($value -is [string] -and -not [string]::IsNullOrWhiteSpace($value)) {
+                            $settings[$name] = $value
+                            $report.configuration_source[$name] = $hive.ToString() + ':MiniCAM/alphacam/' + $name
+                        }
+                    }
+                }
+            }
+        } finally {
+            if ($null -ne $key) { $key.Dispose() }
+            if ($null -ne $base) { $base.Dispose() }
+        }
     }
-    if (-not $SolidLinkServer) {
-        $default = Join-Path ${env:CommonProgramFiles} 'Hexagon\SolidLink 2025.4\code\bin\SolidLink.exe'
-        if (Test-Path -LiteralPath $default -PathType Leaf) { $SolidLinkServer = $default }
-        else {
-            $pick = New-Object System.Windows.Forms.OpenFileDialog
-            try {
-                $pick.Title = 'Wskaz SolidLink.exe uzywany przy zapisie ARD'
-                $pick.Filter = 'SolidLink.exe|SolidLink.exe'
-                if ($pick.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { throw 'Anulowano wybor SolidLink.' }
-                $SolidLinkServer = $pick.FileName
-            } finally { $pick.Dispose() }
+    if ($Root) { $report.configuration_source['root'] = 'explicit_argument' }
+    elseif ($settings.ContainsKey('root')) { $Root = $settings['root'] }
+    else { throw 'Na tym koncie Windows nie znaleziono zapisanego ustawienia MiniCam alphacam/root. Uruchom test na tym samym koncie co dzialajacy zapis ARD.' }
+    if ($SolidLinkServer) { $report.configuration_source['solidlink'] = 'explicit_argument' }
+    elseif ($settings.ContainsKey('solidlink')) { $SolidLinkServer = $settings['solidlink'] }
+    else { throw 'Na tym koncie Windows nie znaleziono zapisanego ustawienia MiniCam alphacam/solidlink. Uruchom test na tym samym koncie co dzialajacy zapis ARD.' }
+    foreach ($required in @((Join-Path $Root 'Add-Ins\Feature\Feature.dll'),
+                            (Join-Path $Root 'Add-Ins\SolidImport\SolidImport.dll'), $SolidLinkServer)) {
+        if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+            throw ('Zapisana konfiguracja MiniCam wskazuje nieistniejacy plik: ' + $required)
         }
     }
     Add-Type -Path (Join-Path $PSScriptRoot 'ReadTranslatorMetadata.cs')
