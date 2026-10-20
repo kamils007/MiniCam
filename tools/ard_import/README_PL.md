@@ -15,8 +15,10 @@ Nie kazda natywna DLL ma biblioteke typow; taki blad zostanie zapisany w raporci
 Potwierdzony zapis STEP -> Parasolid nie potwierdza odczytu Parasolid -> STEP.
 Nawet obecna metoda o odpowiedniej nazwie nie dowodzi udanej konwersji. Po
 ustaleniu dostepnego interfejsu potrzebna bedzie rzeczywista proba konwersji
-i sprawdzenie geometrii wynikowej. Nie zmieniaj instalacji lub polityki
-uruchamiania PowerShell, gdy skrypt jest blokowany; przeslij komunikat.
+i sprawdzenie geometrii wynikowej. Plik CMD ustawia `ExecutionPolicy Bypass`
+wylacznie dla uruchamianego procesu PowerShell; nie zmienia trwale ustawien
+komputera ani konta. Jesli polityka firmowa nadal blokuje uruchomienie,
+przeslij komunikat zamiast zmieniac te ustawienia.
 
 Pakiet przygotowano w chmurze Linux. Czesci Windows nie mozna bylo tutaj
 uruchomic; wynik tego kroku sluzy ustaleniu kolejnego testu.
