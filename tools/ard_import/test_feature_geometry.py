@@ -105,5 +105,45 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(cleared,[scalar,variant])
         with self.assertRaises(ValueError): parent.call('Delete',1)
 
+    def test_snapshot_ids_use_is_same_when_declared_native_id_is_unavailable(self):
+        from types import SimpleNamespace as Obj
+        retained, released, compared = [], [], []
+        entities = {10:'vertex-a',11:'vertex-a',12:'vertex-b'}
+        def getter(pointer,name):
+            if name == 'ID': raise AssertionError('Native ID must never be called')
+            return {'ok':True}, Obj(vt=9,value=Obj(pointer={'a':10,'alias':11,'b':12}[name]))
+        def call(pointer,name,other):
+            self.assertEqual(name,'IsSame')
+            compared.append((pointer,other))
+            return {'ok':True}, Obj(vt=11,value=Obj(short=-1 if entities[pointer]==entities[other] else 0))
+        def keep(pointer):
+            retained.append(pointer)
+            return Obj(vt=9,value=Obj(pointer=pointer),retained=True)
+        def clear(value):
+            if getattr(value,'retained',False): released.append(value.value.pointer)
+        def describe(pointer,**kwargs):
+            return {'name':'ISolidBody' if pointer==1 else 'ISolidVertex'}
+        with FeatureDispatch(1,getter,call,clear,describe,retain=keep) as body:
+            self.assertEqual(body.get('ID'),1)
+            with body.get('a') as first: first_id=first.get('ID')
+            with body.get('alias') as alias: self.assertEqual(alias.get('ID'),first_id)
+            with body.get('b') as other: self.assertNotEqual(other.get('ID'),first_id)
+        self.assertEqual(retained,[1,10,12])
+        self.assertEqual(released,retained)
+        self.assertIn((11,10),compared)
+
+    def test_failed_identity_comparison_releases_pins_without_inventing_an_id(self):
+        from types import SimpleNamespace as Obj
+        released=[]
+        def keep(pointer):return Obj(vt=9,value=Obj(pointer=pointer))
+        def get(pointer,name):return {'ok':True},Obj(vt=9,value=Obj(pointer=10))
+        def call(pointer,name,other):return {'ok':False,'hresult':'0x80020003'},None
+        def clear(value):released.append(value.value.pointer)
+        with self.assertRaises(RuntimeError):
+            with FeatureDispatch(1,get,call,clear,lambda *a,**k:{'name':'ISolidVertex'},retain=keep) as root:
+                root.get('ID')
+                with root.get('other') as other:other.get('ID')
+        self.assertCountEqual(released,[10,1])
+
 
 if __name__ == '__main__': unittest.main()

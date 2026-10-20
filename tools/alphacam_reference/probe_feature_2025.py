@@ -426,12 +426,15 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             if actual is not None:automation.VariantClear(C.byref(actual))
         return {"property":name,"enabled":enabled,"readback_matches":True}
 
-    def geometry_item(obj, index):
-        dispid=LONG(); names=(W.LPWSTR*1)("Item")
+    def geometry_item(obj, name, argument):
+        dispid=LONG(); names=(W.LPWSTR*1)(name)
         hr=method(obj,5,HRESULT,C.POINTER(GUID),C.POINTER(W.LPWSTR),UINT,ULONG,C.POINTER(LONG))(
             obj,C.byref(null_iid),names,1,0,C.byref(dispid))
-        if hr<0: raise RuntimeError("Collection.Item unavailable")
-        arg=VARIANT(); arg.vt=3; arg.value.integer=index
+        if hr<0: raise RuntimeError("Read-only method unavailable: "+name)
+        arg=VARIANT()
+        if name=='Item': arg.vt=3; arg.value.integer=argument
+        elif name=='IsSame': arg.vt=9; arg.value.pointer=argument
+        else: raise ValueError('Unsupported geometry method')
         params=DISPPARAMS(C.cast(C.pointer(arg),PTR),None,1,0)
         answer=VARIANT(); exception=EXCEPINFO(); argument_error=UINT()
         automation.SetErrorInfo(0,None)
@@ -441,6 +444,11 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             C.byref(exception),C.byref(argument_error))
         details=exception_details(exception,hr)
         return {"ok":hr>=0,"hresult":hresult(hr),"details":details},answer
+
+    def geometry_retain(obj):
+        value=VARIANT(); value.vt=9; value.value.pointer=obj
+        method(obj,1,ULONG)(obj)
+        return value
 
     def measure_single_body(bodies, inspector):
         dispid=LONG();names=(W.LPWSTR*1)("Item")
@@ -485,7 +493,8 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                 from feature_geometry import extract_geometry
                 from feature_dispatch import FeatureDispatch
                 adapter=FeatureDispatch(body.value.pointer,property_get,geometry_item,
-                    lambda value:automation.VariantClear(C.byref(value)),inspector.describe)
+                    lambda value:automation.VariantClear(C.byref(value)),inspector.describe,
+                    retain=geometry_retain)
                 with adapter:
                     geometry=extract_geometry(adapter)
                 if any(len(geometry[key])!=counts[collection] for key,collection in

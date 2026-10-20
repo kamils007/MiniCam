@@ -87,6 +87,7 @@ def references(obj, name):
 
 def extract_geometry(body):
     result = {'schema': 'minicam-feature-geometry-v1', 'body_id': ident(body),
+              'id_namespace': 'snapshot_local_identity_verified_by_IsSame',
               'units': 'mm', 'vertices': [], 'edges': [], 'faces': [],
               'property_errors': [], 'converted_to_occt': False}
 
