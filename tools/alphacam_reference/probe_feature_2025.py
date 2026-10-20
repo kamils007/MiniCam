@@ -588,6 +588,11 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             if batch_profile:
                 result["body_measurement"]=measure_single_body(bodies.value.pointer)
                 checkpoint("batch_body_measured",measurement=result["body_measurement"])
+            if batch_profile and batch_profile.get('measure_only'):
+                result['measurement_only_completed'] = True
+                result['save_skipped'] = 'Read-only ARD diagnostic: no Save or object serialization requested.'
+                checkpoint('measurement_only_completed')
+                return result
             target = output_dir / "roundtrip.x_b"
             if target.exists():
                 raise FileExistsError("Refusing to overwrite " + str(target))
@@ -912,6 +917,8 @@ def summarize_stage(stage):
         summary["stop_reason"] = "child_process_exit"
     elif not summary["import_succeeded_with_bodies"]:
         summary["stop_reason"] = "import_not_successful"
+    elif model.get('measurement_only_completed') is True:
+        summary['stop_reason'] = 'completed_measurement_only'
     elif stage.get('direct_record'):
         summary['stop_reason'] = ('completed_native_record' if object_ok and saved.get('ok') and saved_count == 1
                                   else 'native_record_not_successful')

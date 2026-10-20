@@ -20,6 +20,7 @@ def main():
     p.add_argument('--direct-record',action='store_true')
     p.add_argument('--kernel-errors',action='store_true')
     p.add_argument('--schema-path',action='store_true')
+    p.add_argument('--measure-only',action='store_true')
     p.add_argument('--model-sha256',help='Expected fresh Parasolid digest for the integrated pipeline')
     a=p.parse_args()
     from probe_feature_2025 import worker,inspect_pe
@@ -42,7 +43,7 @@ def main():
     result=worker(a.dll.resolve(),'model',[a.dll.parent.parent.parent],a.model.resolve(),
                   a.work_dir.resolve(),environment,
                   batch_profile=dict(state,direct_record=a.direct_record,kernel_errors=a.kernel_errors,
-                                     schema_path=a.schema_path),build_sha256=a.build_sha256)
+                                     schema_path=a.schema_path,measure_only=a.measure_only),build_sha256=a.build_sha256)
     if a.model_sha256:
         after=hashlib.sha256(a.model.read_bytes()).hexdigest()
         result['input_copy']={'sha256_before':before,'sha256_after':after,
