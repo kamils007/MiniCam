@@ -492,11 +492,30 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             if batch_profile and batch_profile.get('geometry_snapshot'):
                 from feature_geometry import extract_geometry
                 from feature_dispatch import FeatureDispatch
-                adapter=FeatureDispatch(body.value.pointer,property_get,geometry_item,
-                    lambda value:automation.VariantClear(C.byref(value)),inspector.describe,
-                    retain=geometry_retain)
-                with adapter:
-                    geometry=extract_geometry(adapter)
+                checkpoint('body_measurement_before_geometry', result=measured)
+                # The host deliberately terminates on an unsupported callback.
+                # Flush each operation BEFORE entering Feature so the report
+                # identifies its caller even when no Python finally can run.
+                with (output_dir/'geometry_calls.jsonl').open('x', encoding='utf-8') as trace:
+                    sequence=0
+                    def traced(operation, obj, name, argument=None):
+                        nonlocal sequence
+                        sequence+=1
+                        if sequence>250000:
+                            raise RuntimeError('Geometry operation limit exceeded')
+                        record={'sequence':sequence,'operation':operation,'member':name}
+                        if name=='Item':record['index']=argument
+                        trace.write(json.dumps(record)+'\n')
+                        trace.flush()
+                        if operation=='get':return property_get(obj,name)
+                        return geometry_item(obj,name,argument)
+                    adapter=FeatureDispatch(body.value.pointer,
+                        lambda obj,name:traced('get',obj,name),
+                        lambda obj,name,arg:traced('call',obj,name,arg),
+                        lambda value:automation.VariantClear(C.byref(value)),inspector.describe,
+                        retain=geometry_retain)
+                    with adapter:
+                        geometry=extract_geometry(adapter)
                 if any(len(geometry[key])!=counts[collection] for key,collection in
                        [('faces','Faces'),('edges','Edges'),('vertices','Vertices')]):
                     raise RuntimeError('Geometry snapshot counts disagree with the measured body')
