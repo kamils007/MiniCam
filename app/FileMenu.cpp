@@ -144,6 +144,7 @@ void MainWindow::onNew()
         return;
     cancelCommand();
     m_original = {};
+    m_ardDocument.reset();
     m_shown = {};
     m_fileName.clear();
     m_savePath.clear();

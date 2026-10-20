@@ -25,6 +25,7 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets PrintSupport)
 find_package(OpenCASCADE REQUIRED)
+add_subdirectory(modules/ard_import)
 
 # ---- Rdzeń: czyste C++ + OCCT, bez Qt ----
 # Linkujemy tylko te moduły OCCT, których naprawdę używamy (pozostałe dociągną się
@@ -40,6 +41,8 @@ else()
 endif()
 
 add_library(camcore STATIC
+    core/ArdImport.cpp
+    core/ArdImport.h
     core/ModelImport.cpp
     core/ModelImport.h
     core/ModelExport.cpp
@@ -83,6 +86,8 @@ target_link_libraries(camcore PUBLIC
 # ---- Aplikacja: GUI w Qt ----
 # qt_add_executable przy statycznym Qt sam dołącza wtyczki (m.in. platformę Windows).
 qt_add_executable(minicam
+    app/ArdSolidImport.cpp
+    app/ArdSolidImport.h
     app/main.cpp
     app/MainWindow.cpp
     app/FileMenu.cpp
@@ -144,9 +149,19 @@ if(WIN32)
 endif()
 target_include_directories(minicam PRIVATE app) # polecenia w app/commands widzą InputBar.h, OccView.h
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
+    minicam-ard-geometry
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
     TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów
 )
+qt_add_resources(minicam "ard_import_driver" PREFIX "/ard-import" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tools/ard_import"
+    FILES tools/ard_import/read_ard_body.py)
+qt_add_resources(minicam "ard_import_overlays" PREFIX "/ard-import/overlay" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    FILES tools/alphacam_reference/probe_feature_2025.py
+          tools/alphacam_reference/com_typeinfo.py
+          tools/alphacam_reference/feature_dispatch.py
+          tools/alphacam_reference/feature_geometry.py
+          tools/step_ard/feature_native_14.py
+          tools/step_ard/build_step_ard_14.py)
 if(MINICAM_WITH_ALPHACAM_EXPORT)
     add_subdirectory(modules/alphacam)
     target_sources(minicam PRIVATE app/ArdSolidExport.cpp app/ArdSolidExport.h)
@@ -195,6 +210,16 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(ard-snapshot-to-occt tools/ard_import/occt/geometry_to_occt.cpp)
+    target_link_libraries(ard-snapshot-to-occt PRIVATE minicam-ard-geometry ${MINICAM_OCC_IMPORT})
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME ard-solid-reconstruction COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/ard_import/occt/check_conversion.py" "$<TARGET_FILE:ard-snapshot-to-occt>")
+    endif()
+    add_executable(ard-import-test tools/ard/ArdImportTest.cpp)
+    target_link_libraries(ard-import-test PRIVATE camcore)
+    add_test(NAME ard-import COMMAND ard-import-test)
     add_executable(ard-record-test tools/ard/ArdRecordTest.cpp)
     target_link_libraries(ard-record-test PRIVATE camcore)
     add_executable(ard-layers-test tools/ard/ArdLayersTest.cpp)

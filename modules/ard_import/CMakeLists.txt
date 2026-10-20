@@ -1,0 +1,6 @@
+add_library(minicam-ard-geometry STATIC FeatureGeometry.cpp FeatureGeometry.h)
+target_include_directories(minicam-ard-geometry PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" ${OpenCASCADE_INCLUDE_DIR})
+target_link_libraries(minicam-ard-geometry PUBLIC Qt6::Core TKShHealing TKTopAlgo TKBRep TKG3d TKGeomBase TKMath TKernel)
+if(MSVC)
+    target_compile_options(minicam-ard-geometry PRIVATE /utf-8 /permissive- /Zc:__cplusplus)
+endif()

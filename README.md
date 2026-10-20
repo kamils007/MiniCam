@@ -11,6 +11,11 @@ Opcjonalny [moduł eksportu ALPHACAM](modules/alphacam/README.md) dodaje w menu
 Plik zapis bieżącej bryły i geometrii do ARD. Konwersja działa w osobnym procesie;
 ustawienia i zależności są potrzebne dopiero przy użyciu eksportu.
 
+[Otwieranie ARD](docs/ard_import.md): kontury 2D, warstwy i poziomy Z oraz
+jedna obsługiwana bryła Parasolid przez odczyt Feature i bezpośrednią
+rekonstrukcję OCCT. Bryły wymagają Windows i skonfigurowanej instalacji ALPHACAM.
+Program zgłasza pozostałe ograniczenia; to nie jest pełny import ALPHACAM.
+
 (dawniej MiniCAM; plik programu nadal nazywa się `minicam.exe`)
 
 Okno Qt 6 z widokiem 3D Open CASCADE. Wczytuje STEP, IGES i BREP razem z kolorami

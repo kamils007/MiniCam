@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "ArdSolidImport.h"
 #include "AlignSettingsDialog.h"
 #include "BottomBars.h"
 #include "InputBar.h"
@@ -32,6 +33,7 @@
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFile>
 #include <QMenu>
 #include <QMessageBox>
 #include <QStatusBar>
@@ -561,8 +563,8 @@ void MainWindow::onOpen()
         return;
     const QString path = QFileDialog::getOpenFileName(
         this, "Otwórz model", QString(),
-        "Modele 3D (*.step *.stp *.iges *.igs *.brep *.brp);;"
-        "STEP (*.step *.stp);;IGES (*.iges *.igs);;BREP (*.brep *.brp)");
+        "Modele i rysunki (*.ard *.step *.stp *.iges *.igs *.brep *.brp);;"
+        "ALPHACAM (*.ard);;STEP (*.step *.stp);;IGES (*.iges *.igs);;BREP (*.brep *.brp)");
     if (!path.isEmpty())
         openFile(path);
 }
@@ -571,10 +573,79 @@ void MainWindow::openFile(const QString& path)
 {
     statusBar()->showMessage("Wczytywanie " + QFileInfo(path).fileName() + "…");
     QApplication::setOverrideCursor(Qt::WaitCursor);
+    bool cursorActive = true;
+    auto restoreCursor = [&] {
+        if (cursorActive) {
+            QApplication::restoreOverrideCursor();
+            cursorActive = false;
+        }
+    };
     QElapsedTimer timer;
     timer.start();
 
     try {
+        if (QFileInfo(path).suffix().compare("ard", Qt::CaseInsensitive) == 0) {
+            QFile file(path);
+            if (!file.open(QIODevice::ReadOnly))
+                throw std::runtime_error(file.errorString().toStdString());
+            if (file.size() > 128 * 1024 * 1024)
+                throw std::runtime_error("ARD: Plik przekracza limit 128 MiB.");
+            const auto bytes = file.readAll();
+            if (file.error() != QFileDevice::NoError)
+                throw std::runtime_error(file.errorString().toStdString());
+            auto document = camcore::readArd(bytes.toStdString());
+            camcore::ImportedModel solid;
+            if (!document.solids.empty()) {
+                // Work on temporary state; a failed 3D import must never replace
+                // the current document with only the available 2D paths.
+                solid = readArdSolid(bytes, document, this);
+                document.warnings.erase(std::remove(document.warnings.begin(), document.warnings.end(),
+                    camcore::kArdSolidConversionWarning), document.warnings.end());
+                document.warnings.push_back("Kolory scian bryly nie zostaly odtworzone.");
+            }
+            if (document.geometries.empty() && solid.shape.IsNull())
+                throw std::runtime_error("ARD: Brak obsługiwanej geometrii do otwarcia.");
+            restoreCursor();
+            if (!document.warnings.empty()) {
+                QMessageBox report(QMessageBox::Warning, "Niepełny odczyt ARD",
+                    QString("Odczytano %1 geometrii 2D, %2 warstw i %3 brył.\n"
+                            "Część danych ALPHACAM nie została odtworzona.\n"
+                            "Zapis lub eksport nie odtworzy całego źródłowego ARD.")
+                        .arg(document.geometries.size()).arg(document.sourceLayers.size()).arg(solid.shape.IsNull() ? 0 : 1),
+                    QMessageBox::Ok | QMessageBox::Cancel, this);
+                report.button(QMessageBox::Ok)->setText("Otwórz odczytane dane");
+                report.setDefaultButton(QMessageBox::Cancel);
+                QStringList details;
+                for (const auto& warning : document.warnings) details << QString::fromStdString(warning);
+                report.setDetailedText(details.join('\n'));
+                if (report.exec() != QMessageBox::Ok) {
+                    statusBar()->showMessage("Anulowano otwieranie ARD");
+                    return;
+                }
+            }
+            // Parse and ask about partial import before replacing the current document.
+            cancelCommand();
+            m_fileName = QFileInfo(path).fileName();
+            m_original = std::move(solid);
+            showModel(m_original);
+            m_ardDocument = std::move(document);
+            m_geometries = m_ardDocument->geometries;
+            m_layerList = m_ardDocument->layers;
+            m_savePath.clear();
+            m_flipped = m_aligned = false; // ARD coordinates and Z levels remain unchanged
+            showGeometries();
+            m_view->fitAll();
+            m_layers->setModelName(m_original.shape.IsNull() ? QString() : m_fileName);
+            m_undo->clear();
+            addRecentFile(path);
+            const bool partial = !m_ardDocument->warnings.empty();
+            setWindowTitle(kAppName + " – " + m_fileName + (partial ? " [odczyt częściowy]" : ""));
+            statusBar()->showMessage(QString("ARD: %1 geometrii 2D, %2 warstw, %3 brył%4")
+                .arg(m_geometries.size()).arg(m_ardDocument->sourceLayers.size())
+                .arg(m_original.shape.IsNull() ? 0 : 1)
+                .arg(partial ? " — pozostałe ograniczenia w raporcie odczytu" : ""));
+            return;
+        }
         // Rdzeń dostaje ścieżkę w UTF-8 – działa też z polskimi znakami.
         m_original = camcore::importModel(path.toUtf8().toStdString());
         m_fileName = QFileInfo(path).fileName();
@@ -590,7 +661,7 @@ void MainWindow::openFile(const QString& path)
         } else {
             showModel(m_original);
         }
-        QApplication::restoreOverrideCursor();
+        restoreCursor();
 
         setWindowTitle(kAppName + " – " + m_fileName);
         statusBar()->showMessage(QString("Wczytano %1 w %2 ms (%3)")
@@ -598,7 +669,7 @@ void MainWindow::openFile(const QString& path)
                                      .arg(timer.elapsed())
                                      .arg(how));
     } catch (const std::exception& ex) {
-        QApplication::restoreOverrideCursor();
+        restoreCursor();
         statusBar()->clearMessage();
         QMessageBox::critical(this, "Błąd wczytywania", QString::fromUtf8(ex.what()));
     }
@@ -613,6 +684,7 @@ void MainWindow::showAligned()
 
 void MainWindow::showModel(const camcore::ImportedModel& model)
 {
+    m_ardDocument.reset();
     m_shown = model;
     m_undo->clear(); // nowa bryła albo nowe położenie – starej historii nie da się już cofnąć
     m_view->showModel(model);
@@ -649,7 +721,8 @@ void MainWindow::showGeometries()
         const camcore::Geometry& g = m_geometries[i];
         // Kolor z warstwy geometrii.
         contours.push_back({g.contour.wire, m_layerList.layerOrAps(g.layer).color, g.contour.zTop - g.contour.zBottom,
-                            camcore::directionMarker(g.contour.wire, g.direction, g.toolSide)});
+                            g.toolDirectionKnown ? camcore::directionMarker(g.contour.wire, g.direction, g.toolSide)
+                                                 : camcore::DirectionMarker{}});
         rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
     }
     // Panel pokazuje wszystkie warstwy użytkownika z listy (także puste –

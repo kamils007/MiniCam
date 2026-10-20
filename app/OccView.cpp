@@ -196,8 +196,11 @@ void OccView::showModel(const camcore::ImportedModel& model)
     m_modelSelected = false;
     m_modelVisible = true;
     m_modelHovered = false;
-    m_model = makeModelPresentation(model, false, false);
-    m_context->Display(m_model, AIS_Shaded, 0, Standard_False);
+    m_model.Nullify();
+    if (!model.shape.IsNull()) {
+        m_model = makeModelPresentation(model, false, false);
+        m_context->Display(m_model, AIS_Shaded, 0, Standard_False);
+    }
 
     m_view->SetProj(V3d_XposYnegZpos); // widok izometryczny
     // Okno mogło właśnie zmienić rozmiar (np. plik podany przy starcie programu) –

@@ -65,6 +65,7 @@ ToolPlacement placementFromSolid(const Geometry& g, const TopoDS_Shape& solid)
 
 void setPlacement(Geometry& g, ToolPlacement placement)
 {
+    g.toolDirectionKnown = true;
     g.direction = placement == ToolPlacement::Inside ? CutDirection::CCW : CutDirection::CW;
     g.toolSide = placement == ToolPlacement::Centre ? ToolSide::Centre : ToolSide::Left;
 }
@@ -193,10 +194,17 @@ void applyDirectionChange(std::vector<Geometry>& geometries, const std::vector<i
             if (i >= 0 && i < static_cast<int>(geometries.size()))
                 which.push_back(static_cast<size_t>(i));
     for (size_t i : which) {
-        if (isClosed(geometries[i].contour.wire))
+        if (isClosed(geometries[i].contour.wire)) {
             changeClosed(geometries, i, change, solid);
-        else
+            if (change.closedDirection != DirectionChange::ClosedDirection::NoChange
+                || change.closedSide != DirectionChange::ClosedSide::NoChange)
+                geometries[i].toolDirectionKnown = true;
+        } else {
             changeOpen(geometries[i], change);
+            if (change.openDirection != DirectionChange::OpenDirection::NoChange
+                || change.openSide != DirectionChange::OpenSide::NoChange)
+                geometries[i].toolDirectionKnown = true;
+        }
     }
 }
 

@@ -426,7 +426,31 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             if actual is not None:automation.VariantClear(C.byref(actual))
         return {"property":name,"enabled":enabled,"readback_matches":True}
 
-    def measure_single_body(bodies):
+    def geometry_item(obj, name, argument):
+        dispid=LONG(); names=(W.LPWSTR*1)(name)
+        hr=method(obj,5,HRESULT,C.POINTER(GUID),C.POINTER(W.LPWSTR),UINT,ULONG,C.POINTER(LONG))(
+            obj,C.byref(null_iid),names,1,0,C.byref(dispid))
+        if hr<0: raise RuntimeError("Read-only method unavailable: "+name)
+        arg=VARIANT()
+        if name=='Item': arg.vt=3; arg.value.integer=argument
+        elif name=='IsSame': arg.vt=9; arg.value.pointer=argument
+        else: raise ValueError('Unsupported geometry method')
+        params=DISPPARAMS(C.cast(C.pointer(arg),PTR),None,1,0)
+        answer=VARIANT(); exception=EXCEPINFO(); argument_error=UINT()
+        automation.SetErrorInfo(0,None)
+        hr=method(obj,6,HRESULT,LONG,C.POINTER(GUID),ULONG,WORD,C.POINTER(DISPPARAMS),
+                  C.POINTER(VARIANT),C.POINTER(EXCEPINFO),C.POINTER(UINT))(
+            obj,dispid.value,C.byref(null_iid),0,1,C.byref(params),C.byref(answer),
+            C.byref(exception),C.byref(argument_error))
+        details=exception_details(exception,hr)
+        return {"ok":hr>=0,"hresult":hresult(hr),"details":details},answer
+
+    def geometry_retain(obj):
+        value=VARIANT(); value.vt=9; value.value.pointer=obj
+        method(obj,1,ULONG)(obj)
+        return value
+
+    def measure_single_body(bodies, inspector):
         dispid=LONG();names=(W.LPWSTR*1)("Item")
         hr=method(bodies,5,HRESULT,C.POINTER(GUID),C.POINTER(W.LPWSTR),UINT,ULONG,C.POINTER(LONG))(
             bodies,C.byref(null_iid),names,1,0,C.byref(dispid))
@@ -463,8 +487,46 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                 finally:
                     if collection is not None:automation.VariantClear(C.byref(collection))
             dimensions=[bounds["Max"+axis]-bounds["Min"+axis] for axis in ("X","Y","Z")]
-            return {"bounds":bounds,"dimensions_api_units":dimensions,"topology_counts":counts,
-                    "alignment_disabled":True,"full_topology_validity_verified":False,"volume_verified":False}
+            measured={"bounds":bounds,"dimensions_api_units":dimensions,"topology_counts":counts,
+                      "alignment_disabled":True,"full_topology_validity_verified":False,"volume_verified":False}
+            if batch_profile and batch_profile.get('geometry_snapshot'):
+                from feature_geometry import extract_geometry
+                from feature_dispatch import FeatureDispatch
+                checkpoint('body_measurement_before_geometry', result=measured)
+                # The host deliberately terminates on an unsupported callback.
+                # Flush each operation BEFORE entering Feature so the report
+                # identifies its caller even when no Python finally can run.
+                with (output_dir/'geometry_calls.jsonl').open('x', encoding='utf-8') as trace:
+                    sequence=0
+                    def traced(operation, obj, name, argument=None):
+                        nonlocal sequence
+                        sequence+=1
+                        if sequence>250000:
+                            raise RuntimeError('Geometry operation limit exceeded')
+                        record={'sequence':sequence,'operation':operation,'member':name}
+                        if name=='Item':record['index']=argument
+                        trace.write(json.dumps(record)+'\n')
+                        trace.flush()
+                        if operation=='get':return property_get(obj,name)
+                        return geometry_item(obj,name,argument)
+                    adapter=FeatureDispatch(body.value.pointer,
+                        lambda obj,name:traced('get',obj,name),
+                        lambda obj,name,arg:traced('call',obj,name,arg),
+                        lambda value:automation.VariantClear(C.byref(value)),inspector.describe,
+                        retain=geometry_retain)
+                    with adapter:
+                        geometry=extract_geometry(adapter)
+                if any(len(geometry[key])!=counts[collection] for key,collection in
+                       [('faces','Faces'),('edges','Edges'),('vertices','Vertices')]):
+                    raise RuntimeError('Geometry snapshot counts disagree with the measured body')
+                data=json.dumps(geometry,ensure_ascii=False,allow_nan=False,indent=2).encode('utf-8')
+                target=output_dir/'feature_geometry.json'
+                with target.open('xb') as stream:stream.write(data)
+                measured['geometry_snapshot']={"filename":target.name,"sha256":hashlib.sha256(data).hexdigest(),
+                    "counts":counts,"topology_read_complete":True,
+                    "property_error_count":len(geometry['property_errors']),"converted_to_occt":False}
+                checkpoint('geometry_snapshot_written',result=measured['geometry_snapshot'])
+            return measured
         finally:automation.VariantClear(C.byref(body))
 
     def count_bodies(obj):
@@ -586,8 +648,13 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                 result["save_skipped"] = "Save signature was not recognized."
                 return result
             if batch_profile:
-                result["body_measurement"]=measure_single_body(bodies.value.pointer)
+                result["body_measurement"]=measure_single_body(bodies.value.pointer, inspector)
                 checkpoint("batch_body_measured",measurement=result["body_measurement"])
+            if batch_profile and batch_profile.get('measure_only'):
+                result['measurement_only_completed'] = True
+                result['save_skipped'] = 'Read-only ARD diagnostic: no Save or object serialization requested.'
+                checkpoint('measurement_only_completed')
+                return result
             target = output_dir / "roundtrip.x_b"
             if target.exists():
                 raise FileExistsError("Refusing to overwrite " + str(target))
@@ -912,6 +979,8 @@ def summarize_stage(stage):
         summary["stop_reason"] = "child_process_exit"
     elif not summary["import_succeeded_with_bodies"]:
         summary["stop_reason"] = "import_not_successful"
+    elif model.get('measurement_only_completed') is True:
+        summary['stop_reason'] = 'completed_measurement_only'
     elif stage.get('direct_record'):
         summary['stop_reason'] = ('completed_native_record' if object_ok and saved.get('ok') and saved_count == 1
                                   else 'native_record_not_successful')

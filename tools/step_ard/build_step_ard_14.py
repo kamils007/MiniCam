@@ -167,6 +167,8 @@ def run_native(root, model, out, report, observe, feature_sha256=FEATURE_SHA256)
                 '--build-sha256', feature_sha256] + (['--direct-record'] if report.get('direct_record') else [])
                 + (['--kernel-errors'] if report.get('kernel_error_diagnostics') else [])
                 + (['--schema-path'] if report.get('configure_schema_path') else [])
+                + (['--measure-only'] if report.get('measure_only') else [])
+                + (['--geometry-snapshot'] if report.get('geometry_snapshot') else [])
                 + (['--model-sha256', report['model_expected_sha256']]
                    if report.get('model_expected_sha256') else []),
                 cwd=out, env=env, stdout=stdout, stderr=stderr)

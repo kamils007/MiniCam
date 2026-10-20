@@ -65,6 +65,7 @@ struct Geometry
     bool visible = true;
     CutDirection direction = CutDirection::CW;
     ToolSide toolSide = ToolSide::Left;
+    bool toolDirectionKnown = true; // false when an imported format's CAM fields are not decoded
 };
 
 } // namespace camcore

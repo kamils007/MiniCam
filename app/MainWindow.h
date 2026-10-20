@@ -3,6 +3,8 @@
 #include <QMainWindow>
 
 #include "Geometry.h"
+#include "ArdImport.h"
+#include <optional>
 
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
@@ -98,6 +100,7 @@ private:
     camcore::PartContours m_contours; // kontury i kieszenie z ostatniego rozpoznawania
     std::vector<camcore::Geometry> m_geometries; // geometrie z właściwościami (warstwa, widoczność)
     camcore::LayerList m_layerList; // warstwy: APS + warstwy użytkownika
+    std::optional<camcore::ArdDocument> m_ardDocument; // original bytes and import limitations
 
     Command* m_command = nullptr;     // trwające polecenie (np. Przesuń) albo brak
     QAction* m_lastCommand = nullptr; // ostatnie polecenie – powtarza je spacja
