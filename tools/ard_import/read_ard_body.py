@@ -16,6 +16,8 @@ SAMPLE_SHA256 = '13b01c7743bf2e97ca1b503362a476b08706ce562a49c17f3ce1a22c8974e93
 FEATURE_SHA256 = '5bbfbdbd41c32dde36dfc81db3a7a022b9e3688622f7005130cc207bc6638438'
 HERE = Path(__file__).resolve().parent
 OVERLAYS = ('alphacam_reference/probe_feature_2025.py',
+            'alphacam_reference/com_typeinfo.py', 'alphacam_reference/feature_dispatch.py',
+            'alphacam_reference/feature_geometry.py',
             'step_ard/feature_native_14.py', 'step_ard/build_step_ard_14.py')
 
 
@@ -108,11 +110,13 @@ def validate_read(native, expected_hash, validate_cls, validate_measurement, val
     return validate_measurement(model, reference_dimensions_mm=None)
 
 
-def run(ard, runtime, root, out):
+def run(ard, runtime, root, out, geometry_snapshot=False):
     out.mkdir(parents=True, exist_ok=False)
     report = {'schema': 'minicam-ard-feature-read-v1', 'read_confirmed': False,
               'converted_to_occt': False, 'geometry_verified': False, 'volume_verified': False,
               'save_requested': False, 'installed_runtime_unchanged': False, 'error': None}
+    report['geometry_snapshot_requested'] = geometry_snapshot
+    report['geometry_snapshot_available'] = False
     original_runtime_hashes = {}
     original_ard_hash = None
     try:
@@ -130,7 +134,11 @@ def run(ard, runtime, root, out):
         for folder in ('alphacam_reference', 'step_ard', 'solidimport'):
             shutil.copytree(runtime / folder, private / folder, ignore=shutil.ignore_patterns('__pycache__'))
         for name in OVERLAYS:
-            original_runtime_hashes[name] = digest((runtime / name).read_bytes())
+            source_file = runtime / name
+            if not source_file.is_file() and name not in (
+                    'alphacam_reference/feature_dispatch.py', 'alphacam_reference/feature_geometry.py'):
+                raise ValueError('Brak wymaganego pliku runtime eksportu: ' + name)
+            original_runtime_hashes[name] = digest(source_file.read_bytes()) if source_file.is_file() else None
             shutil.copyfile(HERE / 'overlay' / name, private / name)
         for folder in ('alphacam_reference', 'solidimport', 'step_ard'):
             sys.path.insert(0, str(private / folder))
@@ -144,7 +152,8 @@ def run(ard, runtime, root, out):
                 raise ValueError('Inna niz obslugiwana wersja pliku: ' + name)
         native = out / 'feature'
         native.mkdir()
-        state = {'measure_only': True, 'configure_schema_path': True, 'acam_observed': False,
+        state = {'measure_only': True, 'geometry_snapshot': geometry_snapshot,
+                 'configure_schema_path': True, 'acam_observed': False,
                  'process_samples': 0, 'model_expected_sha256': digest(payload)}
         report['native'] = state
 
@@ -162,6 +171,22 @@ def run(ard, runtime, root, out):
             collect_feature(native, state, expected_input=digest(payload))
         report['measurement'] = validate_read(state, digest(payload), validate_cls,
                                              validate_measurement, validate_schema_path)
+        if geometry_snapshot:
+            from feature_geometry import validate_geometry
+            descriptor = report['measurement'].get('geometry_snapshot', {})
+            geometry_file = native / 'native' / 'feature_geometry.json'
+            data = geometry_file.read_bytes()
+            geometry = json.loads(data)
+            validate_geometry(geometry)
+            counts = {name: len(geometry[key]) for name, key in
+                      [('Faces', 'faces'), ('Edges', 'edges'), ('Vertices', 'vertices')]}
+            if (descriptor.get('filename') != 'feature_geometry.json' or descriptor.get('sha256') != digest(data)
+                    or counts != report['measurement']['topology_counts'] or descriptor.get('counts') != counts
+                    or descriptor.get('topology_read_complete') is not True
+                    or geometry.get('topology_read_complete') is not True):
+                raise ValueError('Dane geometrii nie odpowiadaja odczytanej bryle.')
+            report['geometry_snapshot_available'] = True
+            report['geometry_snapshot'] = dict(descriptor, size_bytes=len(data))
         if any((native / 'native' / name).exists() for name in ('roundtrip.x_b', 'feature_object.bin')):
             raise ValueError('Nieoczekiwany zapis podczas testu odczytu.')
         report['read_confirmed'] = True
@@ -170,7 +195,8 @@ def run(ard, runtime, root, out):
     finally:
         try:
             report['installed_runtime_unchanged'] = bool(original_runtime_hashes) and all(
-                digest((runtime / name).read_bytes()) == value for name, value in original_runtime_hashes.items())
+                (digest((runtime / name).read_bytes()) == value if value is not None else not (runtime / name).exists())
+                for name, value in original_runtime_hashes.items())
             report['source_ard_unchanged'] = original_ard_hash is not None and digest(ard.read_bytes()) == original_ard_hash
             if report['read_confirmed'] and (not report['installed_runtime_unchanged'] or not report['source_ard_unchanged']):
                 report['read_confirmed'] = False
@@ -196,5 +222,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('ard', 'runtime', 'root', 'out'):
         parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--geometry-snapshot', action='store_true')
     args = parser.parse_args()
-    raise SystemExit(run(*(getattr(args, k).resolve() for k in ('ard', 'runtime', 'root', 'out'))))
+    raise SystemExit(run(*(getattr(args, k).resolve() for k in ('ard', 'runtime', 'root', 'out')),
+                         geometry_snapshot=args.geometry_snapshot))

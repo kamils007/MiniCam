@@ -4,15 +4,15 @@ import ast
 import hashlib
 from pathlib import Path
 import zipfile
+from read_ard_body import OVERLAYS
 
 HERE = Path(__file__).resolve().parent
-OVERLAYS = ('alphacam_reference/probe_feature_2025.py',
-            'step_ard/feature_native_14.py', 'step_ard/build_step_ard_14.py')
 
 
-def package(output):
+def package(output, geometry=False):
     files = {}
-    for name in ('read_ard_body.py', 'InvokeArdRead.ps1', 'TEST_ODCZYTU_BRYLY.cmd', 'README_ODCZYT.md'):
+    launcher = ('TEST_GEOMETRII_BRYLY.cmd', 'README_GEOMETRIA.md') if geometry else ('TEST_ODCZYTU_BRYLY.cmd', 'README_ODCZYT.md')
+    for name in ('read_ard_body.py', 'InvokeArdRead.ps1', *launcher):
         data = (HERE / name).read_bytes()
         if name.endswith('.cmd'):
             data = data.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
@@ -24,14 +24,15 @@ def package(output):
             ast.parse(data, filename=name)
     files['SHA256SUMS.txt'] = ''.join(hashlib.sha256(v).hexdigest() + '  ' + k + '\n'
         for k, v in sorted(files.items())).encode()
+    prefix = 'MiniCam_geometria_bryly/' if geometry else 'MiniCam_test_odczytu_bryly/'
     with zipfile.ZipFile(output, 'x', zipfile.ZIP_DEFLATED) as archive:
         for name, data in files.items():
-            archive.writestr('MiniCam_test_odczytu_bryly/' + name, data)
+            archive.writestr(prefix + name, data)
     with zipfile.ZipFile(output) as archive:
         if archive.testzip() is not None:
             raise ValueError('ZIP verification failed')
         for name, data in files.items():
-            if archive.read('MiniCam_test_odczytu_bryly/' + name) != data:
+            if archive.read(prefix + name) != data:
                 raise ValueError('ZIP contents differ')
     return files
 
@@ -39,6 +40,7 @@ def package(output):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--geometry', action='store_true')
     args = parser.parse_args()
-    files = package(args.out)
+    files = package(args.out, geometry=args.geometry)
     print(str(args.out.resolve()) + ': ' + str(len(files)) + ' files; ZIP verified')

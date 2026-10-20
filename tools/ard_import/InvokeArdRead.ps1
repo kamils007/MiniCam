@@ -1,4 +1,4 @@
-param([string]$Ard)
+param([string]$Ard, [switch]$Geometry)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 try {
@@ -33,7 +33,9 @@ try {
     if (-not (Test-Path -LiteralPath $settings['python'] -PathType Leaf)) { throw 'Nie znaleziono Pythona zapisanego w ustawieniach MiniCam.' }
     $out = Join-Path $PSScriptRoot ('odczyt_' + [Guid]::NewGuid().ToString('N'))
     Write-Host 'Zamknij ALPHACAM na czas testu, tak jak przy zapisie ARD.'
-    & $settings['python'] -I -u (Join-Path $PSScriptRoot 'read_ard_body.py') --ard $Ard --runtime $settings['runtime'] --root $settings['root'] --out $out
+    $extra = @()
+    if ($Geometry) { $extra += '--geometry-snapshot' }
+    & $settings['python'] -I -u (Join-Path $PSScriptRoot 'read_ard_body.py') --ard $Ard --runtime $settings['runtime'] --root $settings['root'] --out $out @extra
     $result = $LASTEXITCODE
     if (Test-Path -LiteralPath (Join-Path $out 'raport_odczytu.zip') -PathType Leaf) {
         Write-Host ('Przeslij plik: ' + (Join-Path $out 'raport_odczytu.zip'))

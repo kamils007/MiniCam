@@ -173,7 +173,7 @@ class Inspector:
                 if pointer:
                     self.automation.SysFreeString(pointer)
 
-    def describe(self, dispatch):
+    def describe(self, dispatch, resolve_methods=None):
         info = PTR()
         hr = self.method(dispatch, 4, LONG, ULONG, ULONG, C.POINTER(PTR))(
             dispatch, 0, 0, C.byref(info))
@@ -199,7 +199,8 @@ class Inspector:
                                      "parameter_count": desc.param_count, "parameters": []})
                     # Resolve references only for the operations used by this
                     # probe; unrelated methods may refer to other type libraries.
-                    if function["name"].lower() in {"import", "importas", "bodies", "save", "count"}:
+                    if function["name"].lower() in ({"import", "importas", "bodies", "save", "count"}
+                                                   | set(resolve_methods or ())):
                         names = self.names(info, desc.memid, desc.param_count + 1)
                         function["return"] = self.type_desc(info, desc.result.type)
                         for i in range(desc.param_count):
