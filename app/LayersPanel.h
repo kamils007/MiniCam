@@ -11,8 +11,7 @@ class QTreeWidgetItem;
 
 // Panel "Warstwy" jak w Alphacam: pionowy pasek zakładek po lewej, pasek
 // narzędzi warstw u góry i drzewo warstw z checkboxami (widoczność).
-// Na razie wszystkie geometrie trafiają do warstwy "Geometrie APS"
-// (niesklasyfikowane); klasyfikacja do innych warstw przyjdzie później.
+// Geometrie są przypisane do grup systemowych albo do warstw użytkownika.
 class LayersPanel : public QWidget
 {
     Q_OBJECT
@@ -32,8 +31,9 @@ public:
     struct GeometryRow
     {
         QString label;
-        QString layer; // "Geometrie APS" albo nazwa warstwy użytkownika
+        QString layer; // nazwa grupy systemowej albo warstwy użytkownika
         bool visible = true;
+        bool systemLayer = false; // explicit origin; never infer it from a user layer's name
     };
     // Geometrie trafiają pod swoje warstwy – jedna pozycja na geometrię.
     void setGeometries(const std::vector<GeometryRow>& rows);
@@ -51,7 +51,7 @@ private slots:
 
 private:
     QTreeWidgetItem* addLayer(const QString& name, int iconKind);
-    QTreeWidgetItem* geometryLayer(const QString& name) const;
+    QTreeWidgetItem* geometryLayer(const QString& name, bool systemLayer) const;
     std::vector<QTreeWidgetItem*> geometryLayers() const;
     static bool isGeometryLayer(const QTreeWidgetItem* item);
     void setLayerChecked(QTreeWidgetItem* layer, Qt::CheckState state);

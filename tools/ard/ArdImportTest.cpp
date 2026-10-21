@@ -1,5 +1,6 @@
 #include "ArdImport.h"
 #include "ArdExport.h"
+#include "ArdPaths.h"
 #include "ToolSides.h"
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -68,6 +69,44 @@ int main(int argc, char** argv) {
         camcore::applyDirectionChange(edited, {}, change, {});
         check(edited[0].toolDirectionKnown, "explicit direction change hidden");
         check(doc.sourceLayers.size() == 9, "layers not read");
+        check(doc.layers.all().size() == 2 && doc.layers.systemLayers().size() == 6,
+              "reserved or unnamed text-style layer imported as a user layer");
+        check(!doc.layers.find("KONSTRUKCJE") && !doc.layers.find("Warstwa ARD 9"),
+              "duplicate system layers under user layers");
+        auto constructionBytes = data;
+        word(constructionBytes, pathStart(data)+221, 3); // user count 1 + reserved number 2
+        auto construction = camcore::readArd(constructionBytes);
+        check(construction.geometries[0].layer == "Konstrukcje"
+              && construction.layers.isSystemLayer(construction.geometries[0].layer),
+              "construction geometry not routed to the reserved group");
+        check(construction.layers.layerOrAps("Konstrukcje").color.Distance(camcore::kApsColor) < .001,
+              "system layer received an arbitrary user palette color");
+        auto constructionCycle = construction;
+        for (int cycle = 0; cycle < 3; ++cycle) {
+            const auto paths = camcore::ardPaths(constructionCycle.geometries, constructionCycle.layers);
+            constructionCycle = camcore::readArd(camcore::writeArd(constructionCycle.layers, paths, {}));
+            check(constructionCycle.geometries[0].layer == "Konstrukcje"
+                  && constructionCycle.layers.all().size() == 2,
+                  "system geometry moved to APS or duplicated on save/reopen");
+        }
+        camcore::LayerList sameName;
+        sameName.createLayer("Konstrukcje");
+        const auto collision = camcore::readArd(camcore::writeArd(sameName, {path}, {}));
+        check(collision.geometries[0].layer == "Konstrukcje [ARD 1]"
+              && !collision.layers.isSystemLayer(collision.geometries[0].layer),
+              "genuine same-named user layer mistaken for a reserved group");
+        check(camcore::ardLayerId(construction.layers, "Zażółć gęślą jaźń") == 1,
+              "reserved layer handling changed user export IDs");
+        auto stylePath = data; word(stylePath, pathStart(data)+221, 9); rejects(stylePath);
+        auto roundTripLayers = doc.layers;
+        for (int cycle = 0; cycle < 3; ++cycle) {
+            auto reopened = camcore::readArd(camcore::writeArd(roundTripLayers, {path}, {}));
+            check(reopened.sourceLayers.size() == 9 && reopened.layers.all().size() == 2,
+                  "opening and saving repeatedly multiplies system/user layers");
+            check(reopened.geometries[0].layer == "Zażółć gęślą jaźń",
+                  "roundtrip changed genuine user geometry assignment");
+            roundTripLayers = reopened.layers;
+        }
         check(doc.geometries[0].layer == "Zażółć gęślą jaźń", "CP1250 layer name");
         check(doc.layers.find(doc.geometries[0].layer)->color.Distance(layers.all()[1].color) < .001,
               "RGB color not retained");

@@ -723,7 +723,8 @@ void MainWindow::showGeometries()
         contours.push_back({g.contour.wire, m_layerList.layerOrAps(g.layer).color, g.contour.zTop - g.contour.zBottom,
                             g.toolDirectionKnown ? camcore::directionMarker(g.contour.wire, g.direction, g.toolSide)
                                                  : camcore::DirectionMarker{}});
-        rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible});
+        rows.push_back({geometryText(i, g.contour), QString::fromStdString(g.layer), g.visible,
+                        m_layerList.isSystemLayer(g.layer)});
     }
     // Panel pokazuje wszystkie warstwy użytkownika z listy (także puste –
     // przydadzą się przy ręcznym dodawaniu warstw).

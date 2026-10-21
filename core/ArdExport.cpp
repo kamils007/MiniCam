@@ -266,6 +266,12 @@ uint32_t ardLayerId(const LayerList& layers, const std::string& name)
     for (size_t i = 1; i < all.size(); ++i)
         if (all[i].name == name)
             return static_cast<uint32_t>(i);
+    // Imported reserved groups already have default records in writeArd.
+    // Refer to those IDs instead of writing extra user layers or falling to APS.
+    if (layers.isSystemLayer(name))
+        for (unsigned i = 0; i < 7; ++i)
+            if (name == systemLayerName(static_cast<SystemLayer>(i)))
+                return userLayerCount(layers) + i + 1;
     return userLayerCount(layers) + 1; // GEOMETRIE APS
 }
 

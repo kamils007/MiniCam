@@ -75,3 +75,6 @@ Pełnego przebiegu „Otwórz ARD” w nowym GUI na Windows nie wykonano jeszcze
 chmurze. To wymaga sprawdzenia nowej kompilacji na stacji z istniejącym runtime.
 Nie deklarujemy obsługi każdego ARD ani niezależnego potwierdzenia objętości
 oryginalnego Parasolid. Prywatne modele i runtime nie są dodawane do repozytorium.
+
+Szczegóły poprawki powielania warstw i pozostałe ograniczenia kolorów/uchwytów:
+[warstwy ARD](ard_layers.md).

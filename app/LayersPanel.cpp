@@ -176,6 +176,7 @@ QTreeWidgetItem* LayersPanel::addLayer(const QString& name, int iconKind)
     item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
     item->setCheckState(0, Qt::Checked);
     item->setData(0, Qt::UserRole + 1, name); // nazwa bez licznika
+    item->setData(0, Qt::UserRole + 2, iconKind >= Aps && iconKind <= Text);
     return item;
 }
 
@@ -190,17 +191,30 @@ bool LayersPanel::isGeometryLayer(const QTreeWidgetItem* item)
 
 std::vector<QTreeWidgetItem*> LayersPanel::geometryLayers() const
 {
-    std::vector<QTreeWidgetItem*> out{m_aps};
+    std::vector<QTreeWidgetItem*> out;
+    for (int i = 0; i < m_tree->topLevelItemCount(); ++i)
+        if (isGeometryLayer(m_tree->topLevelItem(i)))
+            out.push_back(m_tree->topLevelItem(i));
     for (int i = 0; i < m_user->childCount(); ++i)
         out.push_back(m_user->child(i));
     return out;
 }
 
-QTreeWidgetItem* LayersPanel::geometryLayer(const QString& name) const
+QTreeWidgetItem* LayersPanel::geometryLayer(const QString& name, bool systemLayer) const
 {
-    for (QTreeWidgetItem* layer : geometryLayers())
-        if (layer->data(0, Qt::UserRole + 1).toString() == name)
-            return layer;
+    if (systemLayer) {
+        for (int i = 0; i < m_tree->topLevelItemCount(); ++i) {
+            auto* layer = m_tree->topLevelItem(i);
+            if (isGeometryLayer(layer) && layer->data(0, Qt::UserRole + 1).toString() == name)
+                return layer;
+        }
+    } else {
+        for (int i = 0; i < m_user->childCount(); ++i) {
+            auto* layer = m_user->child(i);
+            if (layer->data(0, Qt::UserRole + 1).toString() == name)
+                return layer;
+        }
+    }
     return m_aps; // nieznana warstwa – geometria trafia do APS
 }
 
@@ -226,10 +240,12 @@ void LayersPanel::setUserLayers(const std::vector<LayerRow>& layers)
 void LayersPanel::setGeometries(const std::vector<GeometryRow>& rows)
 {
     m_updating = true;
-    for (QTreeWidgetItem* layer : geometryLayers())
+    for (QTreeWidgetItem* layer : geometryLayers()) {
         qDeleteAll(layer->takeChildren());
+        layer->setCheckState(0, Qt::Checked);
+    }
     for (size_t i = 0; i < rows.size(); ++i) {
-        auto* item = new QTreeWidgetItem(geometryLayer(rows[i].layer), {rows[i].label});
+        auto* item = new QTreeWidgetItem(geometryLayer(rows[i].layer, rows[i].systemLayer), {rows[i].label});
         item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
         item->setCheckState(0, rows[i].visible ? Qt::Checked : Qt::Unchecked);
         item->setData(0, Qt::UserRole, static_cast<int>(i)); // numer geometrii

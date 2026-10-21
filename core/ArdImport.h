@@ -12,7 +12,7 @@ inline constexpr const char* kArdSolidConversionWarning =
 // A read-only import. Retain the source and unconverted objects; an ARD read is
 // not a promise that saving through MiniCam can reproduce the whole document.
 struct ArdLayerInfo {
-    uint32_t id = 0, flags = 0, number = 0, color = 0;
+    uint32_t id = 0, flags = 0, number = 0, systemNumber = 0, color = 0;
     std::string name;
 };
 

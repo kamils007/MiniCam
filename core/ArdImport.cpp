@@ -213,6 +213,17 @@ ArdSolidData solid(const std::string& bytes) {
     return result;
 }
 
+// Reserved numbers are corroborated by the second number and source name.
+// A user layer named KONSTRUKCJE has systemNumber == 0 and stays a user layer.
+unsigned reservedLayer(const ArdLayerInfo& layer) {
+    static const char* names[] = {"GEOMETRIE APS", "KONSTRUKCJE", "DROGI NARZĘDZIA",
+                                  "WYMIARY", "SPLAJNY", "POWIERZCHNIE", "TEXT", ""};
+    return layer.number >= 1 && layer.number <= 8
+        && layer.systemNumber == layer.number
+        && (layer.name == names[layer.number - 1] || (layer.number == 7 && layer.name == "GEOTEXT"))
+        && !(layer.flags & 0x08) ? layer.number : 0;
+}
+
 } // namespace
 
 ArdDocument readArd(const std::string& bytes) {
@@ -271,22 +282,12 @@ ArdDocument readArd(const std::string& bytes) {
             case 0x10: {
                 ArdLayerInfo info; info.id = r.u32(); info.flags = r.u32();
                 auto n = r.u16(); info.name = cp1250(r.terminated(n));
-                info.number = r.u32(); r.u32(); info.color = r.u32(); r.skip(8);
+                info.number = r.u32(); info.systemNumber = r.u32(); info.color = r.u32(); r.skip(8);
                 attributes(r); r.skip(92);
                 if (!info.id || layerNames.count(info.id) || doc.sourceLayers.size() >= 10000)
                     r.fail("Nieprawidlowa lista warstw");
-                std::string name = info.name;
-                if (info.number == 1 && info.name == "GEOMETRIE APS") name = kApsLayer;
-                else {
-                    if (name.empty()) name = "Warstwa ARD " + std::to_string(info.id);
-                    if (doc.layers.find(name)) name += " [ARD " + std::to_string(info.id) + "]";
-                    doc.layers.createLayer(name);
-                }
-                if ((info.flags & 0x10) && info.color != 0xffffffff) {
-                    doc.layers.find(name)->color = Quantity_Color((info.color & 255)/255.,
-                        ((info.color >> 8) & 255)/255., ((info.color >> 16) & 255)/255., Quantity_TOC_sRGB);
-                } else if (info.color != 0xffffffff) indexedColors = true;
-                layerNames[info.id] = name; doc.sourceLayers.push_back(std::move(info)); break;
+                layerNames[info.id] = {}; // validate uniqueness before resolving names
+                doc.sourceLayers.push_back(std::move(info)); break;
             }
             case 0x15: r.skip(68); break; // text style, not text entities
             case 0x21: r.skip(8); break;
@@ -313,9 +314,36 @@ ArdDocument readArd(const std::string& bytes) {
             }
         }
         if (!ended) r.fail("Brak koncowki dokumentu");
+        std::set<std::string> usedNames{kApsLayer};
+        auto color = [&](Layer& layer, const ArdLayerInfo& info) {
+            if ((info.flags & 0x10) && info.color != 0xffffffff)
+                layer.color = Quantity_Color((info.color & 255)/255.,
+                    ((info.color >> 8) & 255)/255., ((info.color >> 16) & 255)/255., Quantity_TOC_sRGB);
+            else if (info.color != 0xffffffff) indexedColors = true;
+        };
+        // System layers first, independent of the order of records in ARD.
+        std::set<unsigned> reservedNumbers;
+        for (const auto& info : doc.sourceLayers) {
+            const auto number = reservedLayer(info);
+            if (!number) continue;
+            if (!reservedNumbers.insert(number).second) r.fail("Powtorzona warstwa systemowa");
+            if (number == 8) continue; // unnamed text-style record, not a user layer
+            auto& layer = doc.layers.createSystemLayer(static_cast<SystemLayer>(number - 1));
+            usedNames.insert(layer.name); layerNames[info.id] = layer.name;
+            color(layer, info);
+        }
+        for (const auto& info : doc.sourceLayers) {
+            if (reservedLayer(info)) continue;
+            std::string name = info.name.empty() ? "Warstwa ARD " + std::to_string(info.id) : info.name;
+            if (usedNames.count(name)) name += " [ARD " + std::to_string(info.id) + "]";
+            while (usedNames.count(name)) name += " [ARD " + std::to_string(info.id) + "]";
+            usedNames.insert(name); layerNames[info.id] = name;
+            color(doc.layers.createLayer(name), info);
+        }
         for (auto& path : paths) {
             const auto layer = layerNames.find(path.layer);
             if (layer == layerNames.end()) r.fail("Geometria wskazuje nieistniejaca warstwe");
+            if (layer->second.empty()) r.fail("Geometria wskazuje techniczny rekord stylu tekstu");
             path.geometry.layer = layer->second;
             machiningAttributes |= path.flags != 0x08000002;
             doc.geometries.push_back(std::move(path.geometry));

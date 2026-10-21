@@ -10,6 +10,21 @@ inline const char* const kApsLayer = "Geometrie APS";
 // Geometrie APS są zawsze zielone, jak w Alphacam.
 inline const Quantity_Color kApsColor(0.00, 0.75, 0.00, Quantity_TOC_sRGB);
 
+enum class SystemLayer { Aps, Construction, Toolpath, Dimension, Spline, Surface, Text };
+inline const char* systemLayerName(SystemLayer layer)
+{
+    switch (layer) {
+    case SystemLayer::Aps: return kApsLayer;
+    case SystemLayer::Construction: return "Konstrukcje";
+    case SystemLayer::Toolpath: return "Drogi Narzędzia";
+    case SystemLayer::Dimension: return "Wymiary";
+    case SystemLayer::Spline: return "Splajny";
+    case SystemLayer::Surface: return "Powierzchnie";
+    case SystemLayer::Text: return "Tekst";
+    }
+    return kApsLayer;
+}
+
 // Warstwa: nazwa, kolor i widoczność. Geometrie rysują się kolorem swojej warstwy.
 struct Layer
 {
@@ -53,7 +68,7 @@ public:
     }
 
     // Zostawia samą warstwę APS (np. po wczytaniu nowej bryły).
-    void clearUserLayers() { m_layers.resize(1); }
+    void clearUserLayers() { m_layers.resize(1); m_systemLayers.clear(); }
 
     Layer* find(const std::string& name)
     {
@@ -66,10 +81,32 @@ public:
     {
         return const_cast<LayerList*>(this)->find(name);
     }
+    // System layers are separate from all(): exporters still receive only APS
+    // and user layers, and never duplicate ALPHACAM's reserved layer records.
+    Layer& createSystemLayer(SystemLayer kind)
+    {
+        const std::string name = systemLayerName(kind);
+        if (kind == SystemLayer::Aps) return m_layers.front();
+        for (Layer& layer : m_systemLayers)
+            if (layer.name == name) return layer;
+        m_systemLayers.push_back({name, kApsColor});
+        return m_systemLayers.back();
+    }
+    const std::vector<Layer>& systemLayers() const { return m_systemLayers; }
+    bool isSystemLayer(const std::string& name) const
+    {
+        if (name == kApsLayer) return true;
+        for (const Layer& layer : m_systemLayers)
+            if (layer.name == name) return true;
+        return false;
+    }
     // Warstwa o tej nazwie, a gdy jej nie ma – APS.
     const Layer& layerOrAps(const std::string& name) const
     {
         const Layer* l = find(name);
+        if (!l)
+            for (const Layer& layer : m_systemLayers)
+                if (layer.name == name) return layer;
         return l ? *l : m_layers.front();
     }
 
@@ -92,6 +129,7 @@ private:
     }
 
     std::vector<Layer> m_layers;
+    std::vector<Layer> m_systemLayers;
 };
 
 } // namespace camcore
