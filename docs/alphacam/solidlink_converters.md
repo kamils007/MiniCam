@@ -257,3 +257,78 @@ załadowanie DLL nie dowodzi poprawnej rejestracji komponentu ani działania
 konwersji. W chmurze przeszło 10 przenośnych testów, w tym obsługa błędu
 zależności Windows i odczyt dokładnego ostrzeżenia. Nie wykonano natywnego
 ładowania i nie zmieniono ścieżki importu w MiniCam.
+
+## Wynik próby v3 — licencja niedostępna w procesie testowym
+
+Raport użytkownika potwierdza załadowanie obu bibliotek po pełnych ścieżkach:
+
+| Biblioteka | SHA-256 |
+| --- | --- |
+| SPAXParasolid.dll | be5e18d3db02317501d949f5e006ba3b8d95e3118c649fe795e5b945ec5d5da2 |
+| SPAXStep.dll | c121ce68868a80a133c2d15db42d5cc862c47fd0ce2c1736a3f4d0685ed85af4 |
+
+Lista ostrzeżeń o niezaładowanych bibliotekach jest pusta. Convert zwraca
+teraz `0x0100000c` / `Licence Not Available`, bez zgłoszonego wyjątku i bez
+częściowego powodzenia. Zatem poprawka ładowania przesunęła próbę dalej;
+nie potwierdza to jeszcze gotowości samej translacji. Czas całkowity wyniósł
+0,449985 s, a nieudanej konwersji 0,037699 s. Źródła pozostały bez zmian.
+Nie powstał zaakceptowany STEP. Dziennik lokalny ma 1467 bajtów, a podsumowanie
+zawiera trzy wystąpienia `error` i jedno `licence`.
+
+Wynik dotyczy samodzielnego procesu tego testu. Nie dowodzi nieaktywności
+licencji ALPHACAM, braku uprawnień do konkretnego formatu ani wystarczalności
+samego uruchomienia CLS/ALPHACAM. Nie wskazuje jeszcze, którego składnika lub
+kierunku translacji dotyczy brak licencji. Potrzebna jest treść nowego
+`translator_native.log` z wyniku v3 przed kolejną zmianą sposobu uruchamiania.
+Nie przygotowujemy kolejnej identycznej próby ani nie zmieniamy bieżącego
+czytnika MiniCam na tę niepotwierdzoną ścieżkę.
+
+## Dziennik v3 i ustalony kierunek dalszej pracy
+
+Dziennik v3 wymienia `Product "GENERIC_R" is not authorized`, brak licencjonowania
+komponentu GENERIC_GRAPH_R oraz `Product "STEP_W" is not authorized` i
+`Product "STEP_GRAPH_R" is not authorized`. To są komunikaty procesu naszego
+testu, nie dowód nieaktywności licencji w samym ALPHACAM ani diagnoza uprawnień
+całej instalacji. Samo poprawne załadowanie DLL i oryginalny SPAIConverter nie
+zapewniły autoryzacji potrzebnej do tej próby.
+
+Użytkownik potwierdził: **kontynuujemy konwersję całej bryły, bez uruchamiania
+ALPHACAM**, a nie powrót do odczytu krawędzi i odbudowy geometrii. Krótko
+rozważana optymalizacja metadanych czytnika została wycofana przed publikacją.
+Nie podłączono API uruchomionego ALPHACAM. Aktualny czytnik i zapis pozostają
+zachowane; próby dotyczą osobnej ścieżki konwersji.
+
+## Próba v4 — pełna funkcja SLInterop i zwykła sesja CLS
+
+Poprzednie próby kończyły się na bezpośredniej warstwie Spatial. V4 używa
+oryginalnego `SLInterop::RunInteropStandard` (RVA 0x23030), który sam wykonuje
+przygotowanie produktu, buduje dokumenty i opcje, uruchamia log, wywołuje
+konwersję oraz sprząta. Nie wydzielamy jego materiału autoryzacyjnego ani nie
+odtwarzamy go w swoim kodzie. Nie modyfikujemy kontroli i wyników licencji.
+Przez cały czas rodzic utrzymuje zwykłe, aktualnie otwarte połączenie CLS
+przez istniejący `feature_cls_session_14.ps1`, z oryginalnym sprawdzeniem wersji,
+publicznymi wywołaniami, walidacją połączenia i normalnym zamknięciem. Wyjście
+STEP jest akceptowane dopiero po potwierdzonym zakończeniu CLS.
+Otwarcie CLS samo w sobie nie jest dowodem uprawnienia do STEP_W.
+
+`solidlink_bulk_worker.py` wymaga przypiętych SHA-256 SLInterop/SPAIInterop/C,
+sprawdza adresy eksportów i oryginalnych importów MFC. 96-bajtową pamięć
+SLInterop z obszarami kontrolnymi uzasadniają konstruktor 0x24550, przypisanie
+0x2ee0 i destruktor 0x24620: pola dochodzą do 0x5c przy wyrównaniu 8.
+Oryginalny konstruktor i destruktor zarządzają obiektem. Nie odczytujemy ani nie
+ustawiamy prywatnych pól licencji. Publiczny SetNamedParameters otrzymuje pustą
+opcjonalną listę. Trzy argumenty CStringW tworzy oryginalny konstruktor MFC
+(import SLInterop IAT 0x2ceb8 / ordinal 290), a zgodność ścieżek sprawdza
+GetLength (0x2cf30 / 5674). RunInteropStandard przejmuje argumenty przez
+wartość i sam je niszczy (0x232e7–0x232fe); adapter nie zwalnia ich ponownie
+po przekazaniu. Przed przekazaniem w razie błędu sprząta je oryginalnym
+destruktorem z IAT 0x2cf80 / 1033. Wszystkie te importy wskazują na zweryfikowane
+ordinały tej samej załadowanej mfc140u.dll. Nie stosujemy własnych definicji
+klas MFC ani podmienionych implementacji producenta.
+
+To eksperymentalny adapter konkretnego binarnego interfejsu, nie potwierdzony
+kontrakt SDK do ogólnej dystrybucji. W chmurze sprawdzono symbole/importy
+z dostarczonymi DLL i przenośne granice procesu z atrapami. Nie wykonano v4
+na Windows, nie potwierdzono autoryzacji ani czasu udanej konwersji.
+Sukces funkcji bez nowego kompletnego STEP, zgodności wejść, poprawnego
+sprzątania i późniejszego sprawdzenia geometrii nie wystarcza do integracji.

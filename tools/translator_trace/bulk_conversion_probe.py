@@ -1,7 +1,8 @@
-"""Isolated Windows experiment: original Spatial objects, ARD payload -> STEP.
+"""Isolated Windows experiment: whole ARD payload -> STEP via original SolidLink.
 
-This is a diagnostic, not a MiniCam import backend. Native execution and the
-availability of the reverse conversion must be verified on the user's station.
+This is a diagnostic, not a MiniCam import backend. V4 uses SLInterop with an
+ordinary live CLS session. Native execution and reverse conversion must be
+verified on the user's station. Older low-level helpers are retained for tests.
 """
 import argparse
 import ctypes as C
@@ -18,7 +19,7 @@ import time
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-SCHEMA = 'minicam-spatial-bulk-probe-v3'
+SCHEMA = 'minicam-solidlink-bulk-probe-v4'
 PINS = {
     'SPAIInterop.dll': 'bb3ec37e9a2c96017bbb3234c2764af10e5fad1bae679a2ba5485ac0336eec62',
     'SPAIInteropC.dll': '6d4fa624e2ee70c1979c512ae0cc1ca0c1c79b5d1b7ffb03eb9b67cb49184bad',
@@ -64,6 +65,8 @@ def summarize_log(path):
             'term_counts': {word: len(re.findall(r'\b' + re.escape(word) + r'\b', text)) for word in words},
             'format_library_warnings': [name + ' library not loaded' for name in
                 ('SPAXParasolid', 'SPAXStep') if re.search(r'\b' + name.lower() + r' library not loaded\b', text)],
+            'unauthorized_products': [name for name in ('GENERIC_R', 'STEP_W', 'STEP_GRAPH_R')
+                if ('product "' + name.lower() + '" is not authorized') in text],
             'raw_log_in_report': False}
 
 
@@ -301,7 +304,61 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
     return 0 if state['native_conversion_succeeded'] else 1
 
 
-def run(ard, directory, out, timeout=90):
+def run_with_cls(command, root, out, report, timeout):
+    """Hold the existing ordinary CLS session until the native worker ends."""
+    helper = child = None
+    session_script = HERE / 'feature_cls_session_14.ps1'
+    if not session_script.is_file():
+        session_script = HERE.parent / 'step_ard' / 'feature_cls_session_14.ps1'
+    powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    try:
+        with (out / 'cls_stdout.txt').open('wb') as stdout, (out / 'cls_stderr.txt').open('wb') as stderr:
+            helper = subprocess.Popen([str(powershell), '-NoProfile', '-NonInteractive',
+                '-ExecutionPolicy', 'Bypass', '-File', str(session_script),
+                '-Root', str(root), '-OutputDirectory', str(out)], cwd=out, stdout=stdout, stderr=stderr)
+        deadline = time.monotonic() + 20
+        while not (out / 'cls_ready.json').is_file():
+            if helper.poll() is not None:
+                raise RuntimeError('Nie udalo sie otworzyc sesji CLS; zobacz raport CLS.')
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Sesja CLS nie byla gotowa w ciagu 20 sekund.')
+            time.sleep(0.1)
+        from solidlink_bulk_worker import validate_ready
+        report['cls_ready'] = json.loads((out / 'cls_ready.json').read_text(encoding='utf-8-sig'))
+        validate_ready(report['cls_ready'])
+        if helper.poll() is not None:
+            raise RuntimeError('Sesja CLS zakonczyla sie przed konwersja.')
+        with (out / 'worker_stdout.txt').open('wb') as stdout, (out / 'worker_stderr.txt').open('wb') as stderr:
+            child = subprocess.Popen(command, cwd=out, stdout=stdout, stderr=stderr)
+        deadline = time.monotonic() + timeout
+        while child.poll() is None:
+            if helper.poll() is not None:
+                raise RuntimeError('Sesja CLS zakonczyla sie podczas konwersji.')
+            if time.monotonic() >= deadline:
+                report['timed_out'] = True
+                raise TimeoutError('Konwersja przekroczyla 90 sekund.')
+            time.sleep(0.1)
+        report['worker_exit_code'] = child.returncode
+    finally:
+        if child is not None and child.poll() is None:
+            child.terminate()
+            child.wait(timeout=10)
+            report['worker_exit_code'] = child.returncode
+        if helper is not None:
+            (out / 'feature_done.signal').touch(exist_ok=False)
+            try:
+                helper.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                report['cls_cleanup_timeout'] = True
+                helper.terminate()
+                helper.wait(timeout=10)
+            report['cls_exit_code'] = helper.returncode
+            path = out / 'cls_result.json'
+            if path.is_file():
+                report['cls_result'] = json.loads(path.read_text(encoding='utf-8-sig'))
+
+
+def run(ard, directory, out, root, timeout=90):
     if sys.platform != 'win32' or struct.calcsize('P') != 8:
         raise RuntimeError('Uruchom ten test w Windows, przez TEST.cmd.')
     out.mkdir(parents=True, exist_ok=False)
@@ -320,17 +377,11 @@ def run(ard, directory, out, timeout=90):
         result_path = out / 'native_result.json'
         command = [sys.executable, '-I', '-u', str(Path(__file__).resolve()), '--worker',
                    '--bin', str(directory), '--source', str(source), '--destination', str(destination),
-                   '--result', str(result_path)]
+                   '--result', str(result_path), '--cls-ready', str(out / 'cls_ready.json')]
         print('Proba konwersji calej bryly. Poczekaj na wynik (maksymalnie 90 sekund).', flush=True)
-        with (out / 'worker_stdout.txt').open('w', encoding='utf-8') as stdout, \
-                (out / 'worker_stderr.txt').open('w', encoding='utf-8') as stderr:
-            try:
-                process = subprocess.run(command, cwd=out, stdout=stdout, stderr=stderr,
-                                         timeout=timeout, check=False)
-                report['worker_exit_code'] = process.returncode
-            except subprocess.TimeoutExpired:
-                report['timed_out'] = True
-                report['error'] = 'Proces testowy przekroczyl 90 sekund i zostal zatrzymany.'
+        run_with_cls(command, root, out, report, timeout)
+        from solidlink_bulk_worker import validate_finished
+        validate_finished(report.get('cls_result', {}), report.get('cls_exit_code'))
         native = json.loads(result_path.read_text(encoding='utf-8')) if result_path.is_file() else {}
         report['native'] = native
         report['native_conversion_succeeded'] = bool(
@@ -345,6 +396,13 @@ def run(ard, directory, out, timeout=90):
     except Exception as error:
         report['error'] = str(error)
     finally:
+        # Include the last native checkpoint even after an early process/CLS failure.
+        native_path = out / 'native_result.json'
+        if 'native' not in report and native_path.is_file():
+            try:
+                report['native'] = json.loads(native_path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                pass
         try:
             report['source_ard_unchanged'] = source_hash is not None and digest(ard) == source_hash
         except OSError:
@@ -369,16 +427,19 @@ def run(ard, directory, out, timeout=90):
 
 
 if __name__ == '__main__':
+    sys.path.insert(0, str(HERE))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--worker', action='store_true')
-    for name in ('ard', 'bin', 'out', 'source', 'destination', 'result'):
+    for name in ('ard', 'bin', 'out', 'source', 'destination', 'result', 'root'):
         parser.add_argument('--' + name, type=Path)
+    parser.add_argument('--cls-ready', type=Path)
     arguments = parser.parse_args()
     if arguments.worker:
-        if any(getattr(arguments, key) is None for key in ('bin', 'source', 'destination', 'result')):
-            parser.error('Worker requires bin/source/destination/result')
-        raise SystemExit(worker(*(getattr(arguments, key).resolve() for key in
-                                  ('bin', 'source', 'destination', 'result'))))
-    if any(getattr(arguments, key) is None for key in ('ard', 'bin', 'out')):
-        parser.error('Requires ard/bin/out')
-    raise SystemExit(run(*(getattr(arguments, key).resolve() for key in ('ard', 'bin', 'out'))))
+        if any(getattr(arguments, key) is None for key in ('bin', 'source', 'destination', 'result', 'cls_ready')):
+            parser.error('Worker requires bin/source/destination/result/cls-ready')
+        from solidlink_bulk_worker import worker as solidlink_worker
+        raise SystemExit(solidlink_worker(*(getattr(arguments, key).resolve() for key in
+                                  ('bin', 'source', 'destination', 'result', 'cls_ready'))))
+    if any(getattr(arguments, key) is None for key in ('ard', 'bin', 'out', 'root')):
+        parser.error('Requires ard/bin/out/root')
+    raise SystemExit(run(*(getattr(arguments, key).resolve() for key in ('ard', 'bin', 'out', 'root'))))

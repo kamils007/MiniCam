@@ -8,6 +8,9 @@ FILES = {
     'BULK_TEST.cmd': HERE / 'BULK_TEST.cmd',
     'BulkTest.ps1': HERE / 'BulkTest.ps1',
     'bulk_conversion_probe.py': HERE / 'bulk_conversion_probe.py',
+    'solidlink_bulk_worker.py': HERE / 'solidlink_bulk_worker.py',
+    'feature_cls_session_14.ps1': HERE.parent / 'step_ard' / 'feature_cls_session_14.ps1',
+    'feature_cls_invocation.cs': HERE.parent / 'step_ard' / 'feature_cls_invocation.cs',
     'ard_payload_reader.py': HERE.parent / 'ard_import' / 'read_ard_body.py',
     'README_PL.md': HERE / 'README_BULK_PL.md',
     'spatial_interop_reference.json': HERE.parent / 'solidimport' / 'spatial_interop_2025_4_reference.json',
@@ -32,4 +35,4 @@ def package(output):
 
 
 if __name__ == '__main__':
-    print(package(HERE / 'MiniCam_konwersja_bryly_v3.zip'))
+    print(package(HERE / 'MiniCam_konwersja_bryly_v4.zip'))

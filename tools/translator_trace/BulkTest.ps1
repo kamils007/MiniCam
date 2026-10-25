@@ -12,6 +12,15 @@ try {
     }
     $candidates = New-Object System.Collections.Generic.List[string]
     $saved = Get-ItemProperty -LiteralPath 'HKCU:\Software\MiniCAM\MiniCAM\alphacam' -ErrorAction SilentlyContinue
+    $acamRoot = Join-Path $env:ProgramFiles 'Hexagon\ALPHACAM 2025'
+    if ($saved -and $saved.root) { $acamRoot = [string]$saved.root }
+    if (-not (Test-Path -LiteralPath (Join-Path $acamRoot 'CLS\LicManaged.dll'))) {
+        $folder = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folder.Description = 'Wskaz folder ALPHACAM zawierajacy podfolder CLS'
+        if ($folder.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { exit 1 }
+        $acamRoot = $folder.SelectedPath
+        $folder.Dispose()
+    }
     if ($saved -and $saved.python) { $candidates.Add([string]$saved.python) }
     foreach ($command in @(Get-Command python.exe,python3.exe,py.exe -ErrorAction SilentlyContinue)) {
         if ($command.Source -notmatch '\\WindowsApps\\') { $candidates.Add($command.Source) }
@@ -47,9 +56,9 @@ try {
     $ard = $picker.FileName
     $picker.Dispose()
     $out = Join-Path $PSScriptRoot ('wynik_' + [Guid]::NewGuid().ToString('N'))
-    Write-Host 'ALPHACAM nie musi byc uruchomiony. Test korzysta z zainstalowanych bibliotek.'
+    Write-Host 'ALPHACAM pozostaw zamkniety. Test otwiera zwykla sesje CLS i biblioteki SolidLink.'
     Write-Host 'Po zakonczeniu przeslij raport_konwersji.zip z nowego folderu wynik_...'
-    & $python -I -u (Join-Path $PSScriptRoot 'bulk_conversion_probe.py') --ard $ard --bin $bin --out $out
+    & $python -I -u (Join-Path $PSScriptRoot 'bulk_conversion_probe.py') --ard $ard --bin $bin --out $out --root $acamRoot
     if (Test-Path -LiteralPath $out) { Start-Process explorer.exe -ArgumentList ('"' + $out + '"') }
 } catch {
     Write-Host ('Nie udalo sie uruchomic testu: ' + $_.Exception.Message)

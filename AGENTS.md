@@ -10,3 +10,12 @@ Na zakończenie tego etapu użytkownik zamknął temat eksportu ALPHACAM i wybra
 **otwieranie plików** jako temat kolejnego wątku. Szczegółowy zakres tego nowego
 zadania nie został jeszcze określony. Zachowaj istniejący eksport przy pracach
 nad otwieraniem; zmieniaj go tylko wtedy, gdy wynika to z nowego zadania.
+
+Aktualne ustalenie z 25.10.2026: pracujemy nad **konwersją całej bryły** zawartej
+w ARD (Parasolid → format odczytywany przez OCCT), bez uruchamiania ALPHACAM
+i bez API jego działającej aplikacji. Użytkownik wyraźnie odrzucił powrót do
+optymalizacji odczytu krawędzi i odbudowy geometrii jako kierunku tego etapu.
+Nie zastępuj ustalonej konwersji taką odbudową bez nowego polecenia użytkownika.
+Obecny czytnik i eksport zachowujemy do czasu potwierdzenia nowej ścieżki.
+Dowody prób, błędy licencji i ograniczenia opisuje
+[analiza SolidLink](docs/alphacam/solidlink_converters.md).

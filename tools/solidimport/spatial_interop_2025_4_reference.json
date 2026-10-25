@@ -45,6 +45,22 @@
         {
           "name": "?RunInteropStandard@SLInterop@@QEAA_NV?$CStringT@_WV?$StrTraitMFC_DLL@_WV?$ChTraitsCRT@_W@ATL@@@@@ATL@@00@Z",
           "rva": "0x23030"
+        },
+        {
+          "name": "??0SLInterop@@QEAA@XZ",
+          "rva": "0x24550"
+        },
+        {
+          "name": "??1SLInterop@@UEAA@XZ",
+          "rva": "0x24620"
+        },
+        {
+          "name": "?SetNamedParameters@SLInterop@@QEAAXPEAV?$vector@UNamedParameter@@V?$allocator@UNamedParameter@@@std@@@std@@@Z",
+          "rva": "0x2e20"
+        },
+        {
+          "name": "?GetInteropResult@SLInterop@@QEAAJXZ",
+          "rva": "0x24300"
         }
       ]
     },
@@ -292,5 +308,33 @@
     "returns": "RAX equals result address",
     "native_verified": false,
     "v1_failure_cause": "Not established; missing wrapper preparation is an observed difference, not a confirmed cause."
+  },
+  "bulk_probe_v4_original_slinterop_entry": {
+    "entry": "RunInteropStandard",
+    "rva": "0x23030",
+    "scope": "Original SLInterop owns preparation, options, conversion and its authorization procedure. Ordinary public CLS session held by parent. No authorization material extracted/replayed; no license results or vendor code modified.",
+    "storage_bytes": 96,
+    "storage_evidence_rvas": [
+      "0x24550",
+      "0x24620",
+      "0x2ee0"
+    ],
+    "cstring_storage_bytes": 8,
+    "cstring_imports": [
+      {
+        "iat_rva": "0x2ceb8",
+        "mfc_ordinal": 290
+      },
+      {
+        "iat_rva": "0x2cf30",
+        "mfc_ordinal": 5674
+      },
+      {
+        "iat_rva": "0x2cf80",
+        "mfc_ordinal": 1033
+      }
+    ],
+    "argument_ownership": "Three by-value CStringW arguments are destroyed by the original callee; no second destruction after transfer.",
+    "native_verified": false
   }
 }
