@@ -1,0 +1,243 @@
+{
+  "schema": "minicam-spatial-interop-static-reference-v1",
+  "analysis_date": "2026-10-25",
+  "scope": "Static PE exports, imports and selected native call sites. No DLL execution, conversion or performance measurement.",
+  "architecture": "Windows AMD64, LLP64; native long is signed 32-bit, pointers are 64-bit",
+  "files": [
+    {
+      "name": "SLInterop.dll",
+      "size_bytes": 290456,
+      "sha256": "30c67178c5224d24ce1ab13ff759e5d4795919314d8637d3b4c472224fc56442",
+      "machine": "0x8664",
+      "versions": {
+        "FileVersion": "2025.4.2616.108",
+        "ProductVersion": "2025.4"
+      },
+      "named_export_count": 56,
+      "imported_libraries": [
+        "solidrep.dll",
+        "SPAAcisDs.dll",
+        "SPAIAcis.dll",
+        "SPAIInterop.dll",
+        "SPAXAcisPMIEntitiesDS.dll",
+        "mfc140u.dll",
+        "KERNEL32.dll",
+        "ADVAPI32.dll",
+        "ole32.dll",
+        "OLEAUT32.dll",
+        "MSVCP140.dll",
+        "VCRUNTIME140_1.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll"
+      ],
+      "selected_exports": [
+        {
+          "name": "?RunInteropIntermediateStep@SLInterop@@QEAA_NV?$CStringT@_WV?$StrTraitMFC_DLL@_WV?$ChTraitsCRT@_W@ATL@@@@@ATL@@00@Z",
+          "rva": "0x22c10"
+        },
+        {
+          "name": "?RunInteropStandard@SLInterop@@QEAA_NV?$CStringT@_WV?$StrTraitMFC_DLL@_WV?$ChTraitsCRT@_W@ATL@@@@@ATL@@00@Z",
+          "rva": "0x23030"
+        }
+      ]
+    },
+    {
+      "name": "SPAIInterop.dll",
+      "size_bytes": 148248,
+      "sha256": "bb3ec37e9a2c96017bbb3234c2764af10e5fad1bae679a2ba5485ac0336eec62",
+      "machine": "0x8664",
+      "versions": {
+        "FileVersion": "6.427.0.25142",
+        "ProductVersion": "6.427.0.25142"
+      },
+      "named_export_count": 472,
+      "imported_libraries": [
+        "SPAIInteropC.dll",
+        "SPAAcisDs.dll",
+        "KERNEL32.dll",
+        "VCRUNTIME140_1.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll"
+      ],
+      "selected_exports": [
+        {
+          "name": "??0SPAIDocument@@QEAA@PEB_W@Z",
+          "rva": "0x5ea0"
+        },
+        {
+          "name": "?Convert@SPAIConverter@@QEAA?AVSPAIResult@@AEBVSPAIDocument@@0@Z",
+          "rva": "0x50a0"
+        },
+        {
+          "name": "?DoConvert@SPAIConverter@@AEAA?AVSPAIResult@@AEBVSPAIDocument@@0@Z",
+          "rva": "0x5230"
+        },
+        {
+          "name": "?Initialize@SPAISystem@@SAX_N@Z",
+          "rva": "0xac00"
+        }
+      ]
+    },
+    {
+      "name": "SPAIInteropC.dll",
+      "size_bytes": 138520,
+      "sha256": "6d4fa624e2ee70c1979c512ae0cc1ca0c1c79b5d1b7ffb03eb9b67cb49184bad",
+      "machine": "0x8664",
+      "versions": {
+        "FileVersion": "6.427.0.25142",
+        "ProductVersion": "6.427.0.25142"
+      },
+      "named_export_count": 153,
+      "imported_libraries": [
+        "SPAXBase.dll",
+        "SPAXInterop.dll",
+        "SPAXBoundaryRep.dll",
+        "SPAXIop.dll",
+        "SPAAcisDs.dll",
+        "VCRUNTIME140_1.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "KERNEL32.dll"
+      ],
+      "selected_exports": [
+        {
+          "name": "?SPAICConverter_Convert@@YAJPEAX00@Z",
+          "rva": "0x1a80"
+        },
+        {
+          "name": "?SPAICConverter_Create@@YAXPEAPEAX@Z",
+          "rva": "0x1b20"
+        },
+        {
+          "name": "?SPAICDidCallHaveException@@YA_NXZ",
+          "rva": "0x9bd0"
+        },
+        {
+          "name": "?SPAICDocument_Create@@YAXPEAPEAXPEB_W@Z",
+          "rva": "0x23a0"
+        },
+        {
+          "name": "?SPAICDocument_SetType@@YAJPEAXPEBD@Z",
+          "rva": "0x2970"
+        },
+        {
+          "name": "?SPAICObject_Unref@@YAHPEAPEAX@Z",
+          "rva": "0x7790"
+        },
+        {
+          "name": "?SPAICResult_GetMessage@@YAPEBDJ@Z",
+          "rva": "0x8890"
+        },
+        {
+          "name": "?SPAICResult_GetReturnCode@@YAHJ@Z",
+          "rva": "0x89a0"
+        },
+        {
+          "name": "?SPAICResult_IsPartialSuccess@@YA_NJ@Z",
+          "rva": "0x8a00"
+        },
+        {
+          "name": "?SPAICResult_IsSuccess@@YA_NJ@Z",
+          "rva": "0x8a60"
+        },
+        {
+          "name": "?SPAICSystem_Initialize@@YAH_N@Z",
+          "rva": "0x8bb0"
+        },
+        {
+          "name": "?SPAICSystem_Shutdown@@YAHXZ",
+          "rva": "0x8bf0"
+        }
+      ]
+    },
+    {
+      "name": "SPAIopC.dll",
+      "size_bytes": 592216,
+      "sha256": "9919180cf67c81c470d20078e923dfe3957d95e334c266a4d84ba7d5583cc3f5",
+      "machine": "0x8664",
+      "versions": {
+        "FileVersion": "6.427.0.25232",
+        "ProductVersion": "6.427.0.25232"
+      },
+      "named_export_count": 1385,
+      "imported_libraries": [
+        "SPAXIop.dll",
+        "SPAXBase.dll",
+        "SPAXInterop.dll",
+        "VCRUNTIME140_1.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "KERNEL32.dll"
+      ],
+      "selected_exports": [
+        {
+          "name": "?SPAIopCDocument_Create@@YAXPEAPEAXPEAX1@Z",
+          "rva": "0x1f200"
+        },
+        {
+          "name": "?SPAIopCDocument_Create@@YAXPEAPEAXPEAX@Z",
+          "rva": "0x1f2d0"
+        },
+        {
+          "name": "?SPAIopCObject_UnRef@@YAHPEAPEAXH@Z",
+          "rva": "0x24ff0"
+        },
+        {
+          "name": "?SPAIopCPartExporter_Create@@YAXPEAPEAX@Z",
+          "rva": "0x28db0"
+        },
+        {
+          "name": "?SPAIopCPartExporter_Export@@YAXPEAX000@Z",
+          "rva": "0x28df0"
+        }
+      ]
+    }
+  ],
+  "c_conversion_contract": {
+    "export": "?SPAICConverter_Convert@@YAJPEAX00@Z",
+    "prototype": "int32_t SPAICConverter_Convert(void* converter, void* source_document, void* destination_document)",
+    "implementation_rva": "0x1a80",
+    "native_convert_call_rva": "0x1ad2",
+    "callee": "SPAIConverterImpl::Convert(source, destination, false, false)",
+    "evidence": "Incoming RDX is preserved as source, incoming R8 as destination; those handles are passed as R8/R9 to the C++ implementation, with RDX reserved for its result object.",
+    "handle_ownership": "Opaque handles are allocated by vendor factory functions and released by SPAICObject_Unref(void**); no reconstructed C++ class layout.",
+    "result_semantics": "Use vendor IsSuccess/IsPartialSuccess predicates and exception state, not a presumed generic return-code convention."
+  },
+  "initialization_findings": {
+    "system_guard_true_callsite_slinterop_rva": "0x245dd",
+    "system_initialize_c_rva": "0x8bb0",
+    "original_wide_document_ctor_spaiinterop_rva": "0x5ea0",
+    "original_document_ctor_prepares_vendor_product_context": true,
+    "preparation_before_c_factory": true,
+    "c_document_factory_callsite_spaiinterop_rva": "0x5f1b",
+    "limitation": "The C factory alone omits preparation performed by the original C++ wrapper. No standalone initialization/authorization contract has been established. No authorization data is copied, recorded or replayed."
+  },
+  "intermediate_step": {
+    "slinterop_rva": "0x22c10",
+    "temporary_filename_pattern": "%s%s.sat",
+    "filename_reference_instruction_rva": "0x22d89",
+    "first_conversion_callsite_rva": "0x22e61",
+    "second_conversion_callsite_rva": "0x22ef8",
+    "interpretation": "This method uses a SAT intermediate document. The method name is not evidence of a STEP file writer."
+  },
+  "not_verified": [
+    "Successful Parasolid-to-STEP or Parasolid-to-IGES conversion on Windows",
+    "Available licensed output formats through these installed components",
+    "Supported standalone initialization for MiniCam",
+    "Bulk output validity and fidelity against the source solid",
+    "Native conversion runtime or improvement over current MiniCam import"
+  ]
+}

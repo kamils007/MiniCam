@@ -87,3 +87,68 @@ czy procesy były krótkotrwałe, czy SolidLink korzystał bezpośrednio z DLL.
 Wersja 2 testu dodaje zdarzenia startu procesów i obserwację modułów SolidLink,
 z jawnym raportowaniem niedostępnego źródła danych. To wciąż ślad obserwacyjny,
 a nie potwierdzenie wywołań czy udanej konwersji Parasolid→STEP.
+
+## Drugi raport obserwacyjny
+
+Raport v2 z 25.10.2026 obejmuje 60,18 s. Zarejestrowano jeden SolidLink.exe,
+ze skrótem zgodnym z profilem powyżej, oraz 49 załadowanych modułów.
+Wśród nich są SLInterop.dll (2025.4.2616.108), PSKERNEL.dll (37.00.214),
+SPAIInterop.dll, SPAIInteropC.dll, SPAIop.dll, SPAIopC.dll, SPAXStep.dll,
+SPAXStepSplitter.dll i SPAXParasolid.dll (rodzina Spatial 6.427).
+Potwierdza to obecność tych bibliotek w procesie, nie ich wywołanie podczas
+otwierania modelu. Wszystkie obserwacje modułów pochodzą z pierwszej próbki;
+raport nie ustala, które biblioteki załadowano dopiero w związku z importem.
+
+Subskrypcja zdarzeń startu procesów zakończyła się `Access denied`;
+`process_events_enabled=false`. Zwykłe próbkowanie pozostało aktywne, lecz nie
+znalazło procesów Converter. Pusta lista zdarzeń nie dowodzi ich nieobecności.
+Nie przechwycono konfiguracji ani pomiaru czasu samej konwersji. Nie ma dowodu
+udanej konwersji Parasolid→STEP i nie zmieniono ścieżki importu MiniCam.
+
+Kolejny krok to statyczne zbadanie SLInterop.dll, SPAIInteropC.dll i SPAIopC.dll
+z `SolidLink 2025.4/code/bin`: pierwsza łączy SolidLink z translacją, a dwie
+pozostałe pozwolą sprawdzić dostępność interfejsów C. Do dalszej analizy potrzebne
+są rzeczywiste pliki. Nazwa DLL ani eksportowanej funkcji nie wystarczy do
+ustalenia kontraktu; przed uruchomieniem trzeba potwierdzić typy, wymagane
+przygotowanie oraz kierunek konwersji. Nie ponawiamy tego samego testu
+obserwacyjnego tylko po to, by zebrać ponownie listę modułów.
+
+## Analiza czterech bibliotek z tej instalacji
+
+Otrzymano SLInterop.dll, SPAIInterop.dll, SPAIopC.dll, a następnie również
+SPAIInteropC.dll. Skróty, wersje, zależności i wybrane eksporty zapisano w
+[`spatial_interop_2025_4_reference.json`](../../tools/solidimport/spatial_interop_2025_4_reference.json).
+Pliki DLL nie są częścią repozytorium; nie uruchamiano ich w Linux.
+
+Potwierdzone statycznie:
+
+- SLInterop::RunInteropStandard tworzy dokument wejściowy i wyjściowy, ustawia
+  jednostki i opcje, a następnie wywołuje SPAIConverter::Convert. Nie przechodzi
+  w tej funkcji przez obiekty Feature reprezentujące kolejne krawędzie bryły.
+- SPAIInterop.dll jest warstwą C++ nad SPAIInteropC.dll. Część C udostępnia
+  fabryki dokumentów i konwertera, SetType, Convert, obsługę wyników oraz
+  zwalnianie nieprzezroczystych uchwytów. Nie trzeba odtwarzać układu klas C++,
+  aby opisać sam kontrakt C. Nazwy eksportów są mimo to dekorowane przez MSVC.
+- `SPAICConverter_Convert` ma trzy argumenty typu `void*`: konwerter, źródło
+  i cel. Zwraca 32-bitowy wynik. Kierunek argumentów potwierdzono w kodzie
+  wywołującym SPAIConverterImpl::Convert, nie tylko z nazwy funkcji.
+- Oryginalny konstruktor dokumentu C++ przygotowuje kontekst produktu przed
+  użyciem fabryki C. Samo System_Initialize + Document_Create + Convert nie
+  odtwarza całego przebiegu producenta. Nie przygotowano takiego uproszczonego
+  testu, który pomijałby znany etap i dawał trudny do interpretacji błąd.
+- SPAIopC.dll udostępnia osobną warstwę obiektów, m.in. PartExporter,
+  DocumentDataImporter i struktury wyników. To nie zamiennik SPAIInteropC.dll;
+  nie wolno mieszać uchwytów między nimi na podstawie podobieństwa nazw.
+- **RunInteropIntermediateStep korzysta z tymczasowego pliku SAT**:
+  wzorzec `%s%s.sat` ma odwołanie w instrukcji RVA 0x22d89, a dwa wywołania
+  Convert są przy RVA 0x22e61 i 0x22ef8. „Step” w nazwie metody nie dowodzi
+  eksportu do formatu STEP.
+
+Wynik to opis mechanizmu konwersji całego dokumentu i konkretnego interfejsu,
+nie działający importer Parasolid→STEP. Nie ustalono jeszcze pełnego,
+obsługiwanego przygotowania samodzielnej sesji ani dostępności wyjścia STEP
+dla tego kierunku na stacji. Nie pozyskiwano materiału autoryzacyjnego i nie
+zmieniano konfiguracji ani kodu bibliotek. Nie ma nowego pomiaru wydajności.
+Przed podłączeniem do MiniCam potrzebna jest natywna próba z właściwym
+przygotowaniem, a następnie odczyt wyniku przez OCCT i porównanie bryły ze
+źródłem. Dotychczasowy czytnik MiniCam i eksport ALPHACAM pozostają bez zmian.
