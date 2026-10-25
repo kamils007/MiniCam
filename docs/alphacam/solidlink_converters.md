@@ -77,3 +77,13 @@ To tekstowa maska atrybutów encji PLMProductDS/PLMProductInstanceDS i pokrewnyc
 nazwy, rewizje, daty, właściciel i operacje paneli Create/Read/Write/Query.
 Nie znaleziono w nim ustawień uruchomienia konwertera STEP/Parasolid. Nie
 jest używany jako instrukcja dla asystenta i nie jest dodawany do repozytorium.
+
+## Pierwszy raport obserwacyjny
+
+Raport użytkownika zarejestrował SolidLink.exe, SHA-256 zgodny z profilem
+`71d48d786a76aa16031be28c9ebbe4c9b95555643fd79f475b5a6e76587ce83c`.
+Nie zarejestrowano błędów, konfiguracji ani procesów konwerterów. Nie wiadomo,
+czy procesy były krótkotrwałe, czy SolidLink korzystał bezpośrednio z DLL.
+Wersja 2 testu dodaje zdarzenia startu procesów i obserwację modułów SolidLink,
+z jawnym raportowaniem niedostępnego źródła danych. To wciąż ślad obserwacyjny,
+a nie potwierdzenie wywołań czy udanej konwersji Parasolid→STEP.
