@@ -31,19 +31,25 @@ nie traktować ich jako poprawnego wyniku, gdy kod wyjścia jest różny od zera
 
 ## Obsługiwany zakres
 
-- Krawędzie liniowe i łuki kołowe z dwoma końcami. Kierunek łuku jest ustalany
-  z końców, płaszczyzny i rzeczywistej długości, nie z arbitralnego krótszego łuku.
+- Krawędzie liniowe, łuki i pełne okręgi ze wspólnym wierzchołkiem na obu końcach.
+  Kierunek zwykłego łuku jest ustalany z końców, płaszczyzny i długości;
+  półokręgu dodatkowo z zakresu sąsiedniego walca.
+- Krawędzie FeatureSplineEdge będące jednoznacznym analitycznym przecięciem
+  płaszczyzny z walcem. Końce i długość muszą pasować do jednego odcinka.
+  Nie interpolujemy dowolnych splajnów z ograniczonego zestawu danych.
 - Ściany płaskie, cylindryczne i stożkowe; jedna pętla zewnętrzna i otwory.
 - Stożek wyznaczany z rzeczywistych okręgów brzegowych; niezależnie sprawdzany
   kąt połówkowy Feature. Nie wymaga nieobecnego XAxis stożka.
 - Każda ściana musi zachować pole z raportu. Po zszyciu muszą zgadzać się
   liczby ścian, krawędzi i wierzchołków. Wynik musi stanowić jedną poprawną,
   zamkniętą bryłę o dodatniej objętości. Tolerancja liniowa: 0,000001 mm.
-- W tym podzbiorze wymagamy zgodności granic bryły z granicami wierzchołków;
-  modele z ekstremami krzywych poza tymi granicami są odrzucane.
+- Granice bryły są porównywane z granicami rzeczywistych krzywych brzegowych,
+  dzięki czemu uwzględniamy ekstrema pełnych okręgów i elips.
+- Szwy walców otrzymują dwa przeciwne użycia w pętli OCCT; natywna lista
+  krawędzi Feature zawiera szew tylko raz. Nie dodajemy nowej krawędzi 3D.
 
-Brak obsługi dowolnych NURBS, torusów, kul, pełnych zamkniętych krawędzi,
-powtórzonych krawędzi szwu w pętli i wielu brył. Nieznane typy lub niespójne
+Brak obsługi dowolnych NURBS, torusów, kul i wielu brył. Obsługiwany szew
+dotyczy walca opisanego danymi analitycznymi i natywną kolejnością pętli. Nieznane typy lub niespójne
 dane są odrzucane. Kolory nie są odtworzone. Narzędzie nie jest ogólnym
 translatorem każdego ARD. Poprawność OCCT i zgodność odczytu STEP nie dowodzą
 same w sobie pełnej równoważności z oryginałem Parasolid.
@@ -70,3 +76,9 @@ włączają tę samą kontrolę powiązania danych, z której korzysta otwierani
 Testy obejmują akceptację zgodnego raportu i odrzucenie niezgodnych skrótów,
 liczników, wymiarów, niepotwierdzonego odczytu i zmiany runtime. GUI tworzy
 kształt bezpośrednio w pamięci; nie zapisuje pośredniego STEP.
+
+
+Nowy raport 210/609/406 przeszedł rekonstrukcję, sprawdzenie całej bryły oraz
+zapis/ponowny import STEP. Testy syntetyczne obejmują pełny i połówkowy walec,
+walec ćwiartkowy obcięty ukośną płaszczyzną (elipsa), a także odrzucenie błędnej
+długości okręgu lub odcinka elipsy. Szczegóły dowodów: `docs/ard_import.md`.

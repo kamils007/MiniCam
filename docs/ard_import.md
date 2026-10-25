@@ -53,8 +53,10 @@ linie/łuki, płaszczyzny, cylindry i stożki wraz z pętlami oraz otworami.
 Sprawdza pola ścian, zamknięcie i poprawność bryły oraz zachowanie liczników.
 Nie używa siatki ani prostopadłościanu jako zamiennika modelu.
 
-Nie obsługujemy jeszcze wielu brył, dowolnych NURBS, torusów, kul, zamkniętych
-krawędzi bez dwóch końców i szwów z powtórzoną krawędzią w pętli. Kolory ścian
+Odtwarzamy również pełne okręgi (z tym samym wierzchołkiem na obu końcach),
+półokręgi określone zakresem sąsiedniego walca oraz jednoznaczne odcinki elips
+na przecięciu płaszczyzny z walcem. Obsługiwane są szwy zamkniętych walców.
+Nie obsługujemy jeszcze wielu brył, dowolnych NURBS, torusów i kul. Kolory ścian
 są pomijane, ponieważ getter Feature.Color wymaga nieobsługiwanych ustawień
 rysunku ALPHACAM. Nieznane powierzchnie i niespójna geometria powodują błąd.
 [Zakres rekonstrukcji i narzędzie offline](../tools/ard_import/occt/README.md).
@@ -104,3 +106,35 @@ przez nowy budżet; dziennik zmalał z ok. 15,6 MB do ok. 0,81 MB. To kontrola
 limitu i logowania, nie ponowne wykonanie COM. Pełnego natywnego odczytu tego
 modelu po poprawce nie wykonano jeszcze na Windows. Zmiana wymaga ponownej
 kompilacji MiniCam, ponieważ skrypty odczytu są wbudowane w zasoby aplikacji.
+
+
+## Pełne okręgi i przecięcia walców — 25.10.2026
+
+Nowszy raport tego samego modelu potwierdził ukończenie odczytu Feature po
+poprawce limitu: 1991409 operacji przy budżecie 12005000. Import zatrzymywał
+się potem w OCCT na `Ambiguous circular arc`. Raport zawiera 20 pełnych okręgów
+oraz 6 krawędzi FeatureSplineEdge, które w tym modelu są odcinkami elips na
+przecięciu płaszczyzny z walcem.
+
+Poprawiono rozróżnienie pełnego okręgu i zwykłego łuku, wybór półokręgu według
+jawnego zakresu sąsiedniej powierzchni oraz analityczne przecięcia plane/cylinder.
+Elipsy nie są zgadywane z końców ani zamieniane na łamane: wynik przecięcia OCCT
+musi zgadzać się z oboma końcami i długością, z jednym pasującym odcinkiem.
+Nie oznacza to obsługi dowolnego splajnu. Pętle walców zachowują natywną kolejność
+wierzchołków i dwa przeciwne użycia krawędzi szwu; ich krzywe UV są uzgadniane
+przez przesunięcia o pełny okres, bez zmiany krzywych przestrzennych. Pozostają
+kontrole pól każdej ściany, poprawności, zamknięcia, liczników i wymiarów.
+
+SHA-256 geometrii nowego raportu:
+`25e52457584621b39a4d75015848f6e059b1953cbff54c2cedd378c069e6c3e6`.
+Wspólny moduł GUI odtworzył z niego poprawną zamkniętą bryłę o 210 ścianach,
+609 krawędziach i 406 wierzchołkach, 169×300×18 mm. Objętość rekonstrukcji
+523792,0497333667 mm³; ponowny import STEP 523792,0497333675 mm³. Nie porównano
+jej z niezależnym pomiarem oryginalnego Parasolid.
+
+Przeszło pięć testów CTest (w tym sześć kontroli rekonstrukcji: modele syntetyczne,
+niezgodne raporty i odmowa nadpisania), 15 testów czytnika Python oraz kompilacja
+aplikacji na Linux. Osobno sprawdzono poprzedni model 48/126/80 z płaszczyznami,
+walcami i stożkami: rekonstrukcja i ponowne otwarcie STEP nadal poprawne.
+Pełny odczyt ARD w nowej kompilacji GUI na Windows nadal wymaga sprawdzenia
+na stacji użytkownika. Modele i pełne raporty pozostają poza repozytorium.
