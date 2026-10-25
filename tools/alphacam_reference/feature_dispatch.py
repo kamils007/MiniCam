@@ -8,6 +8,8 @@ class SnapshotIds:
         self.groups = {}
         self.pointers = {}
         self.pins = []
+        self.hints = {}
+        self.comparisons = self.hint_matches = 0
         self.next_id = 1
 
     def remember(self, obj, group, number):
@@ -28,14 +30,27 @@ class SnapshotIds:
         if cached is not None:
             return cached
         entries = self.groups.setdefault(group, [])
-        for number, retained in entries:
+        hint = obj.identity_hint(group)
+        buckets = self.hints.setdefault(group, {})
+        preferred = buckets.get(hint, []) if hint is not None else []
+        preferred_ids = {number for number, _ in preferred}
+        # Geometry only orders the search. Even identical coordinates/areas
+        # are never sufficient to merge objects: IsSame must confirm every hit.
+        candidates = list(preferred) + [(number, retained) for number, retained in entries
+                                        if number not in preferred_ids]
+        for number, retained in candidates:
             if obj.pointer == retained.pointer:
                 return number
+            self.comparisons += 1
             same = obj.call('IsSame', retained)
             if type(same) is not bool:
                 raise RuntimeError('Feature.IsSame did not return a boolean')
             if same:
                 self.remember(obj, group, number)
+                if number in preferred_ids:
+                    self.hint_matches += 1
+                elif hint is not None:
+                    buckets.setdefault(hint, []).append((number, retained))
                 return number
         if self.next_id > 300000:
             raise RuntimeError('Too many snapshot objects')
@@ -43,6 +58,8 @@ class SnapshotIds:
         number = self.next_id
         self.next_id += 1
         entries.append((number, retained))
+        if hint is not None:
+            buckets.setdefault(hint, []).append((number, retained))
         return number
 
     def close(self):
@@ -51,6 +68,7 @@ class SnapshotIds:
         self.pins.clear()
         self.pointers.clear()
         self.groups.clear()
+        self.hints.clear()
 
 
 class FeatureDispatch:
@@ -140,3 +158,27 @@ class FeatureDispatch:
                                 variant=value,retain=self._retain,identities=self._identities)
         clone._description = self._description
         return clone
+
+    def identity_hint(self, group):
+        """Optional search key; absent/unstable values fall back to all objects."""
+        from feature_geometry import point, number
+        try:
+            if group == 'ISolidVertex':
+                with self.get('Point') as location:
+                    return tuple(round(v, 7) for v in point(location))
+            if group in ('ISolidEdge', 'ISolidFace'):
+                kind = self.get('Type')
+                if type(kind) is not int:
+                    return None
+                value = number(self.get('Length' if group == 'ISolidEdge' else 'Area'))
+                return kind, round(value, 7)
+        except Exception:
+            # A search optimization must not turn an unavailable optional
+            # property into a different identity or prevent the original search.
+            return None
+        return None
+
+    def identity_stats(self):
+        return {'is_same_comparisons': self._identities.comparisons,
+                'hint_confirmed_matches': self._identities.hint_matches,
+                'unique_objects': self._identities.next_id - 1}

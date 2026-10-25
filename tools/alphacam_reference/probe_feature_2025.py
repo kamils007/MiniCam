@@ -22,6 +22,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import time
 from datetime import datetime
 from feature_builds import profile
 
@@ -490,6 +491,7 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
             measured={"bounds":bounds,"dimensions_api_units":dimensions,"topology_counts":counts,
                       "alignment_disabled":True,"full_topology_validity_verified":False,"volume_verified":False}
             if batch_profile and batch_profile.get('geometry_snapshot'):
+                geometry_started=time.perf_counter()
                 from feature_geometry import extract_geometry, GeometryOperations
                 from feature_dispatch import FeatureDispatch
                 checkpoint('body_measurement_before_geometry', result=measured)
@@ -521,7 +523,8 @@ def worker(path, stage, dependency_dirs, model_path=None, output_dir=None, host_
                 measured['geometry_snapshot']={"filename":target.name,"sha256":hashlib.sha256(data).hexdigest(),
                     "counts":counts,"topology_read_complete":True,
                     "property_error_count":len(geometry['property_errors']),"converted_to_occt":False,
-                    "operation_stats":operations.stats()}
+                    "operation_stats":operations.stats(),"identity_stats":adapter.identity_stats(),
+                    "geometry_read_seconds":round(time.perf_counter()-geometry_started,6)}
                 checkpoint('geometry_snapshot_written',result=measured['geometry_snapshot'])
             return measured
         finally:automation.VariantClear(C.byref(body))

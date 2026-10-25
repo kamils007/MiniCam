@@ -145,7 +145,9 @@ class GeometryTests(unittest.TestCase):
         from types import SimpleNamespace as Obj
         released=[]
         def keep(pointer):return Obj(vt=9,value=Obj(pointer=pointer))
-        def get(pointer,name):return {'ok':True},Obj(vt=9,value=Obj(pointer=10))
+        def get(pointer,name):
+            if name != 'other': return {'ok':False},None
+            return {'ok':True},Obj(vt=9,value=Obj(pointer=10))
         def call(pointer,name,other):return {'ok':False,'hresult':'0x80020003'},None
         def clear(value):released.append(value.value.pointer)
         with self.assertRaises(RuntimeError):

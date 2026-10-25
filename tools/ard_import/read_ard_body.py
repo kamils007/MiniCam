@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import struct
 import sys
+import time
 import zipfile
 
 SAMPLE_SHA256 = '13b01c7743bf2e97ca1b503362a476b08706ce562a49c17f3ce1a22c8974e93f'
@@ -204,11 +205,21 @@ def validate_read(native, expected_hash, validate_cls, validate_measurement, val
 
 def run(ard, runtime, root, out, geometry_snapshot=False):
     out.mkdir(parents=True, exist_ok=False)
+    started = phase_started = time.perf_counter()
+    timings = {}
+
+    def phase(name):
+        nonlocal phase_started
+        now = time.perf_counter()
+        timings[name] = round(now - phase_started, 6)
+        phase_started = now
+
     report = {'schema': 'minicam-ard-feature-read-v1', 'read_confirmed': False,
               'converted_to_occt': False, 'geometry_verified': False, 'volume_verified': False,
               'save_requested': False, 'installed_runtime_unchanged': False, 'error': None}
     report['geometry_snapshot_requested'] = geometry_snapshot
     report['geometry_snapshot_available'] = False
+    report['timings_seconds'] = timings
     original_runtime_hashes = {}
     original_ard_hash = None
     try:
@@ -222,6 +233,7 @@ def run(ard, runtime, root, out, geometry_snapshot=False):
         payload, report['extraction'] = extract_sample(source)
         model = out / 'extracted.x_b'
         model.write_bytes(payload)
+        phase('source_and_extraction')
         private = out / 'runtime'
         # Retain private catalogs locally, never include them in the report ZIP.
         for folder in ('alphacam_reference', 'step_ard', 'solidimport'):
@@ -238,11 +250,13 @@ def run(ard, runtime, root, out, geometry_snapshot=False):
         from build_step_ard_14 import (INSTALLATION, run_native, collect_feature, validate_cls,
                                       validate_measurement, validate_schema_path)
         from read_standalone_dependencies import process_names
+        phase('runtime_preparation')
         pins = dict(INSTALLATION)
         pins['Add-Ins/Feature/Feature.dll'] = FEATURE_SHA256
         for name, expected in pins.items():
             if digest((root / name).read_bytes()) != expected:
                 raise ValueError('Inna niz obslugiwana wersja pliku: ' + name)
+        phase('installation_checks')
         native = out / 'feature'
         native.mkdir()
         state = {'measure_only': True, 'geometry_snapshot': geometry_snapshot,
@@ -262,6 +276,7 @@ def run(ard, runtime, root, out, geometry_snapshot=False):
         finally:
             state['inputs_unchanged'] = digest(model.read_bytes()) == digest(payload)
             collect_feature(native, state, expected_input=digest(payload))
+            phase('feature_read_and_cleanup')
         report['measurement'] = validate_read(state, digest(payload), validate_cls,
                                              validate_measurement, validate_schema_path)
         if geometry_snapshot:
@@ -283,6 +298,7 @@ def run(ard, runtime, root, out, geometry_snapshot=False):
         if any((native / 'native' / name).exists() for name in ('roundtrip.x_b', 'feature_object.bin')):
             raise ValueError('Nieoczekiwany zapis podczas testu odczytu.')
         report['read_confirmed'] = True
+        phase('read_validation')
     except Exception as error:
         report['error'] = str(error)
     finally:
@@ -297,6 +313,7 @@ def run(ard, runtime, root, out, geometry_snapshot=False):
         except Exception as error:
             report['read_confirmed'] = False
             report['error'] = str(error)
+        timings['elapsed_before_report'] = round(time.perf_counter() - started, 6)
         (out / 'ard_read_result.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
         with zipfile.ZipFile(out / 'raport_odczytu.zip', 'x', zipfile.ZIP_DEFLATED) as archive:
             archive.write(out / 'ard_read_result.json', 'ard_read_result.json')

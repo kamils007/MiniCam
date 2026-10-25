@@ -138,3 +138,35 @@ aplikacji na Linux. Osobno sprawdzono poprzedni model 48/126/80 z płaszczyznami
 walcami i stożkami: rekonstrukcja i ponowne otwarcie STEP nadal poprawne.
 Pełny odczyt ARD w nowej kompilacji GUI na Windows nadal wymaga sprawdzenia
 na stacji użytkownika. Modele i pełne raporty pozostają poza repozytorium.
+
+## Przyspieszenie wyszukiwania tożsamości — zgłoszone 30 sekund
+
+W odczycie raportu modelu 210/609/406 było 1951808 porównań IsSame.
+Dla świeżego interfejsu czytnik najpierw sprawdza teraz obiekty o zbliżonych
+cechach: współrzędnych wierzchołka, typie/długości krawędzi albo typie/polu
+ściany. To kolejność przeszukiwania, a nie sposób ustalania tożsamości.
+Każde trafienie nadal musi zostać potwierdzone przez natywne IsSame; po
+nietrafieniu sprawdzane są pozostałe obiekty. Dwa różne wierzchołki o tych
+samych współrzędnych nie są scalane. Brak właściwości lub zmiana jej wartości
+nie wyłącza pełnego wyszukiwania. Zapamiętane interfejsy pozostają utrzymywane
+przez AddRef do końca odczytu, jak w poprzedniej poprawce.
+
+Odtworzenie dokładnej kolejności referencji na rzeczywistym JSON z raportu
+zwróciło identyczne identyfikatory i połączenia wszystkich 1449 obiektów.
+Liczba porównań spadła z 1951808 do 350067 (o 82,1%). Bazowy licznik w tej
+symulacji jest równy licznikowi natywnemu z raportu. To wynik liczby operacji,
+nie pomiar przyspieszenia czasu wykonania na Windows.
+
+W nowym raporcie `timings_seconds` mierzy wydzielenie danych, przygotowanie
+prywatnego runtime, kontrolę plików instalacji, odczyt Feature z zamknięciem CLS
+i walidację wyniku. `geometry_snapshot.geometry_read_seconds` mierzy samą
+ekstrakcję geometrii, a `identity_stats` podaje liczbę porównań i potwierdzonych
+trafień wyszukiwania. Nie zmieniamy limitów ani kontroli modelu, nie odtwarzamy
+modelu z poprzedniego odczytu i nie zmieniamy ścieżki eksportu.
+
+Przeszło 19 testów czytnika/wyszukiwania Python, 26 regresji backendu,
+kompilacja MiniCam i pięć testów CTest na Linux. Testy obejmują kolizję cech
+geometrycznych, zmienioną/nieobecną wskazówkę, zwalnianie interfejsów i zgodność
+identyfikatorów przy licznych świeżych interfejsach tego samego obiektu.
+Czas nowej kompilacji na Windows pozostaje do zmierzenia; zmiana wymaga
+ponownej kompilacji, ponieważ skrypty są w zasobach Qt.
