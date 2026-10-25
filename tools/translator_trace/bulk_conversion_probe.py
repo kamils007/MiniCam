@@ -11,13 +11,14 @@ import json
 import os
 from pathlib import Path
 import struct
+import re
 import subprocess
 import sys
 import time
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-SCHEMA = 'minicam-spatial-bulk-probe-v1'
+SCHEMA = 'minicam-spatial-bulk-probe-v2'
 PINS = {
     'SPAIInterop.dll': 'bb3ec37e9a2c96017bbb3234c2764af10e5fad1bae679a2ba5485ac0336eec62',
     'SPAIInteropC.dll': '6d4fa624e2ee70c1979c512ae0cc1ca0c1c79b5d1b7ffb03eb9b67cb49184bad',
@@ -27,16 +28,41 @@ SYMBOLS = {
     'shutdown': ('cpp', '?Shutdown@SPAISystem@@SAXXZ', None, []),
     'document': ('cpp', '??0SPAIDocument@@QEAA@PEB_W@Z', C.c_void_p, [C.c_void_p, C.c_wchar_p]),
     'converter': ('cpp', '??0SPAIConverter@@QEAA@XZ', C.c_void_p, [C.c_void_p]),
+    'file': ('cpp', '??0SPAIFile@@QEAA@PEB_W@Z', C.c_void_p, [C.c_void_p, C.c_wchar_p]),
     'document_destroy': ('cpp', '??1SPAIDocument@@UEAA@XZ', None, [C.c_void_p]),
     'converter_destroy': ('cpp', '??1SPAIConverter@@UEAA@XZ', None, [C.c_void_p]),
+    'file_destroy': ('cpp', '??1SPAIFile@@UEAA@XZ', None, [C.c_void_p]),
     'get_data': ('cpp', '?GetData@SPAIObject@@QEBAPEAXXZ', C.c_void_p, [C.c_void_p]),
     'set_type': ('c', '?SPAICDocument_SetType@@YAJPEAXPEBD@Z', C.c_int32, [C.c_void_p, C.c_char_p]),
-    'convert': ('c', '?SPAICConverter_Convert@@YAJPEAX00@Z', C.c_int32, [C.c_void_p] * 3),
+    'convert_cpp': ('cpp', '?Convert@SPAIConverter@@QEAA?AVSPAIResult@@AEBVSPAIDocument@@0@Z',
+                    C.c_void_p, [C.c_void_p, C.POINTER(C.c_int32), C.c_void_p, C.c_void_p]),
+    'start_log_cpp': ('cpp', '?StartLog@SPAIConverter@@QEAA?AVSPAIResult@@AEBVSPAIFile@@@Z',
+                      C.c_void_p, [C.c_void_p, C.POINTER(C.c_int32), C.c_void_p]),
+    'stop_log_cpp': ('cpp', '?StopLog@SPAIConverter@@QEAA?AVSPAIResult@@AEBVSPAIFile@@@Z',
+                     C.c_void_p, [C.c_void_p, C.POINTER(C.c_int32), C.c_void_p]),
     'success': ('c', '?SPAICResult_IsSuccess@@YA_NJ@Z', C.c_bool, [C.c_int32]),
     'partial': ('c', '?SPAICResult_IsPartialSuccess@@YA_NJ@Z', C.c_bool, [C.c_int32]),
     'exception': ('c', '?SPAICDidCallHaveException@@YA_NXZ', C.c_bool, []),
     'message': ('c', '?SPAICResult_GetMessage@@YAPEBDJ@Z', C.c_char_p, [C.c_int32]),
 }
+
+
+def summarize_log(path):
+    """Return fixed diagnostics only; raw logs/options remain on the station."""
+    if not path.is_file():
+        return {'exists': False}
+    with path.open('rb') as stream:
+        data = stream.read(1024 * 1024)
+    encoding = 'utf-16' if data.startswith((b'\xff\xfe', b'\xfe\xff')) else 'utf-8-sig'
+    text = data.decode(encoding, errors='replace').lower()
+    words = ('error', 'failure', 'failed', 'unsupported', 'not supported', 'not found',
+             'reader', 'writer', 'converter', 'license', 'licence', 'licensing',
+             'parasolid', 'step', 'acis', 'no reader', 'no writer')
+    # Counts are observations, never a diagnosis based on a word alone.
+    return {'exists': True, 'size_bytes': path.stat().st_size,
+            'scan_truncated': path.stat().st_size > len(data),
+            'term_counts': {word: len(re.findall(r'\b' + re.escape(word) + r'\b', text)) for word in words},
+            'raw_log_in_report': False}
 
 
 def digest(path):
@@ -112,6 +138,26 @@ class NativeAPI:
             function.restype = result
             setattr(self, alias, function)
 
+    @staticmethod
+    def cpp_result(function, owner, *arguments):
+        # Verified MSVC x64 hidden result pointer: RCX=this, RDX=&SPAIResult,
+        # R8/R9=documents. SPAIResult ctor RVA 0xa8f0 writes exactly one int32;
+        # Convert returns that pointer (RVA 0x51fa / 0x5218).
+        value = C.c_int32(0x1000002)
+        returned = function(owner, C.byref(value), *arguments)
+        if returned != C.addressof(value):
+            raise RuntimeError('Niepotwierdzony wskaznik wyniku funkcji C++.')
+        return value.value
+
+    def convert_document(self, owner, source, destination):
+        return self.cpp_result(self.convert_cpp, owner, source, destination)
+
+    def start_log(self, owner, file):
+        return self.cpp_result(self.start_log_cpp, owner, file)
+
+    def stop_log(self, owner, file):
+        return self.cpp_result(self.stop_log_cpp, owner, file)
+
 
 def worker(directory, source, destination, result_path, api_factory=NativeAPI):
     started = time.perf_counter()
@@ -120,6 +166,8 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
     api = None
     initialized = False
     owned = []
+    logging = None
+    log_path = result_path.parent / 'translator_native.log'
 
     def checkpoint(phase):
         state['phase'] = phase
@@ -160,7 +208,7 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
         handle = api.get_data(storage.address)
         if not handle:
             raise RuntimeError('Brak uchwytu obiektu ' + kind)
-        return handle
+        return handle, storage.address
 
     try:
         state['source_sha256'] = digest(source)
@@ -170,12 +218,16 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
         # Same true flag as original SLInterop's SPAISystemInitGuard call.
         timed('initialize', api.initialize, True)
         initialized = True
-        source_handle = construct('document', source)
-        target_handle = construct('document', destination)
-        converter_handle = construct('converter')
+        source_handle, source_object = construct('document', source)
+        target_handle, target_object = construct('document', destination)
+        converter_handle, converter_object = construct('converter')
         result('source_type', timed('source_type', api.set_type, source_handle, b'PARASOLID'))
         result('target_type', timed('target_type', api.set_type, target_handle, b'STEP'))
-        result('convert', timed('convert', api.convert, converter_handle, source_handle, target_handle))
+        _, log_object = construct('file', log_path)
+        result('start_log', timed('start_log', api.start_log, converter_object, log_object))
+        logging = (converter_object, log_object)
+        state['conversion_entry'] = 'original_SPAIConverter_Convert_CPP'
+        result('convert', timed('convert', api.convert_document, converter_object, source_object, target_object))
         state['step_envelope_verified'] = step_envelope(destination)
         if not state['step_envelope_verified']:
             raise RuntimeError('Konwerter nie utworzyl kompletnego pliku STEP.')
@@ -186,6 +238,11 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
         state['error'] = str(error)
     finally:
         cleanup_errors = []
+        if logging:
+            try:
+                result('stop_log', timed('stop_log', api.stop_log, *logging))
+            except Exception as error:
+                cleanup_errors.append(str(error))
         while owned:
             kind, storage = owned.pop()
             try:
@@ -199,6 +256,10 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
             except Exception as error:
                 cleanup_errors.append(str(error))
         state['cleanup_errors'] = cleanup_errors
+        try:
+            state['translator_log_summary'] = summarize_log(log_path)
+        except OSError as error:
+            state['translator_log_summary'] = {'error': str(error)}
         if cleanup_errors:
             state['native_conversion_succeeded'] = False
         checkpoint('finished')

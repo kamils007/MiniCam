@@ -31,6 +31,20 @@ class FakeAPI:
         self.calls.append(('converter',))
         return storage
 
+    def file(self, storage, path):
+        self.log_path = Path(path)
+        self.calls.append(('file',))
+        return storage
+
+    def start_log(self, owner, file):
+        self.calls.append(('start_log',))
+        self.log_path.write_text('Error: unsupported writer STEP\nAuthorization: TEST_PRIVATE_VALUE\n')
+        return 0
+
+    def stop_log(self, owner, file):
+        self.calls.append(('stop_log',))
+        return 0
+
     def get_data(self, storage):
         return storage
 
@@ -42,6 +56,10 @@ class FakeAPI:
         self.calls.append(('convert', converter, source, destination))
         self.target.write_bytes(STEP)
         return 123 if self.is_partial else 0
+
+    def convert_document(self, converter, source, destination):
+        self.calls.append(('convert_document_cpp',))
+        return self.convert(converter, source, destination)
 
     def success(self, value):
         return True  # A partial result may also satisfy the generic success predicate.
@@ -60,6 +78,9 @@ class FakeAPI:
 
     def converter_destroy(self, address):
         self.calls.append(('converter_destroy',))
+
+    def file_destroy(self, address):
+        self.calls.append(('file_destroy',))
 
     def shutdown(self):
         self.calls.append(('shutdown',))
@@ -82,7 +103,12 @@ class BoundaryTests(unittest.TestCase):
         self.assertFalse(report['geometry_verified'])
         kinds = [c[0] for c in calls]
         self.assertEqual(kinds[:4], ['initialize', 'document', 'document', 'converter'])
-        self.assertEqual(kinds[-4:], ['converter_destroy', 'document_destroy', 'document_destroy', 'shutdown'])
+        self.assertEqual(kinds[-6:], ['stop_log', 'file_destroy', 'converter_destroy',
+                                     'document_destroy', 'document_destroy', 'shutdown'])
+        self.assertIn('convert_document_cpp', kinds)
+        self.assertEqual(report['conversion_entry'], 'original_SPAIConverter_Convert_CPP')
+        self.assertEqual(report['translator_log_summary']['term_counts']['writer'], 1)
+        self.assertNotIn('TEST_PRIVATE_VALUE', json.dumps(report))
         self.assertTrue(calls[0][1])
         self.assertEqual([c[1] for c in calls if c[0] == 'set_type'], [b'PARASOLID', b'STEP'])
 
@@ -113,6 +139,15 @@ class BoundaryTests(unittest.TestCase):
         C.memset(wrapper.address + wrapper.SIZE, 0, 1)
         with self.assertRaisesRegex(RuntimeError, 'guard'):
             wrapper.check()
+
+    def test_cpp_result_uses_hidden_result_pointer_and_checks_returned_address(self):
+        def native(owner, result, source, target):
+            self.assertEqual((owner, source, target), (11, 22, 33))
+            result._obj.value = 16777217
+            return C.addressof(result._obj)
+        self.assertEqual(probe.NativeAPI.cpp_result(native, 11, 22, 33), 16777217)
+        with self.assertRaisesRegex(RuntimeError, 'wskaznik'):
+            probe.NativeAPI.cpp_result(lambda *args: 0, 11, 22, 33)
 
     def test_real_ard_payload_extraction_stays_correlated(self):
         # A minimal structural fixture, not a vendor model or native conversion.

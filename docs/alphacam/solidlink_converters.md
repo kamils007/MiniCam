@@ -184,3 +184,32 @@ oryginalnego tworzenia/sprzątania obiektów, odrzucenie częściowego wyniku,
 kontrolę pamięci i korelację wyjętego X_B z ARD. Nie wykonano wywołań Windows
 w chmurze. Nie potwierdzono jeszcze, że samodzielne przygotowanie wystarczy
 do konwersji Parasolid→STEP na stacji, i nie zmieniono importu w MiniCam.
+
+## Raport próby v1 i korekta v2
+
+Pierwsza próba dotarła do Convert, lecz zakończyła się `0x01000001` / `Failure`.
+Całość trwała 0,421139 s, samo nieudane Convert 0,023641 s. Biblioteki,
+inicjalizacja, oryginalne konstruktory, ustawienie obu typów i sprzątanie
+zakończyły się bez zgłoszonego wyjątku. ARD i wyjęty X_B pozostały bez zmian.
+Nie powstał zaakceptowany STEP; te czasy nie mierzą udanej konwersji.
+Raport nie ustala, czy przyczyną był format, brak przygotowania, dostępność
+komponentu czy inny warunek środowiska. Nie wyciągamy wniosku o licencji.
+
+Dokładniejsze przejście przez SPAIConverter::Convert (SPAIInterop RVA 0x50a0)
+i dalsze bloki DoConvert (0x5230–0x5344) ujawniło pomijane w v1 przygotowanie:
+`SPAICConverter_CacheAcisSessionValues` przy 0x52a6, wywołanie pomocnicze
+przy 0x52d2 oraz obsługę stanu sesji i błędów. Ich pominięcie jest potwierdzone;
+nie dowodzi to jeszcze, że odpowiadało za wynik Failure.
+
+Wersja 2 wywołuje **całą oryginalną metodę C++ Convert** na oryginalnych
+obiektach, zamiast bezpośrednio SPAICConverter_Convert. Kontrakt MSVC x64:
+RCX=konwerter, RDX=ukryty wskaźnik wyniku, R8=źródło, R9=cel; wynik jest
+4-bajtowym SPAIResult, a RAX zwraca ten sam wskaźnik. Potwierdza to kod
+wywołujący w SLInterop, konstruktor wyniku przy RVA 0xa8f0 oraz zapis/zwrócenie
+wyniku przy 0x5334/0x5336 i 0x51fa. Adapter sprawdza zwrócony adres.
+
+Dodano oryginalne StartLog/StopLog i konstruktor/destruktor SPAIFile.
+Surowy dziennik pozostaje na stacji; raport obejmuje jedynie jego wielkość
+i liczniki stałych słów diagnostycznych. Słowa nie są traktowane jako diagnoza.
+Wynik v2 wymaga ponownej próby Windows. W chmurze sprawdzono kontrakty eksportów
+z dostarczonymi DLL oraz 7 przenośnych kontroli z atrapami funkcji natywnych.

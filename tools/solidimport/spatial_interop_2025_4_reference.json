@@ -85,6 +85,42 @@
         {
           "name": "?Initialize@SPAISystem@@SAX_N@Z",
           "rva": "0xac00"
+        },
+        {
+          "name": "?Shutdown@SPAISystem@@SAXXZ",
+          "rva": "0xac70"
+        },
+        {
+          "name": "??0SPAIConverter@@QEAA@XZ",
+          "rva": "0x4a40"
+        },
+        {
+          "name": "??0SPAIFile@@QEAA@PEB_W@Z",
+          "rva": "0x9ce0"
+        },
+        {
+          "name": "??1SPAIDocument@@UEAA@XZ",
+          "rva": "0x6040"
+        },
+        {
+          "name": "??1SPAIConverter@@UEAA@XZ",
+          "rva": "0x4bc0"
+        },
+        {
+          "name": "??1SPAIFile@@UEAA@XZ",
+          "rva": "0x9d50"
+        },
+        {
+          "name": "?GetData@SPAIObject@@QEBAPEAXXZ",
+          "rva": "0x9e90"
+        },
+        {
+          "name": "?StartLog@SPAIConverter@@QEAA?AVSPAIResult@@AEBVSPAIFile@@@Z",
+          "rva": "0x5890"
+        },
+        {
+          "name": "?StopLog@SPAIConverter@@QEAA?AVSPAIResult@@AEBVSPAIFile@@@Z",
+          "rva": "0x5990"
         }
       ]
     },
@@ -239,5 +275,22 @@
     "Supported standalone initialization for MiniCam",
     "Bulk output validity and fidelity against the source solid",
     "Native conversion runtime or improvement over current MiniCam import"
-  ]
+  ],
+  "bulk_probe_v2_cpp_entry": {
+    "convert_rva": "0x50a0",
+    "do_convert_rva": "0x5230",
+    "cache_acis_session_callsite_rva": "0x52a6",
+    "pre_conversion_helper_callsite_rva": "0x52d2",
+    "spai_result_constructor_rva": "0xa8f0",
+    "native_result_bytes": 4,
+    "argument_registers": {
+      "RCX": "converter wrapper",
+      "RDX": "result address",
+      "R8": "source document wrapper",
+      "R9": "target document wrapper"
+    },
+    "returns": "RAX equals result address",
+    "native_verified": false,
+    "v1_failure_cause": "Not established; missing wrapper preparation is an observed difference, not a confirmed cause."
+  }
 }
