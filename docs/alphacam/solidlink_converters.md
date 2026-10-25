@@ -45,3 +45,35 @@ nie pozyskiwano ani nie odtwarzano materiału autoryzacyjnego. W razie śledzeni
 procesu należy obserwować oryginalny przebieg konfiguracji i plików, zachowując
 normalną obsługę licencji. Plan debugowania całego Acam został wstrzymany po
 wskazaniu tych konkretnych narzędzi przez użytkownika.
+
+## SpaImportConverterC.exe
+
+Dostarczony plik: 1295000 bajtów, SHA-256
+`41795630b92eb21a5f6fdc3ddca09eaf8d84d4168ae381034e72859e2c2e0e96`,
+PE32+ AMD64/Windows GUI, oznaczenie 2025.4.2616.108.
+
+Importuje SPAIop, SPAIInterop, SPAIParasolid, SPAIParasolidKernel i SPAAcisDs.
+Występuje interfejs SPAIConverter::Convert z dokumentem źródłowym i docelowym,
+SPAIDocument::SetType, SPAIDocument i SPAIParasolidDocument. W tabeli formatów
+są m.in. STEP, IGES, PARASOLID i ACIS. W kodzie są osobne wywołania Convert
+z dokumentem ogólnym i dokumentem Parasolid jako celem, a także nazwy
+`si_import_step.stp` i `ie_import_parasolid.x_b`. To uzasadnia badanie konwersji
+całej bryły w oryginalnym silniku Spatial; nie potwierdza samodzielnego działania
+Parasolid→STEP ani zgodności z konfiguracją/licencją stacji.
+
+Nie odtwarzamy ABI klas C++ ani nie wywołujemy funkcji na podstawie samych nazw.
+Następny krok to obserwacja oryginalnego procesu i wybranych pól CFG.
+`tools/translator_trace/TRACE.cmd` uruchamia 60-sekundowe próbkowanie CIM i odczyt
+wyłącznie dozwolonych pól konfiguracji wskazanej w argumentach procesu. Nie
+uruchamia sam konwertera i nie kopiuje plików producenta ani danych licencyjnych.
+To test obserwacyjny, nie debugger i nie weryfikacja konwersji. Natywnego
+monitorowania nie wykonano w Linux.
+
+## PLMProductDS.mask
+
+Dostarczony plik ma 14406 bajtów, SHA-256
+`43df1b7b3838c2b167b93236ebe81c58a54a0773ace4df2116bf6b216a5699da`.
+To tekstowa maska atrybutów encji PLMProductDS/PLMProductInstanceDS i pokrewnych:
+nazwy, rewizje, daty, właściciel i operacje paneli Create/Read/Write/Query.
+Nie znaleziono w nim ustawień uruchomienia konwertera STEP/Parasolid. Nie
+jest używany jako instrukcja dla asystenta i nie jest dodawany do repozytorium.
