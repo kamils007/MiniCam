@@ -1,5 +1,5 @@
 #include "ArdSolidImport.h"
-#include "FeatureGeometry.h"
+#include "WholeBodyImport.h"
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -7,8 +7,6 @@
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QJsonParseError>
 #include <QProcess>
 #include <QProgressDialog>
 #include <QSaveFile>
@@ -16,9 +14,6 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUuid>
-#include <BRepBndLib.hxx>
-#include <Bnd_Box.hxx>
-#include <cmath>
 #include <stdexcept>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
@@ -47,7 +42,7 @@ QString sha(const QByteArray& bytes) {
 class ImportProgress final : public QProgressDialog {
 public:
     explicit ImportProgress(QWidget* parent):QProgressDialog(
-        "Odczytywanie bryły z ARD…\nPozostaw ALPHACAM zamknięty do zakończenia.",QString(),0,0,parent) {
+        "Konwersja bryły z ARD…\nPozostaw ALPHACAM zamknięty do zakończenia.",QString(),0,0,parent) {
         setWindowTitle("Otwórz ARD");setWindowModality(Qt::ApplicationModal);
         setCancelButton(nullptr);setWindowFlag(Qt::WindowCloseButtonHint,false);
         setMinimumDuration(0);setAutoClose(false);
@@ -75,22 +70,27 @@ camcore::ImportedModel readArdSolid(const QByteArray& source,
     }
     if(pythonDefault.isEmpty())pythonDefault=QStandardPaths::findExecutable("python");
     const QString python=settings.value("alphacam/python",pythonDefault).toString();
-    const QString runtime=settings.value("alphacam/runtime",QCoreApplication::applicationDirPath()+"/alphacam-export").toString();
     const QString root=settings.value("alphacam/root","C:/Program Files/Hexagon/ALPHACAM 2025").toString();
-    if(!QFileInfo(python).isFile() || !QFileInfo(QDir(runtime).filePath("step_ard/build_step_ard_14.py")).isFile()
-       || !QFileInfo(QDir(root).filePath("Add-Ins/Feature/Feature.dll")).isFile())
-        fail("Brakuje składników odczytu bryły ARD. Sprawdź zapisane ścieżki Python, modułu i ALPHACAM w ustawieniach ALPHACAM w menu Plik.");
+    const QString solidlink=settings.value("alphacam/solidlink",
+        "C:/Program Files/Common Files/Hexagon/SolidLink 2025.4/code/bin/SolidLink.exe").toString();
+    const QDir bin=QFileInfo(solidlink).absoluteDir();
+    if(!QFileInfo(python).isFile() || !QFileInfo(QDir(root).filePath("CLS/LicManaged.dll")).isFile()
+       || !QFileInfo(bin.filePath("SLInterop.dll")).isFile()
+       || !QFileInfo(bin.filePath("SPAIInterop.dll")).isFile()
+       || !QFileInfo(bin.filePath("SPAIInteropC.dll")).isFile())
+        fail("Brakuje składników konwersji ARD. Sprawdź ścieżki Python, ALPHACAM i SolidLink w ustawieniach ALPHACAM w menu Plik.");
     const QString jobs=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/ard-import/jobs";
     const QString job=QDir(jobs).filePath(QUuid::createUuid().toString(QUuid::WithoutBraces));
     if(!QDir().mkpath(job))fail("Nie można utworzyć folderu odczytu ARD.");
     try {
         QTemporaryDir scripts;
         if(!scripts.isValid())fail("Nie można przygotować składników odczytu ARD.");
-        const QStringList files{"read_ard_body.py","overlay/alphacam_reference/probe_feature_2025.py",
-            "overlay/alphacam_reference/com_typeinfo.py","overlay/alphacam_reference/feature_dispatch.py",
-            "overlay/alphacam_reference/feature_geometry.py","overlay/step_ard/feature_native_14.py",
-            "overlay/step_ard/build_step_ard_14.py"};
-        for(const auto& name:files)write(scripts.filePath(name),read(":/ard-import/"+name,8*1024*1024));
+        const QStringList files{"translator_trace/bulk_conversion_probe.py", "translator_trace/solidlink_bulk_worker.py",
+            "ard_import/read_ard_body.py", "step_ard/feature_cls_session_14.ps1", "step_ard/feature_cls_invocation.cs"};
+        for(const auto& name:files) {
+            const QString target=name=="ard_import/read_ard_body.py" ? "ard_payload_reader.py" : QFileInfo(name).fileName();
+            write(scripts.filePath(target),read(":/ard-import/"+name,8*1024*1024));
+        }
         const QString input=QDir(job).filePath("source.ard"),out=QDir(job).filePath("result");
         write(input,source);
         ImportProgress progress(parent);QProcess process;
@@ -102,19 +102,17 @@ camcore::ImportedModel readArdSolid(const QByteArray& source,
 #endif
         QObject::connect(&process,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),&progress,[&](int,QProcess::ExitStatus){progress.done(0);});
         QObject::connect(&process,&QProcess::errorOccurred,&progress,[&](QProcess::ProcessError error){if(error==QProcess::FailedToStart)progress.done(0);});
-        process.start(python,{"-I","-u",scripts.filePath("read_ard_body.py"),"--ard",input,"--runtime",runtime,
-                              "--root",root,"--out",out,"--geometry-snapshot"});
+        process.start(python,{"-I","-u",scripts.filePath("bulk_conversion_probe.py"),"--ard",input,
+                              "--bin",bin.absolutePath(),"--root",root,"--out",out});
         if(process.state()!=QProcess::NotRunning)progress.exec();
         if(process.error()==QProcess::FailedToStart)fail("Nie można uruchomić odczytu ARD: "+process.errorString());
         if(process.exitStatus()!=QProcess::NormalExit)fail("Proces odczytu ARD zakończył się awarią.");
-        const auto reportBytes=read(QDir(out).filePath("ard_read_result.json"),8*1024*1024);
+        const auto reportBytes=read(QDir(out).filePath("bulk_result.json"),8*1024*1024);
         const auto report=QJsonDocument::fromJson(reportBytes).object();
-        if(process.exitCode()!=0 || !report["read_confirmed"].toBool())
-            fail("Nie udało się odczytać bryły ARD. "+report["error"].toString());
-        const auto snapshot=read(QDir(out).filePath("feature/native/feature_geometry.json"),32*1024*1024);
+        if(process.exitCode()!=0 || !report["native_conversion_succeeded"].toBool())
+            fail("Nie udało się przekonwertować bryły ARD. "+report["error"].toString());
         const auto payload=QByteArray::fromStdString(document.solids.front().parasolid);
-        camcore::ImportedModel model;
-        model.shape=ardimport::shapeFromReadResult(reportBytes,snapshot,sha(source),sha(payload));
-        return model;
+        return ardimport::modelFromWholeBodyResult(reportBytes,QDir(out).filePath("converted.step"),
+                                                   sha(source),sha(payload));
     }catch(const std::exception& e){fail(QString::fromUtf8(e.what())+"\n\nRaport odczytu: "+job);}
 }

@@ -83,6 +83,14 @@ target_link_libraries(camcore PUBLIC
     TKG3d TKGeomBase TKMath TKernel
 )
 
+add_library(minicam-ard-whole-body STATIC
+    modules/ard_import/WholeBodyImport.cpp modules/ard_import/WholeBodyImport.h)
+target_include_directories(minicam-ard-whole-body PUBLIC modules/ard_import)
+target_link_libraries(minicam-ard-whole-body PUBLIC camcore Qt6::Core)
+if(MSVC)
+    target_compile_options(minicam-ard-whole-body PRIVATE /utf-8 /permissive- /Zc:__cplusplus)
+endif()
+
 # ---- Aplikacja: GUI w Qt ----
 # qt_add_executable przy statycznym Qt sam dołącza wtyczki (m.in. platformę Windows).
 qt_add_executable(minicam
@@ -149,19 +157,16 @@ if(WIN32)
 endif()
 target_include_directories(minicam PRIVATE app) # polecenia w app/commands widzą InputBar.h, OccView.h
 target_link_libraries(minicam PRIVATE camcore Qt6::Widgets Qt6::PrintSupport
-    minicam-ard-geometry
+    minicam-ard-whole-body
     TKV3d TKService TKOpenGl   # wizualizacja 3D OCCT
     TKPrim                     # BRepPrimAPI_MakePrism – ścianki konturów
 )
-qt_add_resources(minicam "ard_import_driver" PREFIX "/ard-import" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tools/ard_import"
-    FILES tools/ard_import/read_ard_body.py)
-qt_add_resources(minicam "ard_import_overlays" PREFIX "/ard-import/overlay" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tools"
-    FILES tools/alphacam_reference/probe_feature_2025.py
-          tools/alphacam_reference/com_typeinfo.py
-          tools/alphacam_reference/feature_dispatch.py
-          tools/alphacam_reference/feature_geometry.py
-          tools/step_ard/feature_native_14.py
-          tools/step_ard/build_step_ard_14.py)
+qt_add_resources(minicam "ard_whole_body_driver" PREFIX "/ard-import" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    FILES tools/translator_trace/bulk_conversion_probe.py
+          tools/translator_trace/solidlink_bulk_worker.py
+          tools/ard_import/read_ard_body.py
+          tools/step_ard/feature_cls_session_14.ps1
+          tools/step_ard/feature_cls_invocation.cs)
 if(MINICAM_WITH_ALPHACAM_EXPORT)
     add_subdirectory(modules/alphacam)
     target_sources(minicam PRIVATE app/ArdSolidExport.cpp app/ArdSolidExport.h)
@@ -210,6 +215,9 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(ard-whole-body-test tools/ard/WholeBodyImportTest.cpp)
+    target_link_libraries(ard-whole-body-test PRIVATE minicam-ard-whole-body TKPrim)
+    add_test(NAME ard-whole-body-conversion COMMAND ard-whole-body-test)
     qt_add_executable(layers-panel-test tools/layers/LayersPanelTest.cpp app/LayersPanel.cpp app/LayersPanel.h)
     target_include_directories(layers-panel-test PRIVATE app)
     target_link_libraries(layers-panel-test PRIVATE Qt6::Widgets)

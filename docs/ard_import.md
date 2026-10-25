@@ -8,11 +8,12 @@ Odczyt pozostaje częściowy w odniesieniu do wszystkich danych ALPHACAM.
 ## Stacja Windows
 
 Dla geometrii 2D wystarcza MiniCam. ARD zawierający bryłę wymaga działającej
-instalacji ALPHACAM/Feature 2025.4, bieżącej licencji CLS, Pythona 3 x64 i wcześniej
-przygotowanego runtime `alphacam-export`. MiniCam używa istniejących ustawień
-Python, modułu i folderu ALPHACAM (`QSettings MiniCAM/MiniCAM`, klucze
-`alphacam/python`, `alphacam/runtime`, `alphacam/root`). Sprawdza się je w menu
-Plik w ustawieniach ALPHACAM. Nie zmieniamy konfiguracji ani sposobu eksportu.
+instalacji składników ALPHACAM/SolidLink 2025.4, bieżącej licencji CLS i Pythona
+3 x64. MiniCam używa istniejących ustawień Python, folderu ALPHACAM i pliku
+SolidLink.exe (`QSettings MiniCAM/MiniCAM`, klucze `alphacam/python`,
+`alphacam/root`, `alphacam/solidlink`). Sprawdza się je w menu Plik
+w ustawieniach ALPHACAM. Odczyt nie wymaga już runtime `alphacam-export`;
+runtime i dotychczasowy mechanizm zapisu pozostają potrzebne przy eksporcie.
 Sam folder z DLL przeniesiony z innego komputera nie zastępuje instalacji/licencji.
 
 ALPHACAM musi być zamknięty podczas odczytu bryły, tak jak podczas eksportu.
@@ -20,13 +21,13 @@ Okno pokazuje postęp. Nie przerywa się pracy przez Escape ani zamknięcie okna
 postępu, gdy osobny proces jest właścicielem sesji CLS: worker kończy pracę
 z własnymi limitami czasu i zamyka sesję licencji. Program nie ładuje bibliotek
 producenta do procesu edytora. Sprawdzane są przypięte wersje/SHA-256, tak jak
-w potwierdzonym teście v6; nie rozluźniamy weryfikacji dla innych instalacji.
+w potwierdzonym teście konwersji v4; nie rozluźniamy weryfikacji dla innych instalacji.
 
 Skrypty odczytu są wbudowane w program jako zasoby Qt. Przy otwieraniu MiniCam
-rozpakowuje je do katalogu tymczasowego i nakłada na prywatną kopię istniejącego
-runtime. Nie wymaga podmiany paczki eksportowej ani nadpisywania jej plików.
+rozpakowuje je do katalogu tymczasowego. Nie wymaga podmiany paczki eksportowej
+ani nadpisywania jej plików. Aktualizacja tej ścieżki wymaga przebudowania MiniCam.
 Foldery zleceń i raporty są w lokalnych danych aplikacji: `ard-import/jobs/<id>`;
-ścieżka pojawia się przy błędzie. Zawierają prywatny model i kopię runtime,
+ścieżka pojawia się przy błędzie. Zawierają prywatny model i wynikowy STEP,
 więc nie należy publikować całego folderu w repozytorium.
 
 Jeżeli bryła jest nieobsługiwana, brakuje składników lub wystąpi błąd konwersji,
@@ -46,40 +47,52 @@ są zachowywane w źródle i zgłaszane; nieznane układy rekordów są odrzucan
 a nie przeszukiwane po markerach binarnych.
 
 Dla jednej bryły z rekordu Feature v3 wydzielany jest oryginalny binarny Parasolid.
-Feature w osobnym workerze odczytuje geometrię. MiniCam sprawdza zgodność skrótów
-ARD, Parasolid i JSON, liczniki oraz wymiary. Wspólny moduł
-`modules/ard_import/FeatureGeometry` tworzy bezpośrednio kształt OCCT:
-linie/łuki, płaszczyzny, cylindry i stożki wraz z pętlami oraz otworami.
-Sprawdza pola ścian, zamknięcie i poprawność bryły oraz zachowanie liczników.
-Nie używa siatki ani prostopadłościanu jako zamiennika modelu.
+Osobny proces utrzymuje zwykłą sesję CLS, a worker wywołuje oryginalny
+`SLInterop::RunInteropStandard`, który konwertuje **cały dokument Parasolid na
+STEP**. Nie uruchamia ALPHACAM, nie korzysta z jego API i nie odczytuje krawędzi
+przez Feature. Nie wraca automatycznie do rekonstrukcji analitycznej.
 
-Odtwarzamy również pełne okręgi (z tym samym wierzchołkiem na obu końcach),
-półokręgi określone zakresem sąsiedniego walca oraz jednoznaczne odcinki elips
-na przecięciu płaszczyzny z walcem. Obsługiwane są szwy zamkniętych walców.
-Nie obsługujemy jeszcze wielu brył, dowolnych NURBS, torusów i kul. Kolory ścian
-są pomijane, ponieważ getter Feature.Color wymaga nieobsługiwanych ustawień
-rysunku ALPHACAM. Nieznane powierzchnie i niespójna geometria powodują błąd.
-[Zakres rekonstrukcji i narzędzie offline](../tools/ard_import/occt/README.md).
+MiniCam odrzuca ujemne/częściowe wyniki, awarię procesu i niepotwierdzone zamknięcie
+CLS. `modules/ard_import/WholeBodyImport` sprawdza zgodność skrótów ARD, X_B i STEP,
+pełny raport konwersji, a następnie używa tego samego `camcore::importModel`
+co zwykłe otwieranie STEP. OCCT musi zwrócić jedną poprawną bryłę, zamknięte
+powłoki, skończone wymiary i dodatnią objętość, bez dodatkowych obiektów poza bryłą.
+STEP jest ponownie sprawdzany po odczycie, aby wykryć zmianę pliku w trakcie.
+Nie ma dopasowywania położenia, skalowania do oczekiwanych wymiarów ani zamiany
+modelu na siatkę. Kolory dostępne w STEP przechodzą przez istniejący czytnik XCAF.
+
+Obsługiwany zakres powierzchni zależy teraz od konwersji SolidLink i czytnika STEP
+OCCT. Nie stosujemy listy dopuszczonych powierzchni dawnego czytnika analitycznego.
+Wiele brył pozostaje nieobsługiwane. Ograniczenia parsera rekordów ARD, geometrii
+2D i danych CAM pozostają niezależne od konwersji bryły.
 
 ## Sprawdzenie i ograniczenia dowodów
 
 - Kompilacja aplikacji na Linux, z modułem eksportu i bez niego.
-- CTest: syntetyczne kontury/warstwy ARD, rekonstrukcja bryły, walidacja raportu,
-  istniejące testy warstw eksportu i aktualnego modelu STEP.
-- Testy odrzucają niewłaściwy hash źródła/Parasolid/JSON, niezgodne liczniki lub
-  wymiary, negatywny raport, zmieniony runtime i niedozwolony zapis.
-- Na rzeczywistym raporcie v6 ten sam moduł, którego używa GUI, odtworzył poprawną
-  bryłę: 48 ścian, 126 krawędzi, 80 wierzchołków, 400×600×18 mm.
-- Sam natywny odczyt Feature potwierdzono w raporcie z Windows. Rekonstrukcję,
-  zapis i ponowny odczyt STEP oraz widok w MiniCam sprawdzono na Linux.
+- CTest: walidacja wyniku całej konwersji, zachowanie położenia i wymiarów STEP,
+  odrzucenie niezgodnych źródeł/wyników, błędów CLS, częściowego wyniku i dodatkowej
+  geometrii; istniejące testy ARD i eksportu.
+- Raport Windows v4 potwierdza sukces oryginalnego SLInterop, niezmienione wejścia
+  i poprawne zakończenie CLS bez uruchamiania ALPHACAM. Cały test trwał 3,596927 s,
+  a sama funkcja konwersji 0,071709 s. To czasy tego jednego testu, nie pomiar GUI.
+- Ten sam moduł C++ co GUI odczytał powstały STEP w OCCT: jedna poprawna bryła,
+  63 ściany, 158 krawędzi, 100 wierzchołków, 1200×2300×10 mm; 64 wpisy kolorów.
+  Objętość wyniku wynosi 18140400,761265665 mm³. Nie porównano jej z niezależnym
+  pomiarem oryginalnego Parasolid; poprawność OCCT nie zastępuje takiego porównania.
 
 Pełnego przebiegu „Otwórz ARD” w nowym GUI na Windows nie wykonano jeszcze w tej
-chmurze. To wymaga sprawdzenia nowej kompilacji na stacji z istniejącym runtime.
+chmurze. To wymaga sprawdzenia nowej kompilacji na stacji z zainstalowanymi składnikami.
 Nie deklarujemy obsługi każdego ARD ani niezależnego potwierdzenia objętości
 oryginalnego Parasolid. Prywatne modele i runtime nie są dodawane do repozytorium.
 
 Szczegóły poprawki powielania warstw i pozostałe ograniczenia kolorów/uchwytów:
 [warstwy ARD](ard_layers.md).
+
+## Historia poprzedniej ścieżki odczytu
+
+Poniższe sekcje opisują wcześniejszy czytnik Feature i rekonstrukcję analityczną.
+Narzędzia oraz testy offline zachowano, ale aktualne „Otwórz ARD” używa konwersji
+całej bryły opisanej powyżej. [Narzędzie historyczne](../tools/ard_import/occt/README.md).
 
 ## Większe bryły — poprawka limitu 25.10.2026
 

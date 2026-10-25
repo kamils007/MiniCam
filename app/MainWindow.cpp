@@ -601,7 +601,8 @@ void MainWindow::openFile(const QString& path)
                 solid = readArdSolid(bytes, document, this);
                 document.warnings.erase(std::remove(document.warnings.begin(), document.warnings.end(),
                     camcore::kArdSolidConversionWarning), document.warnings.end());
-                document.warnings.push_back("Kolory scian bryly nie zostaly odtworzone.");
+                if (solid.colors.empty())
+                    document.warnings.push_back("Kolory scian bryly nie zostaly odtworzone.");
             }
             if (document.geometries.empty() && solid.shape.IsNull())
                 throw std::runtime_error("ARD: Brak obsługiwanej geometrii do otwarcia.");

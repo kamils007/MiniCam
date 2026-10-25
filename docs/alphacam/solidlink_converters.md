@@ -332,3 +332,37 @@ z dostarczonymi DLL i przenośne granice procesu z atrapami. Nie wykonano v4
 na Windows, nie potwierdzono autoryzacji ani czasu udanej konwersji.
 Sukces funkcji bez nowego kompletnego STEP, zgodności wejść, poprawnego
 sprzątania i późniejszego sprawdzenia geometrii nie wystarcza do integracji.
+
+## Wynik v4 i podłączenie do otwierania ARD
+
+Raport użytkownika v4 potwierdza powodzenie oryginalnego RunInteropStandard
+(`original_return=true`, wynik 0, brak częściowego powodzenia), zakończenie
+obu procesów kodem 0, niezmienione ARD/X_B i poprawne zamknięcie CLS.
+`acam_used=false`. Cały test trwał 3,596927 s; całe wywołanie konwersji
+0,071709 s. Błędy autoryzacji i ostrzeżenia o bibliotekach zniknęły z podsumowania
+dziennika. Klasyfikacja CLS 348 pozostała false, projekcja wynosiła 0 — niczego
+nie wymuszano. Ponieważ względem v3 zmieniono warstwę wejściową i dodano bieżącą
+sesję CLS, nie rozdzielono udziału tych dwóch zmian w uzyskaniu powodzenia.
+
+Wynikowy STEP: 153174 bajty, SHA-256
+`128e38678cfab4e7ca977e87f479b260edb063a26531e29a7d7b88508f3272a9`.
+Ten sam czytnik STEP/XCAF i walidator co w integracji GUI odczytał go na Linux:
+jedna poprawna zamknięta bryła, 63 ściany, 158 krawędzi, 100 wierzchołków,
+wymiary około 1200×2300×10 mm, 64 wpisy kolorów. Objętość wyniku
+18140400,761265665 mm³, pole 4043194,0326367496 mm². Nie wykonano niezależnego
+porównania objętości, topologii i kolorów z oryginalnym Parasolid. Są to wyniki
+sprawdzenia STEP, nie deklaracja pełnej zgodności wszystkich danych ARD.
+Model i pełny raport pozostają poza repozytorium.
+
+„Otwórz ARD” korzysta teraz z tej konwersji całej bryły. Skrypty v4 i helper CLS
+są zasobami Qt; odczyt nie wymaga prywatnego runtime eksportu. C++ sprawdza
+tożsamość wejść i wyniku, pełny sukces workerów/CLS oraz poprawność bryły OCCT,
+a następnie przekazuje model wraz z kolorami do dotychczasowego widoku.
+Nie ma automatycznego powrotu do rekonstrukcji analitycznej. Zapis zachowuje
+dotychczasowy mechanizm. Po błędzie aktualny dokument pozostaje otwarty.
+
+Sprawdzenia: kompilacja aplikacji na Linux z eksportem i bez eksportu, 6 testów
+CTest (w tym nowy walidator konwersji i zachowania położenia), 17 przenośnych
+testów granicy procesu konwersji i 19 testów wcześniejszego czytnika/parsera.
+Natywne wykonanie v4 potwierdził raport Windows użytkownika. Pełnego przebiegu
+nowego GUI Windows i jego czasu otwierania nie zmierzono jeszcze.

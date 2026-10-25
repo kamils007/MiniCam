@@ -1,7 +1,7 @@
 {
   "schema": "minicam-spatial-interop-static-reference-v1",
   "analysis_date": "2026-10-25",
-  "scope": "Static PE exports, imports and selected native call sites. No DLL execution, conversion or performance measurement.",
+  "scope": "Static PE exports/imports and selected call sites, with user-provided Windows v4 execution evidence and cloud OCCT validation of its STEP. No Windows execution in the cloud.",
   "architecture": "Windows AMD64, LLP64; native long is signed 32-bit, pointers are 64-bit",
   "files": [
     {
@@ -286,11 +286,11 @@
     "interpretation": "This method uses a SAT intermediate document. The method name is not evidence of a STEP file writer."
   },
   "not_verified": [
-    "Successful Parasolid-to-STEP or Parasolid-to-IGES conversion on Windows",
-    "Available licensed output formats through these installed components",
-    "Supported standalone initialization for MiniCam",
-    "Bulk output validity and fidelity against the source solid",
-    "Native conversion runtime or improvement over current MiniCam import"
+    "Other stations, component versions, Parasolid-to-IGES and other output formats",
+    "All installed licensed output formats beyond the successful STEP example",
+    "A vendor-supported general standalone SDK contract beyond the pinned adapter",
+    "Independent source Parasolid versus output STEP fidelity and color comparison",
+    "New GUI Windows runtime and same-input comparison against the old reader"
   ],
   "bulk_probe_v2_cpp_entry": {
     "convert_rva": "0x50a0",
@@ -335,6 +335,27 @@
       }
     ],
     "argument_ownership": "Three by-value CStringW arguments are destroyed by the original callee; no second destruction after transfer.",
-    "native_verified": false
+    "native_verified": true,
+    "windows_evidence": {
+      "report_schema": "minicam-solidlink-bulk-probe-v4",
+      "native_return": true,
+      "native_result": 0,
+      "cls_ready_valid": true,
+      "cls_normal_close_confirmed": true,
+      "acam_used": false,
+      "input_ard_unchanged": true,
+      "payload_unchanged": true,
+      "total_seconds": 3.596927,
+      "whole_document_conversion_seconds": 0.071709,
+      "output_size_bytes": 153174,
+      "output_sha256": "128e38678cfab4e7ca977e87f479b260edb063a26531e29a7d7b88508f3272a9",
+      "occt_valid": true,
+      "occt_solids": 1,
+      "occt_faces": 63,
+      "occt_edges": 158,
+      "occt_vertices": 100,
+      "independent_source_geometry_compared": false,
+      "new_gui_windows_end_to_end_verified": false
+    }
   }
 }

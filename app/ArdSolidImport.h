@@ -4,6 +4,7 @@
 #include <QByteArray>
 class QWidget;
 
-// Feature runs only in its isolated worker. Failure leaves current document intact.
+// Whole-body conversion runs in isolated SolidLink/CLS workers, followed by the
+// normal STEP reader. Failure leaves the current document intact.
 camcore::ImportedModel readArdSolid(const QByteArray& source,
                                    const camcore::ArdDocument& document, QWidget* parent);

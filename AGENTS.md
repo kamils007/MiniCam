@@ -16,6 +16,9 @@ w ARD (Parasolid → format odczytywany przez OCCT), bez uruchamiania ALPHACAM
 i bez API jego działającej aplikacji. Użytkownik wyraźnie odrzucił powrót do
 optymalizacji odczytu krawędzi i odbudowy geometrii jako kierunku tego etapu.
 Nie zastępuj ustalonej konwersji taką odbudową bez nowego polecenia użytkownika.
-Obecny czytnik i eksport zachowujemy do czasu potwierdzenia nowej ścieżki.
+Raport Windows v4 potwierdził konwersję całej bryły (3,6 s z przygotowaniem,
+0,07 s sama konwersja). „Otwórz ARD” podłączono do tej ścieżki; wymaga jeszcze
+sprawdzenia nowej kompilacji GUI na stacji Windows. Dotychczasowy eksport
+pozostaje zachowany. Szczegóły i granice dowodów: [otwieranie ARD](docs/ard_import.md).
 Dowody prób, błędy licencji i ograniczenia opisuje
 [analiza SolidLink](docs/alphacam/solidlink_converters.md).
