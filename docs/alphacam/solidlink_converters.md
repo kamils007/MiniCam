@@ -213,3 +213,47 @@ Surowy dziennik pozostaje na stacji; raport obejmuje jedynie jego wielkość
 i liczniki stałych słów diagnostycznych. Słowa nie są traktowane jako diagnoza.
 Wynik v2 wymaga ponownej próby Windows. W chmurze sprawdzono kontrakty eksportów
 z dostarczonymi DLL oraz 7 przenośnych kontroli z atrapami funkcji natywnych.
+
+## Wynik próby v2
+
+Raport użytkownika potwierdza przejście przez `original_SPAIConverter_Convert_CPP`
+na tym samym ARD i X_B co w v1 (zgodne skróty wejść). Convert nadal zwróciło
+`0x01000001` / `Failure`, bez zgłoszonego wyjątku lub częściowego powodzenia.
+StartLog, StopLog i sprzątanie zakończyły się poprawnie. Cały test trwał
+0,303470 s, a nieudane Convert 0,013661 s. Nie powstał zaakceptowany STEP.
+Źródła pozostały bez zmian. Poprawa wywołania nie rozwiązała problemu;
+przyczyna nie jest jeszcze znana.
+
+Powstał lokalny `translator_native.log`, 1045 bajtów. ZIP zawiera jedynie JSON
+z licznikami słów (m.in. jedno `failure`), bez treści dziennika. Na podstawie
+takiego podsumowania nie można ustalić przyczyny ani wykluczyć problemu
+komponentu czy przygotowania sesji. Następny krok to odczyt istniejącego
+dziennika z tej próby, bez ponawiania tego samego testu lub tworzenia kolejnej
+wersji paczki przed poznaniem nowych danych. Nie zmieniono czytnika MiniCam.
+
+## Treść dziennika v2 i próba v3
+
+Dostarczony dziennik zawiera konkretny komunikat:
+`Warning : SPAXParasolid library not loaded.` Źródło jest opisane jako
+PARASOLID, cel jako STEP; wynik pozostaje Failure. To potwierdza zgłoszenie
+niezaładowanej biblioteki przez translator. Nie rozstrzyga, czy plik nie
+istnieje, brakuje zależności, czy zawiodło inne przygotowanie komponentu.
+Wcześniejsza obserwacja procesu SolidLink pokazała SPAXParasolid.dll w
+`code/bin`; nie oznacza to jej dostępności w procesie testowym.
+
+W v2 `os.add_dll_directory` i flagi LoadLibraryEx dotyczyły naszych wywołań.
+Nie zapewniało to takiej samej ścieżki dla ewentualnych wywołań zwykłego
+LoadLibrary wewnątrz bibliotek producenta. W v3 osobny proces testowy ustawia
+SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS), rejestruje oryginalny
+folder SolidLink i po inicjalizacji jawnie ładuje SPAXParasolid.dll oraz
+SPAXStep.dll po pełnych ścieżkach. Nie zmienia PATH ani ustawień Windows.
+Niezaładowany moduł zatrzymuje próbę przed konwersją i zapisuje istnienie pliku,
+ścieżkę, WinError oraz opis błędu. Uchwyt załadowanej biblioteki pozostaje
+przechowywany do końca procesu testowego. Raport logu rozpoznaje teraz także
+konkretne ostrzeżenia o tych dwóch modułach, bez kopiowania surowego tekstu.
+
+Hipoteza dotycząca wyszukiwania DLL wymaga sprawdzenia na Windows. Samo jawne
+załadowanie DLL nie dowodzi poprawnej rejestracji komponentu ani działania
+konwersji. W chmurze przeszło 10 przenośnych testów, w tym obsługa błędu
+zależności Windows i odczyt dokładnego ostrzeżenia. Nie wykonano natywnego
+ładowania i nie zmieniono ścieżki importu w MiniCam.

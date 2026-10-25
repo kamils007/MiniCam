@@ -32,4 +32,4 @@ def package(output):
 
 
 if __name__ == '__main__':
-    print(package(HERE / 'MiniCam_konwersja_bryly_v2.zip'))
+    print(package(HERE / 'MiniCam_konwersja_bryly_v3.zip'))

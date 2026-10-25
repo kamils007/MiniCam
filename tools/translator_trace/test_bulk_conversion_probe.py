@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import struct
 import unittest
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('bulk_probe', HERE / 'bulk_conversion_probe.py')
@@ -16,12 +17,19 @@ STEP = b'ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n' + b' ' * 128 + b'ENDSEC;\nEND
 
 
 class FakeAPI:
-    def __init__(self, target, partial=False, fail_ctor=False):
+    def __init__(self, target, partial=False, fail_ctor=False, load_fail=False):
         self.target, self.is_partial, self.fail_ctor = target, partial, fail_ctor
+        self.load_fail = load_fail
         self.calls = []
 
     def initialize(self, flag):
         self.calls.append(('initialize', flag))
+
+    def load_format_libraries(self):
+        self.calls.append(('load_format_libraries',))
+        return {'modules': {'SPAXParasolid.dll': {'loaded': not self.load_fail,
+                                                'error': 'Windows error 126' if self.load_fail else None},
+                            'SPAXStep.dll': {'loaded': True}}}
 
     def document(self, storage, path):
         self.calls.append(('document', path))
@@ -102,7 +110,7 @@ class BoundaryTests(unittest.TestCase):
         self.assertTrue(report['native_conversion_succeeded'])
         self.assertFalse(report['geometry_verified'])
         kinds = [c[0] for c in calls]
-        self.assertEqual(kinds[:4], ['initialize', 'document', 'document', 'converter'])
+        self.assertEqual(kinds[:5], ['initialize', 'load_format_libraries', 'document', 'document', 'converter'])
         self.assertEqual(kinds[-6:], ['stop_log', 'file_destroy', 'converter_destroy',
                                      'document_destroy', 'document_destroy', 'shutdown'])
         self.assertIn('convert_document_cpp', kinds)
@@ -126,6 +134,39 @@ class BoundaryTests(unittest.TestCase):
         self.assertNotIn('convert', kinds)
         self.assertNotIn('document_destroy', kinds)
         self.assertEqual(kinds[-1], 'shutdown')
+
+    def test_failed_format_library_load_stops_before_conversion(self):
+        status, report, calls = self.exercise(load_fail=True)
+        self.assertEqual(status, 1)
+        self.assertIn('SPAXParasolid.dll', report['error'])
+        self.assertIn('126', report['error'])
+        self.assertNotIn('convert', [c[0] for c in calls])
+        self.assertEqual(calls[-1], ('shutdown',))
+
+    def test_native_loader_records_dependency_error_and_uses_absolute_paths(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ('SPAXParasolid.dll', 'SPAXStep.dll'):
+                (root / name).write_bytes(b'loader test double')
+            api = probe.NativeAPI.__new__(probe.NativeAPI)
+            api.directory, api.format_libraries = root, []
+            error = OSError('dependency missing')
+            error.winerror = 126
+            with patch.object(probe.C, 'CDLL', side_effect=[error, object()]) as loader:
+                report = api.load_format_libraries()
+            self.assertEqual(report['modules']['SPAXParasolid.dll']['winerror'], 126)
+            self.assertFalse(report['modules']['SPAXParasolid.dll']['loaded'])
+            self.assertTrue(report['modules']['SPAXStep.dll']['loaded'])
+            self.assertEqual(loader.call_args_list[0].args, (str(root / 'SPAXParasolid.dll'),))
+            self.assertEqual(loader.call_args_list[0].kwargs, {'winmode': 0x1100})
+
+    def test_exact_format_warning_is_included_without_raw_log(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / 'native.log'
+            log.write_text('Warning : SPAXParasolid library not loaded.\nSecret: PRIVATE_TEST_VALUE')
+            result = probe.summarize_log(log)
+            self.assertEqual(result['format_library_warnings'], ['SPAXParasolid library not loaded'])
+            self.assertNotIn('PRIVATE_TEST_VALUE', json.dumps(result))
 
     def test_incomplete_step_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

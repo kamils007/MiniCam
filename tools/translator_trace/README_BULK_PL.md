@@ -1,7 +1,9 @@
 # Proba konwersji calej bryly ARD do STEP
 
-Wersja 2 wywoluje cala oryginalna funkcje konwersji C++, lacznie z przygotowaniem
-sesji i parametrow ACIS, ktorego brakowalo w wersji 1.
+Wersja 3 sprawdza ladowanie SPAXParasolid.dll i SPAXStep.dll z pelnych sciezek
+w instalacji SolidLink. Zapisuje dokladny blad Windows, jesli ladowanie sie nie
+powiedzie. Ustawienie wyszukiwania DLL dotyczy tylko osobnego procesu testowego.
+Zachowuje pelna oryginalna funkcje konwersji C++ z wersji 2.
 
 1. Rozpakuj cala paczke do nowego folderu.
 2. Uruchom `BULK_TEST.cmd` i wybierz ARD z jedna bryla.
@@ -21,7 +23,8 @@ wybranej bryly, aby mozna bylo sprawdzic ja w OCCT. Pliki stdout/stderr
 pozostaja tylko lokalnie; nie sa automatycznie pakowane. Oryginalny dziennik
 translatora `translator_native.log` tez pozostaje lokalnie. Raport zawiera
 wylacznie stale liczniki slow diagnostycznych z dziennika, bez kopiowania
-surowego tekstu ustawien czy danych kontekstu producenta.
+surowego tekstu ustawien czy danych kontekstu producenta. Dodatkowo wykrywa
+konkretne ostrzezenia o niezaladowaniu SPAXParasolid/SPAXStep.
 
 To pierwsza proba tego kierunku konwersji, nie gotowa poprawka MiniCam.
 Kompletny plik STEP i powodzenie funkcji producenta sa sprawdzane osobno;

@@ -18,7 +18,7 @@ import time
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-SCHEMA = 'minicam-spatial-bulk-probe-v2'
+SCHEMA = 'minicam-spatial-bulk-probe-v3'
 PINS = {
     'SPAIInterop.dll': 'bb3ec37e9a2c96017bbb3234c2764af10e5fad1bae679a2ba5485ac0336eec62',
     'SPAIInteropC.dll': '6d4fa624e2ee70c1979c512ae0cc1ca0c1c79b5d1b7ffb03eb9b67cb49184bad',
@@ -62,6 +62,8 @@ def summarize_log(path):
     return {'exists': True, 'size_bytes': path.stat().st_size,
             'scan_truncated': path.stat().st_size > len(data),
             'term_counts': {word: len(re.findall(r'\b' + re.escape(word) + r'\b', text)) for word in words},
+            'format_library_warnings': [name + ' library not loaded' for name in
+                ('SPAXParasolid', 'SPAXStep') if re.search(r'\b' + name.lower() + r' library not loaded\b', text)],
             'raw_log_in_report': False}
 
 
@@ -127,7 +129,16 @@ class NativeAPI:
         for name, expected in PINS.items():
             if digest(directory / name) != expected:
                 raise RuntimeError('Nieobslugiwana wersja biblioteki: ' + name)
+        # add_dll_directory alone does not cover legacy LoadLibrary calls made
+        # inside a vendor DLL. Apply this policy only in the disposable worker.
+        kernel = C.WinDLL('kernel32.dll', use_last_error=True)
+        kernel.SetDefaultDllDirectories.argtypes = [C.c_uint32]
+        kernel.SetDefaultDllDirectories.restype = C.c_int32
+        if not kernel.SetDefaultDllDirectories(0x1000):
+            raise C.WinError(C.get_last_error())
         self.search = os.add_dll_directory(str(directory))
+        self.directory = directory
+        self.format_libraries = []
         # Absolute paths, original installation, default Windows/system search.
         libraries = {'cpp': C.CDLL(str(directory / 'SPAIInterop.dll'), winmode=0x1100),
                      'c': C.CDLL(str(directory / 'SPAIInteropC.dll'), winmode=0x1100)}
@@ -137,6 +148,25 @@ class NativeAPI:
             function.argtypes = args
             function.restype = result
             setattr(self, alias, function)
+
+    def load_format_libraries(self):
+        report = {'search_policy': 'worker_default_directories_and_registered_vendor_bin', 'modules': {}}
+        for name in ('SPAXParasolid.dll', 'SPAXStep.dll'):
+            path = self.directory / name
+            info = {'path': str(path), 'exists': path.is_file(), 'loaded': False}
+            report['modules'][name] = info
+            if not info['exists']:
+                info['error'] = 'Brak pliku w wybranym folderze SolidLink.'
+                continue
+            try:
+                info['sha256'] = digest(path)
+                library = C.CDLL(str(path), winmode=0x1100)
+                self.format_libraries.append(library)
+                info['loaded'] = True
+            except OSError as error:
+                info['winerror'] = getattr(error, 'winerror', None)
+                info['error'] = str(error)
+        return report
 
     @staticmethod
     def cpp_result(function, owner, *arguments):
@@ -218,6 +248,11 @@ def worker(directory, source, destination, result_path, api_factory=NativeAPI):
         # Same true flag as original SLInterop's SPAISystemInitGuard call.
         timed('initialize', api.initialize, True)
         initialized = True
+        state['format_library_loading'] = timed('load_format_libraries', api.load_format_libraries)
+        checkpoint('format_library_load_results')
+        for name, info in state['format_library_loading']['modules'].items():
+            if info.get('loaded') is not True:
+                raise RuntimeError('Nie udalo sie zaladowac ' + name + ': ' + info.get('error', 'brak szczegolow'))
         source_handle, source_object = construct('document', source)
         target_handle, target_object = construct('document', destination)
         converter_handle, converter_object = construct('converter')
