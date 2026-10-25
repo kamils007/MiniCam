@@ -152,3 +152,35 @@ zmieniano konfiguracji ani kodu bibliotek. Nie ma nowego pomiaru wydajności.
 Przed podłączeniem do MiniCam potrzebna jest natywna próba z właściwym
 przygotowaniem, a następnie odczyt wyniku przez OCCT i porównanie bryły ze
 źródłem. Dotychczasowy czytnik MiniCam i eksport ALPHACAM pozostają bez zmian.
+
+## Próba konwersji całej bryły — paczka v1
+
+`tools/translator_trace/bulk_conversion_probe.py` przygotowuje samodzielny test
+Windows. Używa oryginalnego SPAISystem::Initialize(true) oraz konstruktorów
+SPAIDocument/SPAIConverter, zachowując przygotowanie producenta. Uchwyty
+otrzymuje wyłącznie przez eksport GetData; właściwą konwersję wykonuje
+SPAICConverter_Convert. Nie wywołuje funkcji pozyskujących materiał
+autoryzacyjny i nie odtwarza go ze stałych ani raportów.
+
+Nie stosuje odtworzonej definicji klasy C++. Oryginalny konstruktor otrzymuje
+24-bajtową pamięć z obszarami kontrolnymi. Rozmiar potwierdza konstruktor
+SPAIObject przy RVA 0x9e30 (trzy pola po 8 bajtów), brak dodatkowych pól
+w konstruktorach SPAIDocument i SPAIConverter oraz odstępy 24 bajtów pomiędzy
+obiektami w kodzie SLInterop. GetData ma RVA 0x9e90, konstruktory dokumentu
+UTF-16/konwertera 0x5ea0/0x4a40, a destruktory 0x6040/0x4bc0. Wszystkie
+wywołania dotyczą wyłącznie przypiętego SHA-256 wersji x64 z tego raportu;
+brak nagłówków SDK ogranicza przenośność tego eksperymentalnego adaptera.
+
+Rodzic strukturalnie wyjmuje X_B z ARD, uruchamia proces testowy i daje mu
+90 sekund. Każdy etap zapisuje osobny punkt kontrolny i czas. Wynik wymaga
+powodzenia bez częściowego wyniku/wyjątku, nowego kompletnego STEP, zgodnego
+skrótu wyjścia, niezmienionego źródła oraz poprawnego zakończenia procesu.
+`geometry_verified` pozostaje false: nagłówek STEP nie potwierdza bryły.
+Raport ZIP obejmuje JSON i, tylko przy takim wyniku, nowy STEP do niezależnego
+sprawdzenia. Pakiet nie zawiera bibliotek producenta ani modelu testowego.
+
+Przenośne testy korzystają z atrap natywnych funkcji; sprawdzają kolejność
+oryginalnego tworzenia/sprzątania obiektów, odrzucenie częściowego wyniku,
+kontrolę pamięci i korelację wyjętego X_B z ARD. Nie wykonano wywołań Windows
+w chmurze. Nie potwierdzono jeszcze, że samodzielne przygotowanie wystarczy
+do konwersji Parasolid→STEP na stacji, i nie zmieniono importu w MiniCam.
