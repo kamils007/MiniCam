@@ -132,8 +132,12 @@ class GeometryTests(unittest.TestCase):
             self.assertEqual(body.get('ID'),1)
             with body.get('a') as first: first_id=first.get('ID')
             with body.get('alias') as alias: self.assertEqual(alias.get('ID'),first_id)
+            verified_comparisons = len(compared)
+            for _ in range(10):
+                with body.get('alias') as alias: self.assertEqual(alias.get('ID'),first_id)
+            self.assertEqual(len(compared),verified_comparisons)
             with body.get('b') as other: self.assertNotEqual(other.get('ID'),first_id)
-        self.assertEqual(retained,[1,10,12])
+        self.assertEqual(retained,[1,10,11,12])
         self.assertEqual(released,retained)
         self.assertIn((11,10),compared)
 
@@ -149,6 +153,28 @@ class GeometryTests(unittest.TestCase):
                 root.get('ID')
                 with root.get('other') as other:other.get('ID')
         self.assertCountEqual(released,[10,1])
+
+    def test_topology_scaled_budget_and_sampled_comparisons_pass_report_failure_point(self):
+        import io
+        import json
+        from feature_geometry import GeometryOperations
+        trace = io.StringIO()
+        operations = GeometryOperations(trace, {'Faces':210, 'Edges':609, 'Vertices':406})
+        for _ in range(250001):
+            operations.before('call', 'IsSame')
+        operations.before('get', 'Vertices')
+        operations.finish()
+        records = [json.loads(line) for line in trace.getvalue().splitlines()]
+        self.assertEqual(records[-2]['member'], 'Vertices')
+        self.assertEqual(records[-1]['operation_count'], 250002)
+        self.assertLess(len(records), 2000)
+        self.assertGreater(operations.limit, 250002)
+        self.assertLessEqual(operations.limit, 20000000)
+        operations.sequence = operations.limit
+        with self.assertRaisesRegex(RuntimeError, 'Geometry operation limit exceeded'):
+            operations.before('get', 'Vertices')
+        with self.assertRaises(ValueError):
+            GeometryOperations(io.StringIO(), {'Faces':True, 'Edges':609, 'Vertices':406})
 
 
 if __name__ == '__main__': unittest.main()

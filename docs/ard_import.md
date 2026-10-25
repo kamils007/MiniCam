@@ -78,3 +78,29 @@ oryginalnego Parasolid. Prywatne modele i runtime nie są dodawane do repozytori
 
 Szczegóły poprawki powielania warstw i pozostałe ograniczenia kolorów/uchwytów:
 [warstwy ARD](ard_layers.md).
+
+## Większe bryły — poprawka limitu 25.10.2026
+
+Raport użytkownika potwierdził udany ImportAs (jedna bryła), ważną licencję CLS
+oraz prawidłowe zakończenie procesów, ale ekstrakcja zatrzymała się błędem
+`Geometry operation limit exceeded`. Model miał 210 ścian, 609 krawędzi i 406
+wierzchołków. Spośród 250000 operacji aż 237471 stanowiły porównania IsSame;
+nie powstał kompletny plik geometrii. Nie był to raport błędu licencji ani
+wcześniejszego `Unsupported edge type`.
+
+Budżet odczytu zależy teraz od zmierzonych liczników: max(250000, 8 × N²),
+N = suma ścian, krawędzi i wierzchołków, z górną granicą 20000000 operacji.
+Dla tego raportu wynosi 12005000. Limit czasu procesu Feature pozostaje 90 s.
+Zapamiętujemy tożsamość wcześniej zweryfikowanych interfejsów; każda zapamiętana
+referencja, również alias, jest utrzymywana do końca ekstrakcji, aby nie pomylić
+ponownie użytego adresu COM. Pamięć i liczba referencji nadal mają limit.
+Dziennik próbkuje powtarzające się IsSame, zachowując wszystkie inne operacje
+oraz końcowe liczniki. Błąd natywny trafia do komunikatu odczytu zamiast znikać
+za ogólnym „odczyt niepotwierdzony”.
+
+Przeszło 15 testów czytnika Python, 26 regresji backendu, kompilacja aplikacji
+i 5 testów CTest na Linux. Odtworzenie 250000 zarejestrowanych operacji przeszło
+przez nowy budżet; dziennik zmalał z ok. 15,6 MB do ok. 0,81 MB. To kontrola
+limitu i logowania, nie ponowne wykonanie COM. Pełnego natywnego odczytu tego
+modelu po poprawce nie wykonano jeszcze na Windows. Zmiana wymaga ponownej
+kompilacji MiniCam, ponieważ skrypty odczytu są wbudowane w zasoby aplikacji.

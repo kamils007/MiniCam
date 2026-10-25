@@ -185,7 +185,12 @@ def validate_read(native, expected_hash, validate_cls, validate_measurement, val
             or summary.get('bodies_after_count') != 1
             or any(summary.get(k) is not True for k in ('host_selftest_ok', 'host_context_bound',
                 'text_table_initialized', 'import_succeeded_with_bodies'))):
-        raise ValueError('Odczyt bryly niepotwierdzony; sprawdz raport Feature.')
+        error = summary.get('native_error') or {}
+        detail = error.get('message', '') if isinstance(error, dict) else ''
+        if detail.startswith('Geometry operation limit exceeded'):
+            raise ValueError('Przekroczono limit operacji odczytu geometrii bryly. ' + detail)
+        raise ValueError('Odczyt bryly niepotwierdzony; sprawdz raport Feature.'
+                         + (' Szczegoly: ' + detail if detail else ''))
     result = stage.get('result', {})
     model = result.get('model_probe', {})
     if model.get('measurement_only_completed') is not True or 'save' in model or 'object_serialization' in model:

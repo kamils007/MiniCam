@@ -6,12 +6,27 @@ class SnapshotIds:
     """Snapshot-local IDs, verified by native IsSame, independent of Feature.ID."""
     def __init__(self):
         self.groups = {}
+        self.pointers = {}
+        self.pins = []
         self.next_id = 1
+
+    def remember(self, obj, group, number):
+        # Pin every cached alias, not just the representative: otherwise COM
+        # could reuse a released pointer for a different object later on.
+        if len(self.pins) >= 300000:
+            raise RuntimeError('Too many retained snapshot interfaces')
+        retained = obj.retain()
+        self.pins.append(retained)
+        self.pointers[(group, obj.pointer)] = number
+        return retained
 
     def assign(self, obj):
         group = obj.describe().get('name')
         if not group:
             raise RuntimeError('Cannot identify Feature interface type')
+        cached = self.pointers.get((group, obj.pointer))
+        if cached is not None:
+            return cached
         entries = self.groups.setdefault(group, [])
         for number, retained in entries:
             if obj.pointer == retained.pointer:
@@ -20,19 +35,21 @@ class SnapshotIds:
             if type(same) is not bool:
                 raise RuntimeError('Feature.IsSame did not return a boolean')
             if same:
+                self.remember(obj, group, number)
                 return number
         if self.next_id > 300000:
             raise RuntimeError('Too many snapshot objects')
-        retained = obj.retain()
+        retained = self.remember(obj, group, self.next_id)
         number = self.next_id
         self.next_id += 1
         entries.append((number, retained))
         return number
 
     def close(self):
-        for entries in self.groups.values():
-            for _, retained in entries:
-                retained.close()
+        for retained in self.pins:
+            retained.close()
+        self.pins.clear()
+        self.pointers.clear()
         self.groups.clear()
 
 

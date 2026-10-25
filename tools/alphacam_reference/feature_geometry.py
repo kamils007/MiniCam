@@ -5,8 +5,46 @@ No mutation, conversion or guessed native ABI is used. Unsupported optional
 surface properties are reported explicitly; their absence is never success.
 """
 import math
+import json
 
 MAX_ITEMS = 100000
+
+
+class GeometryOperations:
+    """Bound work by measured topology and keep repeated identity logs small."""
+    def __init__(self, stream, counts):
+        sizes = [counts.get(name) for name in ('Faces', 'Edges', 'Vertices')]
+        if any(type(n) is not int or not 1 <= n <= MAX_ITEMS for n in sizes):
+            raise ValueError('Invalid measured topology counts')
+        self.stream = stream
+        # IsSame comparisons are quadratic in each interface collection. A
+        # fixed 250k budget stopped the user's valid 210/609/406-element body.
+        self.limit = min(20000000, max(250000, 8 * sum(sizes) ** 2))
+        self.sequence = self.comparisons = self.logged = 0
+
+    def before(self, operation, name, argument=None):
+        self.sequence += 1
+        if self.sequence > self.limit:
+            raise RuntimeError('Geometry operation limit exceeded: ' + str(self.limit))
+        if name == 'IsSame':
+            self.comparisons += 1
+            if self.sequence > 1000 and self.sequence % 1000:
+                return
+        record = {'sequence': self.sequence, 'operation': operation, 'member': name}
+        if name == 'Item':
+            record['index'] = argument
+        self.stream.write(json.dumps(record) + '\n')
+        self.stream.flush()  # retain the last getter if the native host exits
+        self.logged += 1
+
+    def stats(self):
+        return {'operation_count': self.sequence, 'operation_limit': self.limit,
+                'is_same_count': self.comparisons, 'logged_operation_count': self.logged,
+                'is_same_log_sampled': True}
+
+    def finish(self):
+        self.stream.write(json.dumps({'operation': 'summary', **self.stats()}) + '\n')
+        self.stream.flush()
 
 
 def boolean(value):

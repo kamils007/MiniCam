@@ -47,6 +47,14 @@ def validate(value):
 
 
 class ReadArdTests(unittest.TestCase):
+    def test_native_geometry_limit_is_reported_instead_of_generic_read_failure(self):
+        value = proof()
+        summary = value['feature']['stages'][0]['summary']
+        summary['stop_reason'] = 'native_or_probe_error'
+        summary['native_error'] = {'type': 'RuntimeError', 'message': 'Geometry operation limit exceeded'}
+        with self.assertRaisesRegex(ValueError, 'Przekroczono limit operacji odczytu geometrii'):
+            validate(value)
+
     def test_changed_valid_document_is_accepted_and_actual_hash_reported(self):
         data, expected = fixture()
         changed = data[:31] + b'j' + data[32:]
