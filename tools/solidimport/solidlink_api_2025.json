@@ -1,0 +1,746 @@
+{
+  "source": "solidlink_typelib.tlb",
+  "library": "SolidLink",
+  "syskind": 3,
+  "stored_pointer_size": 8,
+  "types": [
+    {
+      "index": 0,
+      "name": "ISolidLink",
+      "guid": "b9e54437-a0ad-48a3-82a7-ee8feaa81f63",
+      "kind": 4,
+      "doc": "",
+      "functions": [
+        {
+          "index": 0,
+          "name": "TranslateSolid",
+          "dispid": 1,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 0,
+          "vtable_offset_x64": 0,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [
+            {
+              "name": "szInputFile",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "szOutputFile",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "szApplicationName",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method TranslateSolid"
+        },
+        {
+          "index": 1,
+          "name": "SetDoHealing",
+          "dispid": 2,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 8,
+          "vtable_offset_x64": 8,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0000",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetDoHealing"
+        },
+        {
+          "index": 2,
+          "name": "SetHealingSewingTolerance",
+          "dispid": 3,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 16,
+          "vtable_offset_x64": 16,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0001",
+              "flags": 0,
+              "type": {
+                "vt": 5,
+                "name": "R8"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetHealingSewingTolerance"
+        },
+        {
+          "index": 3,
+          "name": "SetHealingSimplificationTolerance",
+          "dispid": 4,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 24,
+          "vtable_offset_x64": 24,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0002",
+              "flags": 0,
+              "type": {
+                "vt": 5,
+                "name": "R8"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetHealingSimplificationTolerance"
+        },
+        {
+          "index": 4,
+          "name": "SetInteropOptionsFile",
+          "dispid": 5,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 32,
+          "vtable_offset_x64": 32,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0003",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetInteropOptionsFile"
+        },
+        {
+          "index": 5,
+          "name": "SetOutputUnits",
+          "dispid": 6,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 40,
+          "vtable_offset_x64": 40,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0004",
+              "flags": 0,
+              "type": {
+                "vt": 3,
+                "name": "I4"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetOutputUnits"
+        },
+        {
+          "index": 6,
+          "name": "SetOutputTolerance",
+          "dispid": 7,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 48,
+          "vtable_offset_x64": 48,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0005",
+              "flags": 0,
+              "type": {
+                "vt": 5,
+                "name": "R8"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetOutputTolerance"
+        },
+        {
+          "index": 7,
+          "name": "SetOutputLogFile",
+          "dispid": 8,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 56,
+          "vtable_offset_x64": 56,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0006",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetOutputLogFile"
+        },
+        {
+          "index": 8,
+          "name": "SetOutputVersion",
+          "dispid": 9,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 64,
+          "vtable_offset_x64": 64,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0007",
+              "flags": 0,
+              "type": {
+                "vt": 3,
+                "name": "I4"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetOutputVersion"
+        },
+        {
+          "index": 9,
+          "name": "GetInteropResult",
+          "dispid": 10,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 72,
+          "vtable_offset_x64": 72,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [],
+          "optional_parameter_count": 0,
+          "doc": "method GetInteropResult"
+        },
+        {
+          "index": 10,
+          "name": "SetTranslateSheetBodies",
+          "dispid": 11,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 80,
+          "vtable_offset_x64": 80,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0008",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetTranslateSheetBodies"
+        },
+        {
+          "index": 11,
+          "name": "GetFileType",
+          "dispid": 12,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 88,
+          "vtable_offset_x64": 88,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [
+            {
+              "name": "szInputFile",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method GetFileType"
+        },
+        {
+          "index": 12,
+          "name": "GetConfigNames",
+          "dispid": 13,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 96,
+          "vtable_offset_x64": 96,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0009",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "__MIDL__ISolidLink0010",
+              "flags": 0,
+              "type": {
+                "vt": 26,
+                "name": "PTR",
+                "element": {
+                  "vt": 8,
+                  "name": "BSTR"
+                }
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method GetConfigNames"
+        },
+        {
+          "index": 13,
+          "name": "SetConfigName",
+          "dispid": 14,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 104,
+          "vtable_offset_x64": 104,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0011",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetConfigName"
+        },
+        {
+          "index": 14,
+          "name": "SetSimplifyAndHeal",
+          "dispid": 15,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 112,
+          "vtable_offset_x64": 112,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0012",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetSimplifyAndHeal"
+        },
+        {
+          "index": 15,
+          "name": "SendLicenseString",
+          "dispid": 16,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 120,
+          "vtable_offset_x64": 120,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "szLicenseString",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SendLicenseString"
+        },
+        {
+          "index": 16,
+          "name": "SetTranslationMethod",
+          "dispid": 17,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 128,
+          "vtable_offset_x64": 128,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0013",
+              "flags": 0,
+              "type": {
+                "vt": 3,
+                "name": "I4"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetTranslationMethod"
+        },
+        {
+          "index": 17,
+          "name": "GetMaterials",
+          "dispid": 18,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 136,
+          "vtable_offset_x64": 136,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0014",
+              "flags": 0,
+              "type": {
+                "vt": 26,
+                "name": "PTR",
+                "element": {
+                  "vt": 8,
+                  "name": "BSTR"
+                }
+              }
+            },
+            {
+              "name": "__MIDL__ISolidLink0015",
+              "flags": 0,
+              "type": {
+                "vt": 26,
+                "name": "PTR",
+                "element": {
+                  "vt": 8,
+                  "name": "BSTR"
+                }
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method GetMaterials"
+        },
+        {
+          "index": 18,
+          "name": "SetCreateCadLinkFile",
+          "dispid": 19,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 144,
+          "vtable_offset_x64": 144,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0016",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetCreateCadLinkFile"
+        },
+        {
+          "index": 19,
+          "name": "SetCadLinkFileName",
+          "dispid": 20,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 152,
+          "vtable_offset_x64": 152,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0017",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetCadLinkFileName"
+        },
+        {
+          "index": 20,
+          "name": "ConfirmParasolidLicensed",
+          "dispid": 21,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 160,
+          "vtable_offset_x64": 160,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0018",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method ConfirmParasolidLicensed"
+        },
+        {
+          "index": 21,
+          "name": "SetParameterBool",
+          "dispid": 22,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 168,
+          "vtable_offset_x64": 168,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0019",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "__MIDL__ISolidLink0020",
+              "flags": 0,
+              "type": {
+                "vt": 11,
+                "name": "VARIANT_BOOL"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetParameterBool"
+        },
+        {
+          "index": 22,
+          "name": "SetParameterDouble",
+          "dispid": 23,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 176,
+          "vtable_offset_x64": 176,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0021",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "__MIDL__ISolidLink0022",
+              "flags": 0,
+              "type": {
+                "vt": 5,
+                "name": "R8"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetParameterDouble"
+        },
+        {
+          "index": 23,
+          "name": "SetParameterLong",
+          "dispid": 24,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 184,
+          "vtable_offset_x64": 184,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0023",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "__MIDL__ISolidLink0024",
+              "flags": 0,
+              "type": {
+                "vt": 3,
+                "name": "I4"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetParameterLong"
+        },
+        {
+          "index": 24,
+          "name": "SetParameterString",
+          "dispid": 25,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 192,
+          "vtable_offset_x64": 192,
+          "return_native": {
+            "vt": 24,
+            "name": "VOID"
+          },
+          "parameters_native": [
+            {
+              "name": "__MIDL__ISolidLink0025",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            },
+            {
+              "name": "__MIDL__ISolidLink0026",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method SetParameterString"
+        },
+        {
+          "index": 25,
+          "name": "TranslateByConfigFiles",
+          "dispid": 26,
+          "invkind": 1,
+          "operation": "METHOD",
+          "vtable_offset_stored": 200,
+          "vtable_offset_x64": 200,
+          "return_native": {
+            "vt": 3,
+            "name": "I4"
+          },
+          "parameters_native": [
+            {
+              "name": "szConfigFilesDirectory",
+              "flags": 0,
+              "type": {
+                "vt": 8,
+                "name": "BSTR"
+              }
+            }
+          ],
+          "optional_parameter_count": 0,
+          "doc": "method TranslateByConfigFiles"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "name": "CSolidLinkDoc",
+      "guid": "948284f4-f389-4723-8eed-77ebb09a39c6",
+      "kind": 5,
+      "doc": "",
+      "functions": []
+    }
+  ],
+  "source_sha256": "283a9ce685944a12c66c0be8568e48f23eddc9efe63456deafdf308faf24ee4d",
+  "source_resource": "SolidLink.exe / TYPELIB / 1 / 1033",
+  "registered_progid": "SolidLink.Document.2025.3",
+  "registered_clsid": "80c33292-c478-4543-9dc1-5381a5156f05"
+}

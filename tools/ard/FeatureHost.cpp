@@ -116,6 +116,9 @@ HRESULT STDMETHODCALLTYPE frame(Object* o,Object** p){return objectOutput(p,&o->
 HRESULT STDMETHODCALLTYPE letter(Object*,SHORT* p){return output(p,SHORT('R'));}
 HRESULT STDMETHODCALLTYPE api(Object*,VARIANT_BOOL* p){return output(p,VARIANT_BOOL(VARIANT_TRUE));}
 HRESULT STDMETHODCALLTYPE special(Object* o,LONG* p){return output(p,o->host->specialKey);}
+// The isolated batch helper owns no undo history. Do not advertise enabling it.
+HRESULT STDMETHODCALLTYPE undoDisabledGet(Object*,VARIANT_BOOL* p){return output(p,VARIANT_BOOL(VARIANT_TRUE));}
+HRESULT STDMETHODCALLTYPE undoDisabledPut(Object* o,VARIANT_BOOL v){if(!v)return unsupported(o);return S_OK;}
 HRESULT STDMETHODCALLTYPE undo(Object* o,BSTR s){o->host->undoName=QString::fromWCharArray(s,SysStringLen(s));return S_OK;}
 HRESULT STDMETHODCALLTYPE screenGet(Object* o,VARIANT_BOOL* p){return output(p,o->host->screen);}
 HRESULT STDMETHODCALLTYPE screenPut(Object* o,VARIANT_BOOL v){o->host->screen=v;return S_OK;}
@@ -147,6 +150,7 @@ HRESULT STDMETHODCALLTYPE create(Object* o,BSTR s,Object** p){
 Host::Host(LONG key):specialKey(key){
     standard(app);standard(drawing);standard(frame);
     app.set(72,::drawing);app.set(112,::frame);app.set(272,letter);app.set(456,special);app.set(536,undo);app.set(864,api);
+    app.set(528,undoDisabledPut);app.set(696,undoDisabledGet);
     drawing.set(80,threeGet);drawing.set(88,threePut);drawing.set(160,refresh);drawing.set(352,first);drawing.set(360,count);drawing.set(368,active);drawing.set(376,setActive);drawing.set(384,create);drawing.set(392,refresh);drawing.set(1032,screenGet);drawing.set(1040,screenPut);drawing.set(1840,refresh);
     frame.set(272,projectPut);frame.set(344,projectGet);
 }
